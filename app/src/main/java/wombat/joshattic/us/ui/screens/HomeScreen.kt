@@ -5,6 +5,7 @@ package wombat.joshattic.us.ui.screens
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,17 +15,26 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PostAdd
@@ -41,6 +51,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
@@ -68,7 +79,9 @@ import android.text.TextPaint
 import android.view.View
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -123,9 +136,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             viewModel.selectTab(BottomTab.Account)
                         }
                     },
-                    shape = RoundedCornerShape(18.dp)
+                    shape = CircleShape,
+                    modifier = Modifier.size(64.dp)
                 ) {
-                    Icon(Icons.Filled.PostAdd, contentDescription = "Create post")
+                    Icon(Icons.Filled.PostAdd, contentDescription = "Create post", modifier = Modifier.size(28.dp))
                 }
             }
         },
@@ -245,7 +259,7 @@ private fun FeedTab(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (!loading && posts.isEmpty()) {
@@ -280,7 +294,7 @@ private fun ExploreTab(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -339,7 +353,7 @@ private fun NotificationsTab(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -402,7 +416,7 @@ private fun AccountTab(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (session != null) {
@@ -510,6 +524,55 @@ private fun ComposerSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var textFieldValue by remember(draft) { mutableStateOf(TextFieldValue(draft)) }
+    var showAddImage by remember { mutableStateOf(false) }
+    var imageUrl by remember { mutableStateOf("") }
+    var imageError by remember { mutableStateOf<String?>(null) }
+
+    fun updateDraft(newValue: TextFieldValue) {
+        textFieldValue = newValue
+        onDraftChange(newValue.text)
+    }
+
+    fun wrapWith(tag: String) {
+        val sel = textFieldValue.selection
+        val before = textFieldValue.text.substring(0, sel.start)
+        val selected = textFieldValue.text.substring(sel.start, sel.end)
+        val after = textFieldValue.text.substring(sel.end)
+        val open = "<$tag>"
+        val close = "</$tag>"
+        val newText = before + open + selected + close + after
+        val newStart = sel.start + open.length
+        val newEnd = newStart + selected.length
+        updateDraft(TextFieldValue(text = newText, selection = TextRange(newStart, newEnd)))
+    }
+
+    fun insertAtCursor(insert: String) {
+        val sel = textFieldValue.selection
+        val before = textFieldValue.text.substring(0, sel.start)
+        val after = textFieldValue.text.substring(sel.end)
+        val newText = before + insert + after
+        val newCursor = sel.start + insert.length
+        updateDraft(TextFieldValue(text = newText, selection = TextRange(newCursor)))
+    }
+
+    fun addImage() {
+        val url = imageUrl.trim()
+        if (url.isBlank()) {
+            imageError = "Enter an image URL"
+            return
+        }
+        val lower = url.lowercase()
+        if (!lower.contains("imgbb") && !lower.contains("cubeupload") && !lower.contains("i.ibb.co")) {
+            imageError = "Image src must be from imgbb or cubeupload"
+            return
+        }
+        insertAtCursor("<img src=\"$url\" alt=\"\">")
+        imageUrl = ""
+        imageError = null
+        showAddImage = false
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -517,20 +580,113 @@ private fun ComposerSheet(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("New post", style = MaterialTheme.typography.titleLarge)
+
+            // Rich text toolbar (scrollable for many tools)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Inline text styles
+                IconButton(onClick = { wrapWith("b") }, modifier = Modifier.size(32.dp)) {
+                    Text("B", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                IconButton(onClick = { wrapWith("i") }, modifier = Modifier.size(32.dp)) {
+                    Text("I", fontStyle = FontStyle.Italic, fontSize = 13.sp)
+                }
+                IconButton(onClick = { wrapWith("u") }, modifier = Modifier.size(32.dp)) {
+                    Text("U", textDecoration = TextDecoration.Underline, fontSize = 13.sp)
+                }
+                IconButton(onClick = { wrapWith("s") }, modifier = Modifier.size(32.dp)) {
+                    Text("S", textDecoration = TextDecoration.LineThrough, fontSize = 13.sp)
+                }
+                IconButton(onClick = { wrapWith("strong") }, modifier = Modifier.size(32.dp)) {
+                    Text("strong", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                IconButton(onClick = { wrapWith("em") }, modifier = Modifier.size(32.dp)) {
+                    Text("em", fontSize = 10.sp, fontStyle = FontStyle.Italic)
+                }
+                IconButton(onClick = { wrapWith("mark") }, modifier = Modifier.size(32.dp)) {
+                    Text("mark", fontSize = 10.sp)
+                }
+                IconButton(onClick = { wrapWith("code") }, modifier = Modifier.size(32.dp)) {
+                    Text("code", fontSize = 10.sp)
+                }
+
+                // Block elements
+                IconButton(onClick = { wrapWith("p") }, modifier = Modifier.size(32.dp)) {
+                    Text("p", fontSize = 10.sp)
+                }
+                IconButton(onClick = { wrapWith("h2") }, modifier = Modifier.size(32.dp)) {
+                    Text("h2", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                IconButton(onClick = { wrapWith("blockquote") }, modifier = Modifier.size(32.dp)) {
+                    Text("quote", fontSize = 9.sp)
+                }
+                IconButton(onClick = { wrapWith("pre") }, modifier = Modifier.size(32.dp)) {
+                    Text("pre", fontSize = 10.sp)
+                }
+
+                // Lists
+                IconButton(onClick = { insertAtCursor("<ul>\n<li></li>\n</ul>") }, modifier = Modifier.size(32.dp)) {
+                    Text("ul", fontSize = 10.sp)
+                }
+                IconButton(onClick = { insertAtCursor("<ol>\n<li></li>\n</ol>") }, modifier = Modifier.size(32.dp)) {
+                    Text("ol", fontSize = 10.sp)
+                }
+                IconButton(onClick = { wrapWith("li") }, modifier = Modifier.size(32.dp)) {
+                    Text("li", fontSize = 10.sp)
+                }
+
+                // Image (special)
+                IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(18.dp))
+                }
+            }
+
+            if (showAddImage) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = imageUrl,
+                        onValueChange = { imageUrl = it; imageError = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("https://i.ibb.co/xxx/ or imgbb.com link") },
+                        label = { Text("Image URL (imgbb or cubeupload only)") }
+                    )
+                    if (imageError != null) {
+                        Text(imageError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { addImage() }, enabled = imageUrl.isNotBlank()) {
+                            Text("Insert Image")
+                        }
+                        TextButton(onClick = {
+                            showAddImage = false
+                            imageUrl = ""
+                            imageError = null
+                        }) {
+                            Text("Cancel")
+                        }
+                    }
+                }
+            }
+
             OutlinedTextField(
-                value = draft,
-                onValueChange = onDraftChange,
-                modifier = Modifier.fillMaxWidth(),
+                value = textFieldValue,
+                onValueChange = { updateDraft(it) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
                 minLines = 6,
-                maxLines = 10,
-                placeholder = { Text("Write HTML, for example <p>Hello <strong>world</strong></p>") }
+                placeholder = { Text("Write your post. Use the toolbar above to format (bold, lists, images from imgbb/cubeupload, etc).") }
             )
+
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Preview", style = MaterialTheme.typography.titleSmall)
                     Spacer(modifier = Modifier.height(8.dp))
                     if (draft.isBlank()) {
-                        Text("Your rendered HTML will appear here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Your rendered post will appear here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         HtmlText(draft)
                     }
