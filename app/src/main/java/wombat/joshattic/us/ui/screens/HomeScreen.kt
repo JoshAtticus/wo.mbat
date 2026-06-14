@@ -1106,7 +1106,7 @@ private fun ProfileScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onClose) {
@@ -1132,12 +1132,15 @@ private fun ProfileScreen(
             return@Column
         }
 
-        // Banner
+        // Load user's banner with a subtle themed fallback background using their profile colour.
+        // Keep the banner modest so it doesn't eat the screen.
+        val accent = getUserColorSchemeColors(profile.color).first
         val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner"
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
+                .height(80.dp)
+                .background(accent.copy(alpha = 0.18f))
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -1150,17 +1153,17 @@ private fun ProfileScreen(
             )
         }
 
-        // Profile info themed by user's color
-        val accent = getUserColorSchemeColors(profile.color).first
-        Column(modifier = Modifier.padding(16.dp)) {
+        // Very compact profile info (avatar + name/status + short bio + stats).
+        // This used to take up half the screen; now it's tight so the posts list below gets real room.
+        // Text stays neutral (no forced theme colour on name/status).
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ProfilePicture(username = profile.name, size = 64.dp)
-                Spacer(modifier = Modifier.width(16.dp))
+                ProfilePicture(username = profile.name, size = 40.dp)
+                Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
                         profile.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = accent
+                        style = MaterialTheme.typography.titleLarge
                     )
                     Text(
                         text = if (profile.online) "Online now" else "Offline",
@@ -1169,37 +1172,48 @@ private fun ProfileScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")))
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Spacer(modifier = Modifier.height(6.dp))
+            HtmlText(
+                autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")),
+                maxLines = 2
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ProfileStat("Followers", profile.stats?.followers ?: 0)
                 ProfileStat("Following", profile.stats?.following ?: 0)
                 ProfileStat("Posts", profile.stats?.posts ?: 0)
             }
         }
 
-        // Posts
-        if (posts.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(posts, key = { it.id }) { post ->
-                    PostCard(
-                        post = post,
-                        onClick = { onPostClick(post) },
-                        truncated = true,
-                        onMentionClick = onMentionClick,
-                        onProfileClick = onProfileClick,
-                        onLoveClick = onLoveClick
-                    )
+        // Posts get the remaining space (via weight) so you can actually see a bunch of them.
+        // The list (or empty state) is inside a weight(1f) container instead of a sibling fillMaxSize
+        // that ignored the header above it.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            if (posts.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(posts, key = { it.id }) { post ->
+                        PostCard(
+                            post = post,
+                            onClick = { onPostClick(post) },
+                            truncated = true,
+                            onMentionClick = onMentionClick,
+                            onProfileClick = onProfileClick,
+                            onLoveClick = onLoveClick
+                        )
+                    }
                 }
-            }
-        } else {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No posts yet")
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No posts yet")
+                }
             }
         }
     }
