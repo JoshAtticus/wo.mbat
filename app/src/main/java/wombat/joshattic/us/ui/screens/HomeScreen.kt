@@ -26,11 +26,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -820,24 +822,30 @@ private fun ComposerSheet(
                 }
             }
 
-            Button(
-                onClick = {
-                    // Convert markdown to HTML AFTER pressing post. Append attached images.
-                    val md = draft
-                    val htmlText = markdownToHtml(md)
-                    val imgTags = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
-                    val fullHtml = if (imgTags.isBlank()) htmlText else "$htmlText\n$imgTags"
-                    onDraftChange(fullHtml)
-                    onSubmit()
-                },
-                enabled = draft.isNotBlank() || currentImages.isNotEmpty(),
-                modifier = Modifier.align(Alignment.End)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
             ) {
-                Icon(Icons.Filled.PostAdd, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Post")
+                Button(
+                    onClick = {
+                        // Convert markdown to HTML AFTER pressing post. Append attached images.
+                        val md = draft
+                        val htmlText = markdownToHtml(md)
+                        val imgTags = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
+                        val fullHtml = if (imgTags.isBlank()) htmlText else "$htmlText\n$imgTags"
+                        onDraftChange(fullHtml)
+                        onSubmit()
+                    },
+                    enabled = draft.isNotBlank() || currentImages.isNotEmpty(),
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Icon(Icons.Filled.PostAdd, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Post")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -893,76 +901,103 @@ private fun PostDetailsSheet(
         sheetState = sheetState,
         dragHandle = null
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            PostCard(
-                post = post,
-                onClick = {},
-                clickable = false,
-                truncated = false,
-                onMentionClick = onMentionClick,
-                onProfileClick = onProfileClick,
-                onLoveClick = onLoveClick
-            )
-
+        Column(modifier = Modifier.fillMaxHeight()) {
             val showCommentsSection = hasUserExpandedComments || comments.isNotEmpty()
-            if (showCommentsSection) {
-                Text("Comments", style = MaterialTheme.typography.titleMedium)
-                if (loading) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Loading comments...", style = MaterialTheme.typography.bodyMedium)
+
+            // Header / post + section labels or empty/hint (fixed at top)
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                PostCard(
+                    post = post,
+                    onClick = {},
+                    clickable = false,
+                    truncated = false,
+                    onMentionClick = onMentionClick,
+                    onProfileClick = onProfileClick,
+                    onLoveClick = onLoveClick
+                )
+
+                if (showCommentsSection) {
+                    Text("Comments", style = MaterialTheme.typography.titleMedium)
+                    if (loading) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Loading comments...", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } else if (comments.isEmpty()) {
+                        EmptyStateCard("No comments yet", "Start the conversation.")
                     }
-                } else if (comments.isEmpty()) {
-                    EmptyStateCard("No comments yet", "Start the conversation.")
+                    // Comments list (if any) is rendered in a weighted LazyColumn below to allow shrinking for IME
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.height(240.dp)) {
-                        items(comments, key = { it.id }) { comment ->
-                            CommentCard(
-                                comment = comment,
-                                onReply = onReplyToComment,
-                                onProfileClick = onProfileClick
-                            )
-                        }
+                    // Hint for less verbose UI; user must swipe up on the sheet to reveal comments
+                    Text(
+                        "Swipe up to view comments",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            }
+
+            // Weighted scrollable comments list (takes remaining space; shrinks when keyboard opens)
+            if (showCommentsSection && !loading && comments.isNotEmpty()) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp)
+                ) {
+                    items(comments, key = { it.id }) { comment ->
+                        CommentCard(
+                            comment = comment,
+                            onReply = onReplyToComment,
+                            onProfileClick = onProfileClick
+                        )
                     }
                 }
+            }
 
-                if (replyingTo != null) {
-                    Row(
+            // Input area (TextField + Reply button) — imePadding lifts it above the software keyboard
+            if (showCommentsSection) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .imePadding(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (replyingTo != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Replying to @${replyingTo.poster.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(onClick = onCancelReply) {
+                                Text("Cancel")
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = onDraftChange,
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Replying to @${replyingTo.poster.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(8.dp))
-                        TextButton(onClick = onCancelReply) {
-                            Text("Cancel")
-                        }
+                        minLines = 3,
+                        maxLines = 6,
+                        placeholder = { Text("Write a reply") }
+                    )
+                    Button(onClick = onSubmit, enabled = draft.isNotBlank()) {
+                        Text("Reply")
                     }
                 }
-
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = onDraftChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 6,
-                    placeholder = { Text("Write a reply") }
-                )
-                Button(onClick = onSubmit, enabled = draft.isNotBlank()) {
-                    Text("Reply")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            } else {
-                // Hint for less verbose UI; user must swipe up on the sheet to reveal comments
-                Text(
-                    "Swipe up to view comments",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
             }
         }
     }
