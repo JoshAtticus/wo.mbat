@@ -210,10 +210,6 @@ private fun FeedTab(
         contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            FeedHeader(sessionUsername = sessionUsername, onRefresh = onRefresh)
-        }
-
         if (loading && posts.isEmpty()) {
             item { LoadingCard("Loading feed") }
         }
@@ -581,32 +577,6 @@ private fun WombatBottomNavigationBar(
 }
 
 @Composable
-private fun FeedHeader(sessionUsername: String?, onRefresh: () -> Unit) {
-    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("wo.mbat", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = if (sessionUsername == null) "Browsing as @jeffalo" else "Signed in as @$sessionUsername",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "A clean client for wasteof.money built around reading, writing, and discovering posts.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onRefresh) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Refresh feed")
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ProfileHeader(profile: User) {
     Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -783,7 +753,7 @@ private fun EmptyStateCard(title: String, message: String) {
 @Composable
 private fun titleForTab(tab: BottomTab): String {
     return when (tab) {
-        BottomTab.Home -> "Feed"
+        BottomTab.Home -> "wo.mbat"
         BottomTab.Explore -> "Explore"
         BottomTab.Notifications -> "Notifications"
         BottomTab.Account -> "Account"
