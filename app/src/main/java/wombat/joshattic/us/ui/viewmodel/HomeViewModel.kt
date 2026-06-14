@@ -209,6 +209,27 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 
+    fun saveCurrentDraft() {
+        val draft = _uiState.value.composeDraft.trim()
+        if (draft.isBlank()) return
+        val currentDrafts = _uiState.value.composerDrafts
+        if (!currentDrafts.contains(draft)) {
+            _uiState.value = _uiState.value.copy(
+                composerDrafts = listOf(draft) + currentDrafts
+            )
+        }
+    }
+
+    fun restoreDraft(draft: String) {
+        _uiState.value = _uiState.value.copy(composeDraft = draft)
+    }
+
+    fun deleteDraft(draft: String) {
+        _uiState.value = _uiState.value.copy(
+            composerDrafts = _uiState.value.composerDrafts.filter { it != draft }
+        )
+    }
+
     fun loadCommentsForCurrentPost() {
         val post = _uiState.value.selectedPost ?: return
         if (_uiState.value.comments.isEmpty()) {

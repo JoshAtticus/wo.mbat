@@ -4,9 +4,20 @@ package wombat.joshattic.us.ui.screens
 
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,20 +35,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PostAdd
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
@@ -71,9 +81,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.layout.ContentScale
+import android.graphics.Typeface
+import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ClickableSpan
+import android.text.style.StyleSpan
+import android.text.style.UnderlineSpan
 import android.text.style.URLSpan
 import android.text.TextPaint
 import android.view.View
@@ -216,7 +230,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     draft = uiState.composeDraft,
                     onDraftChange = viewModel::setComposeDraft,
                     onSubmit = viewModel::submitPost,
-                    onDismiss = viewModel::toggleComposer
+                    onDismiss = {
+                        viewModel.saveCurrentDraft()
+                        viewModel.setComposeDraft("")
+                        viewModel.toggleComposer()
+                    },
+                    drafts = uiState.composerDrafts,
+                    onRestoreDraft = viewModel::restoreDraft,
+                    onDeleteDraft = viewModel::deleteDraft
                 )
             }
 
@@ -516,44 +537,156 @@ private fun AccountTab(
     }
 }
 
+private fun htmlToAnnotated(html: String): AnnotatedString {
+    return buildAnnotatedString {
+        var i = 0
+        val openTags = mutableListOf<Pair<String, Int>>()
+        while (i < html.length) {
+            if (html[i] == '<') {
+                val j = html.indexOf('>', i)
+                if (j == -1) {
+                    append(html.substring(i))
+                    break
+                }
+                val tagContent = html.substring(i + 1, j).trim().lowercase()
+                val isClose = tagContent.startsWith("/")
+                val tag = if (isClose) tagContent.substring(1).split(" ")[0] else tagContent.split(" ")[0]
+                if (tag == "br" || tag == "br/") {
+                    append("\n")
+                } else if (tag == "img") {
+                    // images handled separately via currentImages
+                } else if (isClose) {
+                    val idx = openTags.indexOfLast { it.first == tag }
+                    if (idx != -1) {
+                        val (_, startPos) = openTags.removeAt(idx)
+                        val style = when (tag) {
+                            "b", "strong" -> SpanStyle(fontWeight = FontWeight.Bold)
+                            "i", "em" -> SpanStyle(fontStyle = FontStyle.Italic)
+                            "u" -> SpanStyle(textDecoration = TextDecoration.Underline)
+                            "s" -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+                            else -> null
+                        }
+                        if (style != null) {
+                            addStyle(style, startPos, length)
+                        }
+                    }
+                } else {
+                    openTags.add(tag to length)
+                }
+                i = j + 1
+                continue
+            }
+            val nextTag = html.indexOf('<', i)
+            val chunkEnd = if (nextTag == -1) html.length else nextTag
+            append(html.substring(i, chunkEnd))
+            i = chunkEnd
+        }
+        // close any unclosed tags
+        openTags.forEach { (tag, startPos) ->
+            val style = when (tag) {
+                "b", "strong" -> SpanStyle(fontWeight = FontWeight.Bold)
+                "i", "em" -> SpanStyle(fontStyle = FontStyle.Italic)
+                "u" -> SpanStyle(textDecoration = TextDecoration.Underline)
+                "s" -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+                else -> null
+            }
+            if (style != null) {
+                addStyle(style, startPos, length)
+            }
+        }
+    }
+}
+
+private fun annotatedToHtml(annotated: AnnotatedString): String {
+    val text = annotated.text
+    if (text.isBlank()) return ""
+    val events = mutableListOf<Pair<Int, String>>()
+    annotated.spanStyles.forEach { range ->
+        val style = range.item
+        val tag = when {
+            style.fontWeight == FontWeight.Bold || (style.fontWeight?.weight ?: 0) >= 600 -> "b"
+            style.fontStyle == FontStyle.Italic -> "i"
+            style.textDecoration == TextDecoration.Underline -> "u"
+            style.textDecoration == TextDecoration.LineThrough -> "s"
+            else -> null
+        }
+        if (tag != null) {
+            events.add(range.start to "<$tag>")
+            events.add(range.end to "</$tag>")
+        }
+    }
+    events.sortBy { it.first }
+    val sb = StringBuilder()
+    var pos = 0
+    for ((p, tagStr) in events) {
+        if (p > pos) sb.append(text.substring(pos, p))
+        sb.append(tagStr)
+        pos = p
+    }
+    if (pos < text.length) sb.append(text.substring(pos))
+    val inner = sb.toString().replace("\n", "</p><p>")
+    return "<p>$inner</p>"
+}
+
 @Composable
 private fun ComposerSheet(
     draft: String,
     onDraftChange: (String) -> Unit,
     onSubmit: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    drafts: List<String>,
+    onRestoreDraft: (String) -> Unit,
+    onDeleteDraft: (String) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var textFieldValue by remember(draft) { mutableStateOf(TextFieldValue(draft)) }
     var showAddImage by remember { mutableStateOf(false) }
     var imageUrl by remember { mutableStateOf("") }
     var imageError by remember { mutableStateOf<String?>(null) }
+    var showDraftsDialog by remember { mutableStateOf(false) }
 
-    fun updateDraft(newValue: TextFieldValue) {
-        textFieldValue = newValue
-        onDraftChange(newValue.text)
+    // Current images extracted from draft
+    var currentImages by remember(draft) { mutableStateOf(extractImages(draft)) }
+
+    // The rich content for direct editing (formatted text visible, no HTML tags)
+    var richText by remember(draft) { mutableStateOf(AnnotatedString("")) }
+    var editorValue by remember(draft) { mutableStateOf(TextFieldValue()) }
+
+    // Sync when draft changes (e.g. from drafts restore or initial)
+    LaunchedEffect(draft) {
+        currentImages = extractImages(draft)
+        val textPart = stripImages(draft)
+        richText = htmlToAnnotated(textPart)
+        editorValue = TextFieldValue(annotatedString = richText)
     }
 
-    fun wrapWith(tag: String) {
-        val sel = textFieldValue.selection
-        val before = textFieldValue.text.substring(0, sel.start)
-        val selected = textFieldValue.text.substring(sel.start, sel.end)
-        val after = textFieldValue.text.substring(sel.end)
-        val open = "<$tag>"
-        val close = "</$tag>"
-        val newText = before + open + selected + close + after
-        val newStart = sel.start + open.length
-        val newEnd = newStart + selected.length
-        updateDraft(TextFieldValue(text = newText, selection = TextRange(newStart, newEnd)))
+    fun updateDraftFromEditor() {
+        val textHtml = annotatedToHtml(editorValue.annotatedString)
+        val imgHtml = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
+        val newDraft = if (imgHtml.isBlank()) textHtml else "$textHtml\n$imgHtml"
+        onDraftChange(newDraft)
     }
 
-    fun insertAtCursor(insert: String) {
-        val sel = textFieldValue.selection
-        val before = textFieldValue.text.substring(0, sel.start)
-        val after = textFieldValue.text.substring(sel.end)
-        val newText = before + insert + after
-        val newCursor = sel.start + insert.length
-        updateDraft(TextFieldValue(text = newText, selection = TextRange(newCursor)))
+    fun applyStyle(tag: String) {
+        val sel = editorValue.selection
+        if (sel.collapsed) return
+        val start = minOf(sel.start, sel.end)
+        val end = maxOf(sel.start, sel.end)
+        val newAnnotated = buildAnnotatedString {
+            append(editorValue.annotatedString)
+            val style = when (tag) {
+                "b", "strong" -> SpanStyle(fontWeight = FontWeight.Bold)
+                "i", "em" -> SpanStyle(fontStyle = FontStyle.Italic)
+                "u" -> SpanStyle(textDecoration = TextDecoration.Underline)
+                "s" -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+                else -> null
+            }
+            if (style != null) {
+                addStyle(style, start, end)
+            }
+        }
+        editorValue = editorValue.copy(annotatedString = newAnnotated)
+        richText = newAnnotated
+        updateDraftFromEditor()
     }
 
     fun addImage() {
@@ -567,10 +700,46 @@ private fun ComposerSheet(
             imageError = "Image src must be from imgbb or cubeupload"
             return
         }
-        insertAtCursor("<img src=\"$url\" alt=\"\">")
+        currentImages = currentImages + url
+        updateDraftFromEditor()
         imageUrl = ""
         imageError = null
         showAddImage = false
+    }
+
+    if (showDraftsDialog) {
+        AlertDialog(
+            onDismissRequest = { showDraftsDialog = false },
+            title = { Text("Drafts") },
+            text = {
+                Column {
+                    if (drafts.isEmpty()) {
+                        Text("No saved drafts yet. Close the composer to save the current post as a draft.")
+                    } else {
+                        drafts.forEach { d ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = d.take(100) + if (d.length > 100) "..." else "",
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2
+                                )
+                                TextButton(onClick = {
+                                    onRestoreDraft(d)
+                                    showDraftsDialog = false
+                                }) { Text("Restore") }
+                                TextButton(onClick = { onDeleteDraft(d) }) { Text("Delete") }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDraftsDialog = false }) { Text("Close") }
+            }
+        )
     }
 
     ModalBottomSheet(
@@ -579,69 +748,64 @@ private fun ComposerSheet(
         dragHandle = null
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("New post", style = MaterialTheme.typography.titleLarge)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("New post", style = MaterialTheme.typography.titleLarge)
+                TextButton(onClick = { showDraftsDialog = true }) {
+                    Text("Drafts (${drafts.size})")
+                }
+            }
 
-            // Rich text toolbar (scrollable for many tools)
+            // Keep the preview box (small live rendered view of the full post)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 200.dp)
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(12.dp)
+            ) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (draft.isBlank()) {
+                        Text(
+                            "Preview of your post will update as you edit below.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        HtmlText(draft)
+                    }
+                }
+            }
+
+            // Rich text toolbar - bigger buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Inline text styles
-                IconButton(onClick = { wrapWith("b") }, modifier = Modifier.size(32.dp)) {
-                    Text("B", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                IconButton(onClick = { applyStyle("b") }, modifier = Modifier.size(56.dp)) {
+                    Text("B", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 }
-                IconButton(onClick = { wrapWith("i") }, modifier = Modifier.size(32.dp)) {
-                    Text("I", fontStyle = FontStyle.Italic, fontSize = 13.sp)
+                IconButton(onClick = { applyStyle("i") }, modifier = Modifier.size(56.dp)) {
+                    Text("I", fontStyle = FontStyle.Italic, fontSize = 20.sp)
                 }
-                IconButton(onClick = { wrapWith("u") }, modifier = Modifier.size(32.dp)) {
-                    Text("U", textDecoration = TextDecoration.Underline, fontSize = 13.sp)
+                IconButton(onClick = { applyStyle("u") }, modifier = Modifier.size(56.dp)) {
+                    Text("U", textDecoration = TextDecoration.Underline, fontSize = 20.sp)
                 }
-                IconButton(onClick = { wrapWith("s") }, modifier = Modifier.size(32.dp)) {
-                    Text("S", textDecoration = TextDecoration.LineThrough, fontSize = 13.sp)
+                IconButton(onClick = { applyStyle("s") }, modifier = Modifier.size(56.dp)) {
+                    Text("S", textDecoration = TextDecoration.LineThrough, fontSize = 20.sp)
                 }
-                IconButton(onClick = { wrapWith("strong") }, modifier = Modifier.size(32.dp)) {
-                    Text("strong", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-                IconButton(onClick = { wrapWith("em") }, modifier = Modifier.size(32.dp)) {
-                    Text("em", fontSize = 10.sp, fontStyle = FontStyle.Italic)
-                }
-                IconButton(onClick = { wrapWith("mark") }, modifier = Modifier.size(32.dp)) {
-                    Text("mark", fontSize = 10.sp)
-                }
-                IconButton(onClick = { wrapWith("code") }, modifier = Modifier.size(32.dp)) {
-                    Text("code", fontSize = 10.sp)
-                }
-
-                // Block elements
-                IconButton(onClick = { wrapWith("p") }, modifier = Modifier.size(32.dp)) {
-                    Text("p", fontSize = 10.sp)
-                }
-                IconButton(onClick = { wrapWith("h2") }, modifier = Modifier.size(32.dp)) {
-                    Text("h2", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-                IconButton(onClick = { wrapWith("blockquote") }, modifier = Modifier.size(32.dp)) {
-                    Text("quote", fontSize = 9.sp)
-                }
-                IconButton(onClick = { wrapWith("pre") }, modifier = Modifier.size(32.dp)) {
-                    Text("pre", fontSize = 10.sp)
-                }
-
-                // Lists
-                IconButton(onClick = { insertAtCursor("<ul>\n<li></li>\n</ul>") }, modifier = Modifier.size(32.dp)) {
-                    Text("ul", fontSize = 10.sp)
-                }
-                IconButton(onClick = { insertAtCursor("<ol>\n<li></li>\n</ol>") }, modifier = Modifier.size(32.dp)) {
-                    Text("ol", fontSize = 10.sp)
-                }
-                IconButton(onClick = { wrapWith("li") }, modifier = Modifier.size(32.dp)) {
-                    Text("li", fontSize = 10.sp)
-                }
-
-                // Image (special)
-                IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(18.dp))
+                IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(24.dp))
                 }
             }
 
@@ -673,26 +837,37 @@ private fun ComposerSheet(
                 }
             }
 
-            OutlinedTextField(
-                value = textFieldValue,
-                onValueChange = { updateDraft(it) },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
-                minLines = 6,
-                placeholder = { Text("Write your post. Use the toolbar above to format (bold, lists, images from imgbb/cubeupload, etc).") }
-            )
-
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Preview", style = MaterialTheme.typography.titleSmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (draft.isBlank()) {
-                        Text("Your rendered post will appear here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        HtmlText(draft)
-                    }
-                }
+            // The direct editable box (placed where the current typing box was)
+            // User edits directly here - sees formatted text (bold etc.), no HTML tags, can edit any part
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 180.dp)
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(12.dp)
+            ) {
+                BasicTextField(
+                    value = editorValue,
+                    onValueChange = { newValue ->
+                        editorValue = newValue
+                        richText = newValue.annotatedString
+                        updateDraftFromEditor()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+                )
             }
-            Button(onClick = onSubmit, enabled = draft.isNotBlank()) {
+
+            Button(
+                onClick = onSubmit,
+                enabled = draft.isNotBlank(),
+                modifier = Modifier.align(Alignment.End)
+            ) {
                 Icon(Icons.Filled.PostAdd, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Post")
@@ -895,9 +1070,17 @@ private fun PostCard(
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = if (clickable) Modifier.fillMaxWidth().clickable(onClick = onClick) else Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = if (clickable) Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(16.dp) else Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ProfilePicture(username = post.poster.name, size = 40.dp)
                 Spacer(modifier = Modifier.width(12.dp))
@@ -905,7 +1088,6 @@ private fun PostCard(
                     Text(post.poster.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("${post.loves} loves", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             HtmlText(
                 displayContent,
@@ -927,8 +1109,9 @@ private fun PostCard(
             }
             Divider()
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                PostMetric(post.comments, "comments")
-                PostMetric(post.reposts, "reposts")
+                PostMetric(post.loves, "loves", Icons.Filled.Favorite)
+                PostMetric(post.comments, "comments", Icons.Filled.Chat)
+                PostMetric(post.reposts, "reposts", Icons.Filled.Repeat)
             }
         }
     }
@@ -994,13 +1177,14 @@ private fun HtmlText(
     onMentionClick: ((String) -> Unit)? = null
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
-    val linkColor = MaterialTheme.colorScheme.primary.toArgb()
+    val linkColor = MaterialTheme.colorScheme.onBackground.toArgb()
     AndroidView(
         modifier = modifier,
         factory = { context ->
             TextView(context).apply {
                 movementMethod = LinkMovementMethod.getInstance()
                 setTextColor(textColor)
+                setLinkTextColor(linkColor)
                 textSize = 16f
                 if (maxLines != Int.MAX_VALUE) {
                     this.maxLines = maxLines
@@ -1010,11 +1194,18 @@ private fun HtmlText(
         },
         update = { textView ->
             textView.setTextColor(textColor)
+            textView.setLinkTextColor(linkColor)
             if (maxLines != Int.MAX_VALUE) {
                 textView.maxLines = maxLines
                 textView.ellipsize = android.text.TextUtils.TruncateAt.END
             }
-            val spanned = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
+            // Normalize <br> and paragraph breaks so multiple <p> elements (and <br>) produce visible newlines/separation in the TextView
+            val htmlToRender = html.trim()
+                .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+                .replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "</p>\n\n<p")
+                .replace(Regex("^\\n+"), "")
+                .replace(Regex("\\n+$"), "")
+            val spanned = HtmlCompat.fromHtml(htmlToRender, HtmlCompat.FROM_HTML_MODE_LEGACY)
             if (onMentionClick != null) {
                 val spannable = SpannableStringBuilder(spanned)
                 val urlSpans = spannable.getSpans(0, spannable.length, URLSpan::class.java)
@@ -1031,6 +1222,7 @@ private fun HtmlText(
                             }
                             override fun updateDrawState(ds: TextPaint) {
                                 ds.isUnderlineText = true
+                                ds.isFakeBoldText = true
                                 ds.color = linkColor
                             }
                         }
@@ -1044,14 +1236,38 @@ private fun HtmlText(
             } else {
                 textView.text = spanned
             }
+            // Ensure all links (URLSpans) are slightly bold + underlined (in addition to theme color)
+            (textView.text as? Spannable)?.let { spannable ->
+                spannable.getSpans(0, spannable.length, URLSpan::class.java).forEach { span ->
+                    val s = spannable.getSpanStart(span)
+                    val e = spannable.getSpanEnd(span)
+                    if (spannable.getSpans(s, e, StyleSpan::class.java).none { it.style == Typeface.BOLD }) {
+                        spannable.setSpan(StyleSpan(Typeface.BOLD), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+                    if (spannable.getSpans(s, e, UnderlineSpan::class.java).isEmpty()) {
+                        spannable.setSpan(UnderlineSpan(), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+                }
+            }
         }
     )
 }
 
 @Composable
-private fun PostMetric(value: Int, label: String) {
+private fun PostMetric(value: Int, label: String, icon: ImageVector) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value.toString(), style = MaterialTheme.typography.titleSmall)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(value.toString(), style = MaterialTheme.typography.titleSmall)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
