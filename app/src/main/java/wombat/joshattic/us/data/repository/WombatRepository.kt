@@ -3,10 +3,12 @@ package wombat.joshattic.us.data.repository
 import kotlinx.coroutines.flow.Flow
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
+import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
 import wombat.joshattic.us.data.model.CreatePostRequest
 import wombat.joshattic.us.data.model.FeedResponse
 import wombat.joshattic.us.data.model.LoginRequest
+import wombat.joshattic.us.data.model.LoveToggleResponse
 import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
@@ -41,6 +43,13 @@ class WombatRepository(
     suspend fun loadComments(session: AuthSession?, postId: String) =
         apiService.getComments(postId = postId, token = session?.token)
 
+    suspend fun loadCommentReplies(session: AuthSession?, commentId: String, page: Int = 1): CommentResponse =
+        apiService.getCommentReplies(commentId, page, session?.token)
+
+    suspend fun loadTrendingPosts(session: AuthSession?): FeedResponse {
+        return apiService.getTrendingPosts(session?.token)
+    }
+
     suspend fun loadUnreadNotifications(session: AuthSession?): List<Notification> {
         val token = session?.token ?: return emptyList()
         return apiService.getUnreadNotifications(token).unread.orEmpty()
@@ -65,6 +74,10 @@ class WombatRepository(
         if (notificationIds.isNotEmpty()) {
             apiService.markRead(session.token, wombat.joshattic.us.data.model.MarkReadRequest(notificationIds))
         }
+    }
+
+    suspend fun toggleLove(session: AuthSession, postId: String): LoveToggleResponse {
+        return apiService.togglePostLove(postId, session.token)
     }
 
     suspend fun logout() {

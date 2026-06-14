@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.data.repository.WombatRepository
@@ -21,8 +23,9 @@ class MainActivity : ComponentActivity() {
         )
         enableEdgeToEdge()
         setContent {
-            WombatTheme {
-                val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository))
+            val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository))
+            val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+            WombatTheme(userColor = uiState.accountProfile?.color) {
                 HomeScreen(viewModel = homeViewModel)
             }
         }

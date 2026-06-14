@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.AuthSession
+import wombat.joshattic.us.data.model.Comment
+import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.ui.state.BottomTab
@@ -109,34 +111,63 @@ class HomeViewModel(
     }
 
     fun setExploreQuery(query: String) {
-        _uiState.value = _uiState.value.copy(exploreQuery = query, errorMessage = null)
+        // no longer used for search in explore; kept for compatibility if needed elsewhere
+        _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 
-    fun searchExplore() {
+    fun loadExploreTrending() {
         viewModelScope.launch {
-            val snapshot = _uiState.value
-            val username = snapshot.exploreQuery.trim().ifBlank {
-                snapshot.session?.username ?: DEFAULT_GUEST_USER
-            }
+            _uiState.value = _uiState.value.copy(exploreTrendingLoading = true, errorMessage = null)
+            runCatching { repository.loadTrendingPosts(_uiState.value.session) }
+                .onSuccess { response ->
+                    _uiState.value = _uiState.value.copy(
+                        exploreTrendingPosts = response.posts,
+                        exploreTrendingLoading = false
+                    )
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        exploreTrendingLoading = false,
+                        errorMessage = throwable.message ?: "Unable to load trending"
+                    )
+                }
+        }
+    }
 
-            _uiState.value = _uiState.value.copy(exploreLoading = true, errorMessage = null)
+    fun openProfile(username: String) {
+        _uiState.value = _uiState.value.copy(
+            viewingProfileUsername = username,
+            viewingProfile = null,
+            viewingProfilePosts = emptyList(),
+            viewingProfileLoading = true
+        )
+        viewModelScope.launch {
             runCatching {
                 val profile = repository.loadUserProfile(username)
-                val posts = repository.loadUserPosts(snapshot.session, username).posts
+                val posts = repository.loadUserPosts(_uiState.value.session, username).posts
                 profile to posts
             }.onSuccess { (profile, posts) ->
                 _uiState.value = _uiState.value.copy(
-                    exploreProfile = profile,
-                    explorePosts = posts,
-                    exploreLoading = false
+                    viewingProfile = profile,
+                    viewingProfilePosts = posts,
+                    viewingProfileLoading = false
                 )
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
-                    exploreLoading = false,
-                    errorMessage = throwable.message ?: "Unable to search user"
+                    viewingProfileLoading = false,
+                    errorMessage = throwable.message ?: "Unable to load profile"
                 )
             }
         }
+    }
+
+    fun closeProfile() {
+        _uiState.value = _uiState.value.copy(
+            viewingProfileUsername = null,
+            viewingProfile = null,
+            viewingProfilePosts = emptyList(),
+            viewingProfileLoading = false
+        )
     }
 
     fun openPost(post: Post) {
@@ -145,7 +176,8 @@ class HomeViewModel(
             showComposer = false,
             commentDraft = "",
             comments = emptyList(),
-            commentsLoading = false
+            commentsLoading = false,
+            commentReplyParent = null
         )
         // Comments are loaded lazily when user swipes up in the details sheet to expand
     }
@@ -155,7 +187,8 @@ class HomeViewModel(
             selectedPost = null,
             comments = emptyList(),
             commentDraft = "",
-            commentsLoading = false
+            commentsLoading = false,
+            commentReplyParent = null
         )
     }
 
@@ -173,9 +206,13 @@ class HomeViewModel(
                 return@launch
             }
 
-            runCatching { repository.createComment(session, selectedPost.id, draft, null) }
+            val parent = _uiState.value.commentReplyParent?.id
+            runCatching { repository.createComment(session, selectedPost.id, draft, parent) }
                 .onSuccess {
-                    _uiState.value = _uiState.value.copy(commentDraft = "")
+                    _uiState.value = _uiState.value.copy(
+                        commentDraft = "",
+                        commentReplyParent = null
+                    )
                     loadComments(selectedPost.id)
                 }
                 .onFailure { throwable ->
@@ -240,7 +277,40 @@ class HomeViewModel(
     }
 
     fun clearComments() {
-        _uiState.value = _uiState.value.copy(comments = emptyList(), commentsLoading = false)
+        _uiState.value = _uiState.value.copy(comments = emptyList(), commentsLoading = false, commentReplyParent = null)
+    }
+
+    fun setCommentReplyParent(comment: Comment?) {
+        _uiState.value = _uiState.value.copy(commentReplyParent = comment)
+    }
+
+    fun togglePostLove(post: Post) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            runCatching { repository.toggleLove(session, post.id) }
+                .onSuccess { response ->
+                    val newLoves = response.new.loves
+                    val newIsLoving = response.new.isLoving
+                    updatePostsWithLove(post.id, newLoves, newIsLoving)
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = throwable.message ?: "Failed to toggle love"
+                    )
+                }
+        }
+    }
+
+    private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
+        val current = _uiState.value
+        fun transform(p: Post) = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
+        _uiState.value = current.copy(
+            feed = current.feed.map(::transform),
+            exploreTrendingPosts = current.exploreTrendingPosts.map(::transform),
+            accountPosts = current.accountPosts.map(::transform),
+            viewingProfilePosts = current.viewingProfilePosts.map(::transform),
+            selectedPost = if (current.selectedPost?.id == postId) transform(current.selectedPost) else current.selectedPost
+        )
     }
 
     private fun observeSessionAndRefresh() {
@@ -254,8 +324,8 @@ class HomeViewModel(
                     loadFeedForCurrentSession(session)
                     loadNotifications(session)
                     loadAccountProfile(session)
-                    if (_uiState.value.selectedTab == BottomTab.Explore && _uiState.value.exploreQuery.isNotBlank()) {
-                        searchExplore()
+                    if (_uiState.value.selectedTab == BottomTab.Explore) {
+                        loadExploreTrending()
                     }
                 }
         }
@@ -310,25 +380,44 @@ class HomeViewModel(
     private suspend fun loadComments(postId: String) {
         val session = _uiState.value.session
         _uiState.value = _uiState.value.copy(commentsLoading = true)
-        runCatching { repository.loadComments(session, postId) }
-            .onSuccess { response ->
-                _uiState.value = _uiState.value.copy(
-                    comments = response.comments,
-                    commentsLoading = false
-                )
-            }
-            .onFailure { throwable ->
-                _uiState.value = _uiState.value.copy(
-                    commentsLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load comments"
-                )
-            }
+        runCatching {
+            val topLevel = repository.loadComments(session, postId).comments
+                .map { it.copy(replies = it.replies ?: emptyList()) }
+            topLevel.map { loadRepliesRecursively(it, session) }
+        }.onSuccess { fullComments ->
+            _uiState.value = _uiState.value.copy(
+                comments = fullComments,
+                commentsLoading = false
+            )
+        }.onFailure { throwable ->
+            _uiState.value = _uiState.value.copy(
+                commentsLoading = false,
+                errorMessage = throwable.message ?: "Unable to load comments"
+            )
+        }
+    }
+
+    private suspend fun loadRepliesRecursively(comment: Comment, session: AuthSession?): Comment {
+        val safeReplies = comment.replies ?: emptyList()
+        if (!comment.hasReplies || safeReplies.isNotEmpty()) {
+            return comment.copy(replies = safeReplies)
+        }
+        val allReplies = mutableListOf<Comment>()
+        var page = 1
+        while (true) {
+            val resp: CommentResponse = runCatching { repository.loadCommentReplies(session, comment.id, page) }.getOrNull() ?: break
+            allReplies.addAll(resp.comments)
+            if (resp.last) break
+            page++
+        }
+        val loaded = allReplies.map { loadRepliesRecursively(it, session) }
+        return comment.copy(replies = loaded)
     }
 
     private fun refreshForSelectedTab(tab: BottomTab) {
         when (tab) {
             BottomTab.Home -> refreshFeed()
-            BottomTab.Explore -> if (_uiState.value.exploreQuery.isNotBlank()) searchExplore()
+            BottomTab.Explore -> loadExploreTrending()
             BottomTab.Notifications -> refreshNotifications()
             BottomTab.Account -> refreshAccount()
         }

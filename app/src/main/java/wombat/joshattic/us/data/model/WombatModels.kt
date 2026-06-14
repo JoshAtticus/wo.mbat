@@ -20,11 +20,12 @@ data class Post(
     @SerializedName("_id") val id: String,
     val poster: Poster,
     val content: String,
-    val repost: Post?,
+    val repost: Post? = null,
     val time: Long,
     val comments: Int,
     val loves: Int,
-    val reposts: Int
+    val reposts: Int,
+    val isLoving: Boolean? = null
 )
 
 data class Poster(
@@ -48,7 +49,7 @@ data class Notification(
     val time: Long
 )
 
-data class NotificationData(val actor: Poster, val post: String?)
+data class NotificationData(val actor: Poster, val post: Post? = null)
 
 data class CommentResponse(val comments: List<Comment>, val last: Boolean)
 
@@ -59,7 +60,9 @@ data class Comment(
     val parent: String?,
     val content: String,
     val time: Long,
-    val hasReplies: Boolean
+    val hasReplies: Boolean,
+    val top: String? = null,
+    val replies: List<Comment> = emptyList()
 )
 
 data class LoginRequest(val username: String, val password: String)
@@ -75,4 +78,14 @@ data class CreateCommentRequest(val content: String, val parent: String? = null)
 data class AuthSession(
     val token: String,
     val username: String
+)
+
+data class LoveToggleResponse(
+    val ok: String,
+    val new: LoveState
+)
+
+data class LoveState(
+    val isLoving: Boolean,
+    val loves: Int
 )

@@ -14,6 +14,7 @@ import wombat.joshattic.us.data.model.FeedResponse
 import wombat.joshattic.us.data.model.LoginRequest
 import wombat.joshattic.us.data.model.LoginResponse
 import wombat.joshattic.us.data.model.MarkReadRequest
+import wombat.joshattic.us.data.model.LoveToggleResponse
 import wombat.joshattic.us.data.model.NotificationResponse
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
@@ -61,10 +62,28 @@ interface ApiService {
         @Header("authorization") token: String? = null
     ): CommentResponse
 
+    @GET("comments/{comment_id}/replies")
+    suspend fun getCommentReplies(
+        @Path("comment_id") commentId: String,
+        @Query("page") page: Int = 1,
+        @Header("authorization") token: String? = null
+    ): CommentResponse
+
     @POST("posts/{post_id}/comments")
     suspend fun makeComment(
         @Path("post_id") postId: String,
         @Header("authorization") token: String,
         @Body request: CreateCommentRequest
     ): Comment
+
+    @GET("explore/posts/trending")
+    suspend fun getTrendingPosts(
+        @Header("authorization") token: String? = null
+    ): FeedResponse
+
+    @POST("posts/{post_id}/loves")
+    suspend fun togglePostLove(
+        @Path("post_id") postId: String,
+        @Header("authorization") token: String
+    ): LoveToggleResponse
 }

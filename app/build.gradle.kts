@@ -13,8 +13,8 @@ android {
 
     defaultConfig {
         applicationId = "wombat.joshattic.us"
-        minSdk = 26
-        targetSdk = 36
+        minSdk = 23
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 

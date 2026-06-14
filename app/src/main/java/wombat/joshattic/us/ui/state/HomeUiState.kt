@@ -13,11 +13,16 @@ data class HomeUiState(
     val accountProfile: User? = null,
     val exploreProfile: User? = null,
     val explorePosts: List<Post> = emptyList(),
+    val exploreTrendingPosts: List<Post> = emptyList(),
+    val exploreTrendingLoading: Boolean = false,
+    val viewingProfileUsername: String? = null,
+    val viewingProfile: User? = null,
+    val viewingProfilePosts: List<Post> = emptyList(),
+    val viewingProfileLoading: Boolean = false,
     val comments: List<Comment> = emptyList(),
     val selectedPost: Post? = null,
     val isLoading: Boolean = false,
     val feedLoading: Boolean = false,
-    val exploreLoading: Boolean = false,
     val commentsLoading: Boolean = false,
     val authLoading: Boolean = false,
     val accountLoading: Boolean = false,
@@ -27,12 +32,12 @@ data class HomeUiState(
     val loginError: String? = null,
     val loginUsername: String = "",
     val loginPassword: String = "",
-    val exploreQuery: String = "",
     val composeDraft: String = "",
     val commentDraft: String = "",
     val selectedTab: BottomTab = BottomTab.Home,
     val showComposer: Boolean = false,
-    val composerDrafts: List<String> = emptyList()
+    val composerDrafts: List<String> = emptyList(),
+    val commentReplyParent: Comment? = null
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size
