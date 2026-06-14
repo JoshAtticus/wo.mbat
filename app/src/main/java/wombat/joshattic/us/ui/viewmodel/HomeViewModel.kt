@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.AuthSession
@@ -118,19 +120,21 @@ class HomeViewModel(
     fun loadExploreTrending() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(exploreTrendingLoading = true, errorMessage = null)
-            runCatching { repository.loadTrendingPosts(_uiState.value.session) }
-                .onSuccess { response ->
-                    _uiState.value = _uiState.value.copy(
-                        exploreTrendingPosts = response.posts,
-                        exploreTrendingLoading = false
-                    )
-                }
-                .onFailure { throwable ->
-                    _uiState.value = _uiState.value.copy(
-                        exploreTrendingLoading = false,
-                        errorMessage = throwable.message ?: "Unable to load trending"
-                    )
-                }
+            val currentSession = _uiState.value.session
+            runCatching {
+                val response = repository.loadTrendingPosts(currentSession)
+                if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
+            }.onSuccess { posts ->
+                _uiState.value = _uiState.value.copy(
+                    exploreTrendingPosts = posts,
+                    exploreTrendingLoading = false
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    exploreTrendingLoading = false,
+                    errorMessage = throwable.message ?: "Unable to load trending"
+                )
+            }
         }
     }
 
@@ -142,9 +146,11 @@ class HomeViewModel(
             viewingProfileLoading = true
         )
         viewModelScope.launch {
+            val currentSession = _uiState.value.session
             runCatching {
                 val profile = repository.loadUserProfile(username)
-                val posts = repository.loadUserPosts(_uiState.value.session, username).posts
+                val rawPosts = repository.loadUserPosts(currentSession, username).posts
+                val posts = if (currentSession != null) augmentLoveStatuses(rawPosts, currentSession) else rawPosts
                 profile to posts
             }.onSuccess { (profile, posts) ->
                 _uiState.value = _uiState.value.copy(
@@ -313,6 +319,17 @@ class HomeViewModel(
         )
     }
 
+    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = coroutineScope {
+        posts.map { post ->
+            async {
+                val loved = runCatching {
+                    repository.getPostLoveStatus(session, post.id, session.username)
+                }.getOrDefault(post.isLoving ?: false)
+                post.copy(isLoving = loved)
+            }
+        }.map { it.await() }
+    }
+
     private fun observeSessionAndRefresh() {
         viewModelScope.launch {
             repository.sessionFlow
@@ -333,19 +350,20 @@ class HomeViewModel(
 
     private suspend fun loadFeedForCurrentSession(session: AuthSession?) {
         _uiState.value = _uiState.value.copy(feedLoading = true, errorMessage = null)
-        runCatching { repository.loadFeed(session) }
-            .onSuccess { response ->
-                _uiState.value = _uiState.value.copy(
-                    feed = response.posts,
-                    feedLoading = false
-                )
-            }
-            .onFailure { throwable ->
-                _uiState.value = _uiState.value.copy(
-                    feedLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load feed"
-                )
-            }
+        runCatching {
+            val response = repository.loadFeed(session)
+            if (session != null) augmentLoveStatuses(response.posts, session) else response.posts
+        }.onSuccess { posts ->
+            _uiState.value = _uiState.value.copy(
+                feed = posts,
+                feedLoading = false
+            )
+        }.onFailure { throwable ->
+            _uiState.value = _uiState.value.copy(
+                feedLoading = false,
+                errorMessage = throwable.message ?: "Unable to load feed"
+            )
+        }
     }
 
     private suspend fun loadNotifications(session: AuthSession?) {
@@ -370,10 +388,12 @@ class HomeViewModel(
             .onSuccess { profile ->
                 _uiState.value = _uiState.value.copy(accountProfile = profile)
             }
-        runCatching { repository.loadUserPosts(session, session.username).posts }
-            .onSuccess { posts ->
-                _uiState.value = _uiState.value.copy(accountPosts = posts)
-            }
+        runCatching {
+            val rawPosts = repository.loadUserPosts(session, session.username).posts
+            augmentLoveStatuses(rawPosts, session)
+        }.onSuccess { posts ->
+            _uiState.value = _uiState.value.copy(accountPosts = posts)
+        }
         _uiState.value = _uiState.value.copy(accountLoading = false)
     }
 

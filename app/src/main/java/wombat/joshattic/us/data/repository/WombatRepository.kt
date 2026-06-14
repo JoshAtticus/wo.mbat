@@ -80,6 +80,10 @@ class WombatRepository(
         return apiService.togglePostLove(postId, session.token)
     }
 
+    suspend fun getPostLoveStatus(session: AuthSession?, postId: String, username: String): Boolean {
+        return apiService.getPostLoveStatus(postId, username, session?.token)
+    }
+
     suspend fun logout() {
         authPreferences.clearSession()
     }
