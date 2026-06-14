@@ -30,7 +30,18 @@ class HomeViewModel(
     }
 
     fun selectTab(tab: BottomTab) {
-        _uiState.value = _uiState.value.copy(selectedTab = tab)
+        _uiState.value = _uiState.value.copy(
+            selectedTab = tab,
+            viewingProfileUsername = null,
+            viewingProfile = null,
+            viewingProfilePosts = emptyList(),
+            viewingProfileLoading = false,
+            selectedPost = null,
+            comments = emptyList(),
+            commentDraft = "",
+            commentsLoading = false,
+            commentReplyParent = null
+        )
         refreshForSelectedTab(tab)
     }
 
@@ -143,7 +154,12 @@ class HomeViewModel(
             viewingProfileUsername = username,
             viewingProfile = null,
             viewingProfilePosts = emptyList(),
-            viewingProfileLoading = true
+            viewingProfileLoading = true,
+            selectedPost = null,
+            comments = emptyList(),
+            commentDraft = "",
+            commentsLoading = false,
+            commentReplyParent = null
         )
         viewModelScope.launch {
             val currentSession = _uiState.value.session

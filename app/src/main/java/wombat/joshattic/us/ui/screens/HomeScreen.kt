@@ -102,6 +102,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -189,56 +190,76 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onLoveClick = viewModel::togglePostLove
                 )
             } else {
-                when (uiState.selectedTab) {
-                    BottomTab.Home -> FeedTab(
-                        posts = uiState.feed,
-                        loading = uiState.feedLoading,
-                        onRefresh = viewModel::refreshFeed,
-                        onPostClick = viewModel::openPost,
-                        onMentionClick = { username ->
-                            viewModel.openProfile(username)
-                        },
-                        onProfileClick = viewModel::openProfile,
-                        onLoveClick = viewModel::togglePostLove
-                    )
-                    BottomTab.Explore -> ExploreTab(
-                        trendingPosts = uiState.exploreTrendingPosts,
-                        trendingLoading = uiState.exploreTrendingLoading,
-                        onRefresh = viewModel::loadExploreTrending,
-                        onOpenPost = viewModel::openPost,
-                        onMentionClick = { username ->
-                            viewModel.openProfile(username)
-                        },
-                        onProfileClick = viewModel::openProfile,
-                        onLoveClick = viewModel::togglePostLove
-                    )
-                    BottomTab.Notifications -> NotificationsTab(
-                        session = uiState.session,
-                        notifications = uiState.unreadNotifications,
-                        loading = uiState.notificationsLoading,
-                        onRefresh = viewModel::refreshNotifications,
-                        onMarkAllRead = viewModel::markAllNotificationsRead
-                    )
-                    BottomTab.Account -> AccountTab(
-                        session = uiState.session,
-                        profile = uiState.accountProfile,
-                        posts = uiState.accountPosts,
-                        loading = uiState.accountLoading,
-                        loginUsername = uiState.loginUsername,
-                        loginPassword = uiState.loginPassword,
-                        loginLoading = uiState.authLoading,
-                        loginError = uiState.loginError,
-                        onUsernameChange = viewModel::setLoginUsername,
-                        onPasswordChange = viewModel::setLoginPassword,
-                        onLogin = viewModel::login,
-                        onLogout = viewModel::logout,
-                        onRefresh = viewModel::refreshAccount,
-                        onPostClick = viewModel::openPost,
-                        onMentionClick = { username ->
-                            viewModel.openProfile(username)
-                        },
-                        onLoveClick = viewModel::togglePostLove
-                    )
+                val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
+
+                LaunchedEffect(pagerState.settledPage) {
+                    val targetTab = BottomTab.values()[pagerState.settledPage]
+                    if (uiState.selectedTab != targetTab) {
+                        viewModel.selectTab(targetTab)
+                    }
+                }
+
+                LaunchedEffect(uiState.selectedTab) {
+                    if (pagerState.currentPage != uiState.selectedTab.ordinal) {
+                        pagerState.animateScrollToPage(uiState.selectedTab.ordinal)
+                    }
+                }
+
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (BottomTab.values()[page]) {
+                        BottomTab.Home -> FeedTab(
+                            posts = uiState.feed,
+                            loading = uiState.feedLoading,
+                            onRefresh = viewModel::refreshFeed,
+                            onPostClick = viewModel::openPost,
+                            onMentionClick = { username ->
+                                viewModel.openProfile(username)
+                            },
+                            onProfileClick = viewModel::openProfile,
+                            onLoveClick = viewModel::togglePostLove
+                        )
+                        BottomTab.Explore -> ExploreTab(
+                            trendingPosts = uiState.exploreTrendingPosts,
+                            trendingLoading = uiState.exploreTrendingLoading,
+                            onRefresh = viewModel::loadExploreTrending,
+                            onOpenPost = viewModel::openPost,
+                            onMentionClick = { username ->
+                                viewModel.openProfile(username)
+                            },
+                            onProfileClick = viewModel::openProfile,
+                            onLoveClick = viewModel::togglePostLove
+                        )
+                        BottomTab.Notifications -> NotificationsTab(
+                            session = uiState.session,
+                            notifications = uiState.unreadNotifications,
+                            loading = uiState.notificationsLoading,
+                            onRefresh = viewModel::refreshNotifications,
+                            onMarkAllRead = viewModel::markAllNotificationsRead
+                        )
+                        BottomTab.Account -> AccountTab(
+                            session = uiState.session,
+                            profile = uiState.accountProfile,
+                            posts = uiState.accountPosts,
+                            loading = uiState.accountLoading,
+                            loginUsername = uiState.loginUsername,
+                            loginPassword = uiState.loginPassword,
+                            loginLoading = uiState.authLoading,
+                            loginError = uiState.loginError,
+                            onUsernameChange = viewModel::setLoginUsername,
+                            onPasswordChange = viewModel::setLoginPassword,
+                            onLogin = viewModel::login,
+                            onLogout = viewModel::logout,
+                            onRefresh = viewModel::refreshAccount,
+                            onPostClick = viewModel::openPost,
+                            onMentionClick = { username ->
+                                viewModel.openProfile(username)
+                            },
+                            onLoveClick = viewModel::togglePostLove
+                        )
+                    }
                 }
             }
 
@@ -276,7 +297,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onCancelReply = { viewModel.setCommentReplyParent(null) },
                     onReplyToComment = viewModel::setCommentReplyParent,
                     onProfileClick = viewModel::openProfile,
-                    onLoveClick = viewModel::togglePostLove
+                    onLoveClick = viewModel::togglePostLove,
+                    onPostClick = viewModel::openPost
                 )
             }
         }
@@ -310,7 +332,7 @@ private fun FeedTab(
             }
 
             items(posts, key = { it.id }) { post ->
-                PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick)
+                PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onPostClick)
             }
         }
     }
@@ -357,7 +379,7 @@ private fun ExploreTab(
             }
 
             items(trendingPosts, key = { it.id }) { post ->
-                PostCard(post = post, onClick = { onOpenPost(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick)
+                PostCard(post = post, onClick = { onOpenPost(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onOpenPost)
             }
         }
     }
@@ -383,31 +405,6 @@ private fun NotificationsTab(
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Notifications", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (session == null) "Sign in to receive alerts about loves, comments, reposts, and follows." else "Unread items are shown here until you mark them read.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (notifications.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(onClick = onMarkAllRead) {
-                                Icon(Icons.Filled.ArrowDownward, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Mark all read")
-                            }
-                        }
-                    }
-                }
-            }
 
             if (notifications.isEmpty() && !loading) {
                 item { EmptyStateCard("All clear", "No unread notifications right now.") }
@@ -456,17 +453,20 @@ private fun AccountTab(
                 // Profile details card
                 item {
                     if (profile != null) {
+                        val accent = getUserColorSchemeColors(profile.color).first
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
                             shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    ProfilePicture(username = profile.name, size = 56.dp)
+                                    ProfilePicture(username = profile.name, size = 56.dp, borderColor = accent)
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(profile.name, style = MaterialTheme.typography.titleLarge)
+                                        Text(profile.name, style = MaterialTheme.typography.titleLarge, color = accent)
                                         Text(
                                             text = if (profile.online) "Online now" else "Offline",
                                             style = MaterialTheme.typography.bodyMedium,
@@ -478,9 +478,9 @@ private fun AccountTab(
                                 HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")))
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    ProfileStat("Followers", profile.stats?.followers ?: 0)
-                                    ProfileStat("Following", profile.stats?.following ?: 0)
-                                    ProfileStat("Posts", profile.stats?.posts ?: 0)
+                                    ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
+                                    ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
+                                    ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -501,7 +501,7 @@ private fun AccountTab(
                     }
 
                     items(posts, key = { it.id }) { post ->
-                        PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick)
+                        PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onPostClick)
                     }
                 }
             } else {
@@ -782,7 +782,7 @@ private fun ComposerSheet(
                     )
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(12.dp),
-                placeholder = { Text("Write your post... Use markdown like **bold**, *italic*, etc. Attach images below. HTML conversion on Post.") }
+                placeholder = { Text("What's happening? Write words here, markdown supported.") }
             )
 
             // Image attachments preview - shown below the text editor like normal post composer (thumbnails, removable)
@@ -866,13 +866,18 @@ private fun PostDetailsSheet(
     onCancelReply: () -> Unit = {},
     onReplyToComment: (Comment) -> Unit = {},
     onProfileClick: (String) -> Unit = {},
-    onLoveClick: (Post) -> Unit = {}
+    onLoveClick: (Post) -> Unit = {},
+    onPostClick: (Post) -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     // Use local state to track if user has expanded (to prevent auto-expand on future post opens)
     var hasUserExpandedComments by remember { mutableStateOf(false) }
     var isFirstValueReport by remember { mutableStateOf(true) }
+
+    val currentComments by rememberUpdatedState(comments)
+    val currentOnCollapse by rememberUpdatedState(onCollapseComments)
+    val currentOnExpand by rememberUpdatedState(onExpandComments)
 
     // React to sheet value changes, but *ignore the very first value report* after the composable mounts for this post.
     // This ensures that even if the sheet opens already reporting Expanded (due to tall content or animation),
@@ -887,10 +892,13 @@ private fun PostDetailsSheet(
         when (current) {
             SheetValue.Expanded -> {
                 hasUserExpandedComments = true
-                onExpandComments()
+                currentOnExpand()
             }
             SheetValue.PartiallyExpanded -> {
-                onCollapseComments()
+                if (currentComments.isEmpty()) {
+                    hasUserExpandedComments = false
+                    currentOnCollapse()
+                }
             }
             else -> {}
         }
@@ -904,61 +912,63 @@ private fun PostDetailsSheet(
         Column(modifier = Modifier.fillMaxHeight()) {
             val showCommentsSection = hasUserExpandedComments || comments.isNotEmpty()
 
-            // Header / post + section labels or empty/hint (fixed at top)
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp)
             ) {
-                PostCard(
-                    post = post,
-                    onClick = {},
-                    clickable = false,
-                    truncated = false,
-                    onMentionClick = onMentionClick,
-                    onProfileClick = onProfileClick,
-                    onLoveClick = onLoveClick
-                )
-
-                if (showCommentsSection) {
-                    Text("Comments", style = MaterialTheme.typography.titleMedium)
-                    if (loading) {
-                        Row(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Loading comments...", style = MaterialTheme.typography.bodyMedium)
-                        }
-                    } else if (comments.isEmpty()) {
-                        EmptyStateCard("No comments yet", "Start the conversation.")
-                    }
-                    // Comments list (if any) is rendered in a weighted LazyColumn below to allow shrinking for IME
-                } else {
-                    // Hint for less verbose UI; user must swipe up on the sheet to reveal comments
-                    Text(
-                        "Swipe up to view comments",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 8.dp)
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PostCard(
+                        post = post,
+                        onClick = {},
+                        clickable = false,
+                        truncated = false,
+                        onMentionClick = onMentionClick,
+                        onProfileClick = onProfileClick,
+                        onLoveClick = onLoveClick,
+                        onPostClick = onPostClick
                     )
                 }
-            }
 
-            // Weighted scrollable comments list (takes remaining space; shrinks when keyboard opens)
-            if (showCommentsSection && !loading && comments.isNotEmpty()) {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 16.dp)
-                ) {
-                    items(comments, key = { it.id }) { comment ->
-                        CommentCard(
-                            comment = comment,
-                            onReply = onReplyToComment,
-                            onProfileClick = onProfileClick
+                if (showCommentsSection) {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Comments", style = MaterialTheme.typography.titleMedium)
+                            if (loading) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Loading comments...", style = MaterialTheme.typography.bodyMedium)
+                                }
+                            } else if (comments.isEmpty()) {
+                                EmptyStateCard("No comments yet", "Start the conversation.")
+                            }
+                        }
+                    }
+
+                    if (!loading && comments.isNotEmpty()) {
+                        items(comments, key = { it.id }) { comment ->
+                            CommentCard(
+                                comment = comment,
+                                onReply = onReplyToComment,
+                                onProfileClick = onProfileClick
+                            )
+                        }
+                    }
+                } else {
+                    item {
+                        // Hint for less verbose UI; user must swipe up on the sheet to reveal comments
+                        Text(
+                            "Swipe up to view comments",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
                 }
@@ -1135,84 +1145,93 @@ private fun ProfileScreen(
         // Load user's banner with a subtle themed fallback background using their profile colour.
         // Keep the banner modest so it doesn't eat the screen.
         val accent = getUserColorSchemeColors(profile.color).first
-        val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner"
-        Box(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp)
-                .background(accent.copy(alpha = 0.18f))
+                .weight(1f),
+            contentPadding = PaddingValues(bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(bannerUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "Profile banner",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        // Very compact profile info (avatar + name/status + short bio + stats).
-        // This used to take up half the screen; now it's tight so the posts list below gets real room.
-        // Text stays neutral (no forced theme colour on name/status).
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ProfilePicture(username = profile.name, size = 40.dp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        profile.name,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Text(
-                        text = if (profile.online) "Online now" else "Offline",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            item {
+                val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner"
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .background(accent.copy(alpha = 0.18f))
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(bannerUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Profile banner",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            HtmlText(
-                autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")),
-                maxLines = 2
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProfileStat("Followers", profile.stats?.followers ?: 0)
-                ProfileStat("Following", profile.stats?.following ?: 0)
-                ProfileStat("Posts", profile.stats?.posts ?: 0)
-            }
-        }
 
-        // Posts get the remaining space (via weight) so you can actually see a bunch of them.
-        // The list (or empty state) is inside a weight(1f) container instead of a sibling fillMaxSize
-        // that ignored the header above it.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-            if (posts.isNotEmpty()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
                 ) {
-                    items(posts, key = { it.id }) { post ->
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ProfilePicture(username = profile.name, size = 56.dp, borderColor = accent)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    profile.name,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = accent
+                                )
+                                Text(
+                                    text = if (profile.online) "Online now" else "Offline",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HtmlText(
+                            autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")),
+                            maxLines = 2
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
+                            ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
+                            ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
+                        }
+                    }
+                }
+            }
+
+            if (posts.isNotEmpty()) {
+                items(posts, key = { it.id }) { post ->
+                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
                         PostCard(
                             post = post,
                             onClick = { onPostClick(post) },
                             truncated = true,
                             onMentionClick = onMentionClick,
                             onProfileClick = onProfileClick,
-                            onLoveClick = onLoveClick
+                            onLoveClick = onLoveClick,
+                            onPostClick = onPostClick
                         )
                     }
                 }
             } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No posts yet")
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text("No posts yet")
+                    }
                 }
             }
         }
@@ -1220,10 +1239,14 @@ private fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileStat(label: String, value: Int) {
+private fun ProfileStat(label: String, value: Int, accentColor: Color? = null) {
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value.toString(), style = MaterialTheme.typography.titleMedium)
+            Text(
+                value.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                color = accentColor ?: MaterialTheme.colorScheme.onSurface
+            )
             Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -1237,7 +1260,8 @@ private fun PostCard(
     truncated: Boolean = false,
     onMentionClick: ((String) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
-    onLoveClick: ((Post) -> Unit)? = null
+    onLoveClick: ((Post) -> Unit)? = null,
+    onPostClick: ((Post) -> Unit)? = null
 ) {
     val imageUrls = extractImages(post.content)
     val displayContent = autoLinkAndMentions(stripImages(post.content))
@@ -1251,13 +1275,16 @@ private fun PostCard(
             modifier = if (clickable) Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(16.dp) else Modifier
+                .padding(vertical = 12.dp) else Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
-                modifier = Modifier.clickable { onProfileClick(post.poster.name) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onProfileClick(post.poster.name) }
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ProfilePicture(username = post.poster.name, size = 40.dp)
@@ -1267,30 +1294,51 @@ private fun PostCard(
                     Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            // Group main post text + repost card with significantly reduced padding/gap between them
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 HtmlText(
                     displayContent,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                     maxLines = if (truncated) 6 else Int.MAX_VALUE,
                     onMentionClick = onMentionClick
                 )
-                post.repost?.let {
-                    val repostDisplay = autoLinkAndMentions(stripImages(it.content))
-                    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                        // Significantly reduced bottom padding (and internal spacing) of the repost card
-                        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Repost", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(it.poster.name, style = MaterialTheme.typography.titleSmall)
+                post.repost?.let { repostPost ->
+                    val repostDisplay = autoLinkAndMentions(stripImages(repostPost.content))
+                    Card(
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = onPostClick != null) {
+                                onPostClick?.invoke(repostPost)
+                            }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                ProfilePicture(username = repostPost.poster.name, size = 24.dp)
+                                Column {
+                                    Text("Repost", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(repostPost.poster.name, style = MaterialTheme.typography.titleSmall)
+                                }
+                            }
                             HtmlText(repostDisplay, maxLines = 4)
                         }
                     }
                 }
             }
             if (imageUrls.isNotEmpty()) {
-                PostImageCarousel(imageUrls)
+                PostImageCarousel(imageUrls, modifier = Modifier.padding(horizontal = 16.dp))
             }
-            Divider()
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 PostMetric(
                     value = post.loves,
                     label = "loves",
@@ -1372,15 +1420,39 @@ private fun NotificationCard(notification: Notification) {
 }
 
 @Composable
-private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp) {
-    AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data("https://api.wasteof.money/users/$username/picture")
-            .crossfade(true)
-            .build(),
-        contentDescription = username,
-        modifier = Modifier.size(size).clip(CircleShape)
-    )
+private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderColor: Color? = null) {
+    if (borderColor != null) {
+        Box(
+            modifier = Modifier.size(size),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .border(3.dp, borderColor, CircleShape)
+            )
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data("https://api.wasteof.money/users/$username/picture")
+                    .crossfade(true)
+                    .build(),
+                contentDescription = username,
+                modifier = Modifier
+                    .size(size - 6.dp)
+                    .clip(CircleShape)
+            )
+        }
+    } else {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data("https://api.wasteof.money/users/$username/picture")
+                .crossfade(true)
+                .build(),
+            contentDescription = username,
+            modifier = Modifier.size(size).clip(CircleShape)
+        )
+    }
 }
 
 @Composable
