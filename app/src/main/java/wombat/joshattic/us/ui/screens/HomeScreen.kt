@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PostAdd
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
@@ -42,7 +41,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
@@ -54,6 +52,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -100,12 +100,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(titleForTab(uiState.selectedTab)) },
-                actions = {
-                    IconButton(onClick = viewModel::refreshCurrentTab) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
-                    }
-                }
+                title = { Text(titleForTab(uiState.selectedTab)) }
             )
         },
         floatingActionButton = {
@@ -137,7 +132,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
         Box(modifier = Modifier.padding(innerPadding)) {
             when (uiState.selectedTab) {
                 BottomTab.Home -> FeedTab(
-                    sessionUsername = uiState.session?.username,
                     posts = uiState.feed,
                     loading = uiState.feedLoading,
                     onRefresh = viewModel::refreshFeed,
@@ -150,17 +144,21 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     posts = uiState.explorePosts,
                     onQueryChange = viewModel::setExploreQuery,
                     onSearch = viewModel::searchExplore,
+                    onRefresh = viewModel::searchExplore,
                     onOpenPost = viewModel::openPost
                 )
                 BottomTab.Notifications -> NotificationsTab(
                     session = uiState.session,
                     notifications = uiState.unreadNotifications,
-                    loading = uiState.isLoading,
+                    loading = uiState.notificationsLoading,
+                    onRefresh = viewModel::refreshNotifications,
                     onMarkAllRead = viewModel::markAllNotificationsRead
                 )
                 BottomTab.Account -> AccountTab(
                     session = uiState.session,
                     profile = uiState.accountProfile,
+                    posts = uiState.accountPosts,
+                    loading = uiState.accountLoading,
                     loginUsername = uiState.loginUsername,
                     loginPassword = uiState.loginPassword,
                     loginLoading = uiState.authLoading,
@@ -169,7 +167,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onPasswordChange = viewModel::setLoginPassword,
                     onLogin = viewModel::login,
                     onLogout = viewModel::logout,
-                    onRefresh = viewModel::refreshAccount
+                    onRefresh = viewModel::refreshAccount,
+                    onPostClick = viewModel::openPost
                 )
             }
 
@@ -199,27 +198,34 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
 @Composable
 private fun FeedTab(
-    sessionUsername: String?,
     posts: List<Post>,
     loading: Boolean,
     onRefresh: () -> Unit,
     onPostClick: (Post) -> Unit
 ) {
-    LazyColumn(
+    val refreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        state = refreshState,
+        isRefreshing = loading,
+        onRefresh = onRefresh
     ) {
-        if (loading && posts.isEmpty()) {
-            item { LoadingCard("Loading feed") }
-        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (loading && posts.isEmpty()) {
+                item { LoadingCard("Loading feed") }
+            }
 
-        if (!loading && posts.isEmpty()) {
-            item { EmptyStateCard(title = "Nothing here yet", message = "Pull fresh posts by refreshing the feed.") }
-        }
+            if (!loading && posts.isEmpty()) {
+                item { EmptyStateCard(title = "Nothing here yet", message = "Pull down to refresh.") }
+            }
 
-        items(posts, key = { it.id }) { post ->
-            PostCard(post = post, onClick = { onPostClick(post) })
+            items(posts, key = { it.id }) { post ->
+                PostCard(post = post, onClick = { onPostClick(post) })
+            }
         }
     }
 }
@@ -232,46 +238,55 @@ private fun ExploreTab(
     posts: List<Post>,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onRefresh: () -> Unit,
     onOpenPost: (Post) -> Unit
 ) {
-    LazyColumn(
+    val refreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        state = refreshState,
+        isRefreshing = loading,
+        onRefresh = onRefresh
     ) {
-        item {
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Search a creator", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = onQueryChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        placeholder = { Text("Enter a username") },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) }
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = onSearch, enabled = query.isNotBlank() || true) {
-                        Icon(Icons.Filled.Tag, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Discover")
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Search a creator", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = onQueryChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("Enter a username") },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) }
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = onSearch, enabled = query.isNotBlank() || true) {
+                            Icon(Icons.Filled.Tag, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Discover")
+                        }
                     }
                 }
             }
-        }
 
-        when {
-            loading -> item { LoadingCard("Searching") }
-            profile == null && posts.isEmpty() -> item { EmptyStateCard("No creator loaded", "Search by username to browse a profile and their posts.") }
-            profile != null -> {
-                item { ProfileHeader(profile) }
-                if (posts.isEmpty()) {
-                    item { EmptyStateCard("No posts found", "This user has no visible posts yet.") }
-                }
-                items(posts, key = { it.id }) { post ->
-                    PostCard(post = post, onClick = { onOpenPost(post) })
+            when {
+                loading -> item { LoadingCard("Searching") }
+                profile == null && posts.isEmpty() -> item { EmptyStateCard("No creator loaded", "Search by username to browse a profile and their posts.") }
+                profile != null -> {
+                    item { ProfileHeader(profile) }
+                    if (posts.isEmpty()) {
+                        item { EmptyStateCard("No posts found", "This user has no visible posts yet.") }
+                    }
+                    items(posts, key = { it.id }) { post ->
+                        PostCard(post = post, onClick = { onOpenPost(post) })
+                    }
                 }
             }
         }
@@ -283,45 +298,54 @@ private fun NotificationsTab(
     session: Any?,
     notifications: List<Notification>,
     loading: Boolean,
+    onRefresh: () -> Unit,
     onMarkAllRead: () -> Unit
 ) {
-    LazyColumn(
+    val refreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        state = refreshState,
+        isRefreshing = loading,
+        onRefresh = onRefresh
     ) {
-        item {
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Notifications", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (session == null) "Sign in to receive alerts about loves, comments, reposts, and follows." else "Unread items are shown here until you mark them read.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (notifications.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(onClick = onMarkAllRead) {
-                            Icon(Icons.Filled.ArrowDownward, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Mark all read")
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Notifications", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (session == null) "Sign in to receive alerts about loves, comments, reposts, and follows." else "Unread items are shown here until you mark them read.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (notifications.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = onMarkAllRead) {
+                                Icon(Icons.Filled.ArrowDownward, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Mark all read")
+                            }
                         }
                     }
                 }
             }
-        }
 
-        if (loading) {
-            item { LoadingCard("Loading notifications") }
-        }
+            if (loading) {
+                item { LoadingCard("Loading notifications") }
+            }
 
-        if (notifications.isEmpty() && !loading) {
-            item { EmptyStateCard("All clear", "No unread notifications right now.") }
-        }
+            if (notifications.isEmpty() && !loading) {
+                item { EmptyStateCard("All clear", "No unread notifications right now.") }
+            }
 
-        items(notifications, key = { it.id }) { notification ->
-            NotificationCard(notification)
+            items(notifications, key = { it.id }) { notification ->
+                NotificationCard(notification)
+            }
         }
     }
 }
@@ -330,6 +354,8 @@ private fun NotificationsTab(
 private fun AccountTab(
     session: Any?,
     profile: User?,
+    posts: List<Post>,
+    loading: Boolean,
     loginUsername: String,
     loginPassword: String,
     loginLoading: Boolean,
@@ -338,89 +364,115 @@ private fun AccountTab(
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onPostClick: (Post) -> Unit
 ) {
-    LazyColumn(
+    val refreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        state = refreshState,
+        isRefreshing = loading,
+        onRefresh = onRefresh
     ) {
-        item {
-            if (profile != null) {
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            ProfilePicture(username = profile.name, size = 56.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(profile.name, style = MaterialTheme.typography.titleLarge)
-                                Text(
-                                    text = if (profile.online) "Online now" else "Offline",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (session != null) {
+                // Profile details card
+                item {
+                    if (profile != null) {
+                        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    ProfilePicture(username = profile.name, size = 56.dp)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(profile.name, style = MaterialTheme.typography.titleLarge)
+                                        Text(
+                                            text = if (profile.online) "Online now" else "Offline",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HtmlText(profile.bio ?: "<p>No bio yet.</p>")
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    ProfileStat("Followers", profile.stats?.followers ?: 0)
+                                    ProfileStat("Following", profile.stats?.following ?: 0)
+                                    ProfileStat("Posts", profile.stats?.posts ?: 0)
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    TextButton(onClick = onLogout) {
+                                        Text("Sign out")
+                                    }
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        HtmlText(profile.bio ?: "<p>No bio yet.</p>")
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ProfileStat("Followers", profile.stats?.followers ?: 0)
-                            ProfileStat("Following", profile.stats?.following ?: 0)
-                            ProfileStat("Posts", profile.stats?.posts ?: 0)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = onRefresh) {
-                                Icon(Icons.Filled.Refresh, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Refresh")
-                            }
-                            TextButton(onClick = onLogout) {
-                                Text("Sign out")
-                            }
-                        }
+                    } else {
+                        LoadingCard("Loading profile")
+                    }
+                }
+
+                // User's posts under the account details
+                if (profile != null) {
+                    if (loading && posts.isEmpty()) {
+                        item { LoadingCard("Loading your posts") }
+                    }
+
+                    if (!loading && posts.isEmpty()) {
+                        item { EmptyStateCard(title = "No posts yet", message = "Pull down to refresh or create your first post.") }
+                    }
+
+                    items(posts, key = { it.id }) { post ->
+                        PostCard(post = post, onClick = { onPostClick(post) })
                     }
                 }
             } else {
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Sign in", style = MaterialTheme.typography.titleLarge)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Use your wasteof.money account to post, comment, and see notifications.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = loginUsername,
-                            onValueChange = onUsernameChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("Username") },
-                            leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) }
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = loginPassword,
-                            onValueChange = onPasswordChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("Password") },
-                            visualTransformation = PasswordVisualTransformation()
-                        )
-                        if (!loginError.isNullOrBlank()) {
+                item {
+                    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Sign in", style = MaterialTheme.typography.titleLarge)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(loginError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(onClick = onLogin, enabled = !loginLoading) {
-                            if (loginLoading) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Use your wasteof.money account to post, comment, and see notifications.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = loginUsername,
+                                onValueChange = onUsernameChange,
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                label = { Text("Username") },
+                                leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) }
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = loginPassword,
+                                onValueChange = onPasswordChange,
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                label = { Text("Password") },
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                            if (!loginError.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(loginError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                             }
-                            Text("Sign in")
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = onLogin, enabled = !loginLoading) {
+                                if (loginLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text("Sign in")
+                            }
                         }
                     }
                 }

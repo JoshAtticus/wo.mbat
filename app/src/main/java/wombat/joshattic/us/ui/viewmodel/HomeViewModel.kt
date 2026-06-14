@@ -94,6 +94,7 @@ class HomeViewModel(
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(showComposer = false, composeDraft = "")
                     refreshFeed()
+                    refreshAccount()
                 }
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
@@ -205,10 +206,6 @@ class HomeViewModel(
         }
     }
 
-    fun refreshCurrentTab() {
-        refreshForSelectedTab(_uiState.value.selectedTab)
-    }
-
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
@@ -250,24 +247,31 @@ class HomeViewModel(
 
     private suspend fun loadNotifications(session: AuthSession?) {
         if (session == null) {
-            _uiState.value = _uiState.value.copy(unreadNotifications = emptyList())
+            _uiState.value = _uiState.value.copy(unreadNotifications = emptyList(), notificationsLoading = false)
             return
         }
 
+        _uiState.value = _uiState.value.copy(notificationsLoading = true)
         val unread = runCatching { repository.loadUnreadNotifications(session) }.getOrDefault(emptyList())
-        _uiState.value = _uiState.value.copy(unreadNotifications = unread)
+        _uiState.value = _uiState.value.copy(unreadNotifications = unread, notificationsLoading = false)
     }
 
     private suspend fun loadAccountProfile(session: AuthSession?) {
         if (session == null) {
-            _uiState.value = _uiState.value.copy(accountProfile = null)
+            _uiState.value = _uiState.value.copy(accountProfile = null, accountPosts = emptyList(), accountLoading = false)
             return
         }
 
+        _uiState.value = _uiState.value.copy(accountLoading = true)
         runCatching { repository.loadUserProfile(session.username) }
             .onSuccess { profile ->
                 _uiState.value = _uiState.value.copy(accountProfile = profile)
             }
+        runCatching { repository.loadUserPosts(session, session.username).posts }
+            .onSuccess { posts ->
+                _uiState.value = _uiState.value.copy(accountPosts = posts)
+            }
+        _uiState.value = _uiState.value.copy(accountLoading = false)
     }
 
     private suspend fun loadComments(postId: String) {
