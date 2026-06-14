@@ -144,11 +144,10 @@ class HomeViewModel(
             selectedPost = post,
             showComposer = false,
             commentDraft = "",
-            comments = emptyList()
+            comments = emptyList(),
+            commentsLoading = false
         )
-        viewModelScope.launch {
-            loadComments(post.id)
-        }
+        // Comments are loaded lazily when user swipes up in the details sheet to expand
     }
 
     fun closePost() {
@@ -208,6 +207,19 @@ class HomeViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun loadCommentsForCurrentPost() {
+        val post = _uiState.value.selectedPost ?: return
+        if (_uiState.value.comments.isEmpty()) {
+            viewModelScope.launch {
+                loadComments(post.id)
+            }
+        }
+    }
+
+    fun clearComments() {
+        _uiState.value = _uiState.value.copy(comments = emptyList(), commentsLoading = false)
     }
 
     private fun observeSessionAndRefresh() {
