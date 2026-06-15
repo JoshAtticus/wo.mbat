@@ -2099,16 +2099,40 @@ private fun PostImageCarousel(
     isDetailView: Boolean = false
 ) {
     if (images.isEmpty()) return
+
+    if (images.size == 1) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(images[0])
+                .crossfade(true)
+                .build(),
+            contentDescription = "Post image",
+            modifier = modifier
+                .fillMaxWidth()
+                .then(
+                    if (isDetailView) {
+                        Modifier.heightIn(max = 600.dp)
+                    } else {
+                        Modifier.height(220.dp)
+                    }
+                )
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onImageClick(images, 0) },
+            contentScale = if (isDetailView) ContentScale.FillWidth else ContentScale.Crop
+        )
+        return
+    }
+
     // Keying by the images list hash ensures the state resets when the images change (e.g., when a different post is selected)
     val pagerState = key(images) {
         rememberPagerState(pageCount = { images.size })
     }
-    Column(modifier = modifier.padding(top = 8.dp)) {
+    Column(modifier = modifier) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (isDetailView) 300.dp else 200.dp)
+                .height(if (isDetailView) 400.dp else 220.dp)
                 .clip(RoundedCornerShape(12.dp))
         ) { page ->
             AsyncImage(
@@ -2120,7 +2144,7 @@ private fun PostImageCarousel(
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable { onImageClick(images, page) },
-                contentScale = if (isDetailView) ContentScale.Fit else ContentScale.Crop
+                contentScale = ContentScale.Crop
             )
         }
         if (images.size > 1) {
