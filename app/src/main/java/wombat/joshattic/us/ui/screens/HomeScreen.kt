@@ -103,6 +103,11 @@ import android.text.style.URLSpan
 import android.text.TextPaint
 import android.view.View
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -779,38 +784,76 @@ private fun ComposerSheet(
     }
 
     if (showDraftsDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showDraftsDialog = false },
-            title = { Text("Drafts") },
-            text = {
-                Column {
-                    if (drafts.isEmpty()) {
-                        Text("No saved drafts yet. Close the composer to save the current post as a draft.")
-                    } else {
-                        drafts.forEach { d ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.7f)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Drafts Manager", style = MaterialTheme.typography.headlineSmall)
+                    IconButton(onClick = { showDraftsDialog = false }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close")
+                    }
+                }
+
+                if (drafts.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text("No saved drafts yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyVerticalStaggeredGrid(
+                        columns = StaggeredGridCells.Fixed(2),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalItemSpacing = 8.dp
+                    ) {
+                        items(drafts) { d ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                             ) {
-                                Text(
-                                    text = d.take(100) + if (d.length > 100) "..." else "",
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 2
-                                )
-                                TextButton(onClick = {
-                                    onRestoreDraft(d)
-                                    showDraftsDialog = false
-                                }) { Text("Restore") }
-                                TextButton(onClick = { onDeleteDraft(d) }) { Text("Delete") }
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = d,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 10,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        IconButton(onClick = {
+                                            onRestoreDraft(d)
+                                            showDraftsDialog = false
+                                        }) {
+                                            Icon(Icons.Filled.Restore, contentDescription = "Restore", tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                        IconButton(onClick = { onDeleteDraft(d) }) {
+                                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showDraftsDialog = false }) { Text("Close") }
             }
-        )
+        }
     }
 
     ModalBottomSheet(
@@ -864,21 +907,30 @@ private fun ComposerSheet(
             }
 
             // Direct editable text input (no outer box, input itself sized and styled)
-            OutlinedTextField(
-                value = draft,
-                onValueChange = onDraftChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 220.dp)
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(12.dp),
-                placeholder = { Text("What's happening? Write words here, markdown supported.") }
-            )
+            val wordCount = draft.split(Regex("\\s+")).filter { it.isNotBlank() }.size
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 220.dp)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(12.dp),
+                    placeholder = { Text("What's happening? Write words here, markdown supported.") }
+                )
+                Text(
+                    text = "$wordCount / ${HomeViewModel.MAX_WORD_COUNT} words",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (wordCount > HomeViewModel.MAX_WORD_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.End)
+                )
+            }
 
             // Image attachments preview - shown below the text editor like normal post composer (thumbnails, removable)
             if (currentImages.isNotEmpty()) {
@@ -932,7 +984,7 @@ private fun ComposerSheet(
                         onDraftChange(fullHtml)
                         onSubmit()
                     },
-                    enabled = draft.isNotBlank() || currentImages.isNotEmpty(),
+                    enabled = (draft.isNotBlank() || currentImages.isNotEmpty()) && wordCount <= HomeViewModel.MAX_WORD_COUNT,
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Icon(Icons.Filled.PostAdd, contentDescription = null)
@@ -1293,8 +1345,7 @@ private fun ProfileScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 16.dp),
+                .weight(1f),
             contentPadding = PaddingValues(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -1303,7 +1354,6 @@ private fun ProfileScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = -16.dp)
                         .height(80.dp)
                         .background(accent.copy(alpha = 0.18f))
                 ) {
@@ -1323,6 +1373,7 @@ private fun ProfileScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                         .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
@@ -1387,7 +1438,7 @@ private fun ProfileScreen(
 
             if (posts.isNotEmpty()) {
                 items(posts, key = { it.id }) { post ->
-                    Box(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         PostCard(
                             post = post,
                             onClick = { onPostClick(post) },

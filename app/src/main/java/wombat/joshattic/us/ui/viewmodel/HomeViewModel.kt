@@ -100,10 +100,10 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(composeDraft = draft, errorMessage = null)
     }
 
-    fun submitPost() {
+    fun submitPost(contentOverride: String? = null) {
         viewModelScope.launch {
             val session = _uiState.value.session ?: return@launch
-            val draft = _uiState.value.composeDraft.trim()
+            val draft = contentOverride?.trim() ?: _uiState.value.composeDraft.trim()
             if (draft.isBlank()) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Write something before posting.")
                 return@launch
@@ -119,6 +119,10 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
                 }
         }
+    }
+
+    fun clearAllDrafts() {
+        _uiState.value = _uiState.value.copy(composerDrafts = emptyList(), toastMessage = "All drafts cleared")
     }
 
     fun refreshFeed() {
@@ -321,13 +325,17 @@ class HomeViewModel(
         val currentDrafts = _uiState.value.composerDrafts
         if (!currentDrafts.contains(draft)) {
             _uiState.value = _uiState.value.copy(
-                composerDrafts = listOf(draft) + currentDrafts
+                composerDrafts = listOf(draft) + currentDrafts,
+                toastMessage = "Post saved to drafts"
             )
         }
     }
 
     fun restoreDraft(draft: String) {
-        _uiState.value = _uiState.value.copy(composeDraft = draft)
+        _uiState.value = _uiState.value.copy(
+            composeDraft = draft,
+            composerDrafts = _uiState.value.composerDrafts.filter { it != draft }
+        )
     }
 
     fun deleteDraft(draft: String) {
@@ -595,6 +603,7 @@ class HomeViewModel(
 
     companion object {
         private const val DEFAULT_GUEST_USER = "jeffalo"
+        const val MAX_WORD_COUNT = 500
 
         fun factory(repository: WombatRepository): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
