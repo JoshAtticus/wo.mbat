@@ -58,6 +58,11 @@ class WombatRepository(
         return apiService.getUnreadNotifications(token).unread.orEmpty()
     }
 
+    suspend fun loadReadNotifications(session: AuthSession?): List<Notification> {
+        val token = session?.token ?: return emptyList()
+        return apiService.getReadNotifications(token).read.orEmpty()
+    }
+
     suspend fun createPost(session: AuthSession, htmlContent: String): Post {
         return apiService.makePost(
             token = session.token,

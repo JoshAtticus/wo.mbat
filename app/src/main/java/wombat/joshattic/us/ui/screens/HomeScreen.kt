@@ -101,6 +101,7 @@ import android.text.style.UnderlineSpan
 import android.text.style.URLSpan
 import android.text.TextPaint
 import android.view.View
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -260,7 +261,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         )
                         BottomTab.Notifications -> NotificationsTab(
                             session = uiState.session,
-                            notifications = uiState.unreadNotifications,
+                            unreadNotifications = uiState.unreadNotifications,
+                            readNotifications = uiState.readNotifications,
                             loading = uiState.notificationsLoading,
                             onRefresh = viewModel::refreshNotifications,
                             onMarkAllRead = viewModel::markAllNotificationsRead
@@ -393,22 +395,9 @@ private fun ExploreTab(
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Text("Trending Posts", style = MaterialTheme.typography.titleMedium)
-            }
-
-            if (trendingLoading && trendingPosts.isEmpty()) {
-                item {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Loading trending")
-                    }
-                }
-            }
 
             if (trendingPosts.isEmpty() && !trendingLoading) {
-                item { EmptyStateCard("No trending posts", "Pull to refresh to load trending posts.") }
+                item { EmptyStateCard("No trending posts (bug?)", "Pull to refresh to load trending posts.") }
             }
 
             items(trendingPosts, key = { it.id }) { post ->
@@ -421,7 +410,8 @@ private fun ExploreTab(
 @Composable
 private fun NotificationsTab(
     session: Any?,
-    notifications: List<Notification>,
+    unreadNotifications: List<Notification>,
+    readNotifications: List<Notification>,
     loading: Boolean,
     onRefresh: () -> Unit,
     onMarkAllRead: () -> Unit
@@ -439,12 +429,74 @@ private fun NotificationsTab(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            if (notifications.isEmpty() && !loading) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        val unreadCount = unreadNotifications.size
+                        Text(
+                            text = "$unreadCount unread notification${if (unreadCount != 1) "s" else ""}",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        if (session == null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Sign in to receive alerts about loves, comments, reposts, and follows.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (unreadNotifications.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = onMarkAllRead) {
+                                Icon(Icons.Filled.ArrowDownward, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Mark all read")
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (unreadNotifications.isEmpty() && !loading) {
                 item { EmptyStateCard("All clear", "No unread notifications right now.") }
             }
 
-            items(notifications, key = { it.id }) { notification ->
+            items(unreadNotifications, key = { it.id }) { notification ->
                 NotificationCard(notification)
+            }
+
+            if (readNotifications.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp, horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        Text(
+                            text = "Read notifications",
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
+                }
+
+                items(readNotifications, key = { it.id }) { notification ->
+                    NotificationCard(notification)
+                }
             }
         }
     }

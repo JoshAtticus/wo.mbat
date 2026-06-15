@@ -10,6 +10,7 @@ data class HomeUiState(
     val session: AuthSession? = null,
     val feed: List<Post> = emptyList(),
     val unreadNotifications: List<Notification> = emptyList(),
+    val readNotifications: List<Notification> = emptyList(),
     val accountProfile: User? = null,
     val exploreProfile: User? = null,
     val explorePosts: List<Post> = emptyList(),

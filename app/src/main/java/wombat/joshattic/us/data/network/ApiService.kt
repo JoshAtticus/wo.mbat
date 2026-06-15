@@ -51,6 +51,11 @@ interface ApiService {
         @Header("authorization") token: String
     ): NotificationResponse
 
+    @GET("messages/read")
+    suspend fun getReadNotifications(
+        @Header("authorization") token: String
+    ): NotificationResponse
+
     @POST("messages/mark/read")
     suspend fun markRead(
         @Header("authorization") token: String,

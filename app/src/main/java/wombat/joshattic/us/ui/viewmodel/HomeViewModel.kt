@@ -481,13 +481,18 @@ class HomeViewModel(
 
     private suspend fun loadNotifications(session: AuthSession?) {
         if (session == null) {
-            _uiState.value = _uiState.value.copy(unreadNotifications = emptyList(), notificationsLoading = false)
+            _uiState.value = _uiState.value.copy(unreadNotifications = emptyList(), readNotifications = emptyList(), notificationsLoading = false)
             return
         }
 
         _uiState.value = _uiState.value.copy(notificationsLoading = true)
         val unread = runCatching { repository.loadUnreadNotifications(session) }.getOrDefault(emptyList())
-        _uiState.value = _uiState.value.copy(unreadNotifications = unread, notificationsLoading = false)
+        val read = runCatching { repository.loadReadNotifications(session) }.getOrDefault(emptyList())
+        _uiState.value = _uiState.value.copy(
+            unreadNotifications = unread,
+            readNotifications = read,
+            notificationsLoading = false
+        )
     }
 
     private suspend fun loadAccountProfile(session: AuthSession?) {
