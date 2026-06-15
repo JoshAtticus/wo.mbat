@@ -11,6 +11,7 @@ import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
 import wombat.joshattic.us.data.model.CreatePostRequest
 import wombat.joshattic.us.data.model.FeedResponse
+import wombat.joshattic.us.data.model.FollowToggleResponse
 import wombat.joshattic.us.data.model.LoginRequest
 import wombat.joshattic.us.data.model.LoginResponse
 import wombat.joshattic.us.data.model.MarkReadRequest
@@ -93,4 +94,17 @@ interface ApiService {
         @Path("username") username: String,
         @Header("authorization") token: String? = null
     ): Boolean
+
+    @GET("users/{username}/followers/{follower}")
+    suspend fun getFollowStatus(
+        @Path("username") username: String,
+        @Path("follower") follower: String,
+        @Header("authorization") token: String? = null
+    ): Boolean
+
+    @POST("users/{username}/followers")
+    suspend fun toggleFollow(
+        @Path("username") username: String,
+        @Header("authorization") token: String
+    ): FollowToggleResponse
 }

@@ -4,6 +4,7 @@ package wombat.joshattic.us.ui.screens
 
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PostAdd
@@ -65,6 +67,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -131,11 +135,19 @@ import java.util.Date
 fun HomeScreen(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(uiState.toastMessage) {
+        uiState.toastMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearToast()
         }
     }
 
@@ -181,7 +193,15 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     profile = uiState.viewingProfile,
                     posts = uiState.viewingProfilePosts,
                     loading = uiState.viewingProfileLoading,
+                    isBlocked = uiState.viewingProfileUsername?.let { uiState.blockedUsernames.contains(it.lowercase()) } == true,
+                    isFollowing = uiState.viewingProfileIsFollowing,
+                    followLoading = uiState.viewingProfileFollowLoading,
+                    currentUsername = uiState.session?.username,
                     onClose = viewModel::closeProfile,
+                    onFollowClick = viewModel::toggleViewedProfileFollow,
+                    onBlockClick = { username -> viewModel.blockUser(username) },
+                    onBlockReportClick = { username -> viewModel.blockUser(username, reported = true) },
+                    onUnblockClick = viewModel::unblockViewedProfile,
                     onPostClick = viewModel::openPost,
                     onMentionClick = { username ->
                         viewModel.openProfile(username)
@@ -220,6 +240,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             },
                             onProfileClick = viewModel::openProfile,
                             onLoveClick = viewModel::togglePostLove
+                            ,
+                            onBlockUser = { username -> viewModel.blockUser(username) },
+                            onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
                         )
                         BottomTab.Explore -> ExploreTab(
                             trendingPosts = uiState.exploreTrendingPosts,
@@ -231,6 +254,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             },
                             onProfileClick = viewModel::openProfile,
                             onLoveClick = viewModel::togglePostLove
+                            ,
+                            onBlockUser = { username -> viewModel.blockUser(username) },
+                            onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
                         )
                         BottomTab.Notifications -> NotificationsTab(
                             session = uiState.session,
@@ -299,6 +325,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onProfileClick = viewModel::openProfile,
                     onLoveClick = viewModel::togglePostLove,
                     onPostClick = viewModel::openPost
+                    ,
+                    onBlockUser = { username -> viewModel.blockUser(username) },
+                    onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
                 )
             }
         }
@@ -313,7 +342,9 @@ private fun FeedTab(
     onPostClick: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
-    onLoveClick: (Post) -> Unit = {}
+    onLoveClick: (Post) -> Unit = {},
+    onBlockUser: ((String) -> Unit)? = null,
+    onBlockReportUser: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -332,7 +363,7 @@ private fun FeedTab(
             }
 
             items(posts, key = { it.id }) { post ->
-                PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onPostClick)
+                PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onPostClick, onBlockUser = onBlockUser, onBlockReportUser = onBlockReportUser)
             }
         }
     }
@@ -346,7 +377,9 @@ private fun ExploreTab(
     onOpenPost: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
-    onLoveClick: (Post) -> Unit = {}
+    onLoveClick: (Post) -> Unit = {},
+    onBlockUser: ((String) -> Unit)? = null,
+    onBlockReportUser: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -379,7 +412,7 @@ private fun ExploreTab(
             }
 
             items(trendingPosts, key = { it.id }) { post ->
-                PostCard(post = post, onClick = { onOpenPost(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onOpenPost)
+                PostCard(post = post, onClick = { onOpenPost(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onOpenPost, onBlockUser = onBlockUser, onBlockReportUser = onBlockReportUser)
             }
         }
     }
@@ -867,7 +900,9 @@ private fun PostDetailsSheet(
     onReplyToComment: (Comment) -> Unit = {},
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onPostClick: (Post) -> Unit = {}
+    onPostClick: (Post) -> Unit = {},
+    onBlockUser: ((String) -> Unit)? = null,
+    onBlockReportUser: ((String) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
@@ -929,7 +964,9 @@ private fun PostDetailsSheet(
                         onMentionClick = onMentionClick,
                         onProfileClick = onProfileClick,
                         onLoveClick = onLoveClick,
-                        onPostClick = onPostClick
+                        onPostClick = onPostClick,
+                        onBlockUser = onBlockUser,
+                        onBlockReportUser = onBlockReportUser
                     )
                 }
 
@@ -1106,12 +1143,21 @@ private fun ProfileScreen(
     profile: User?,
     posts: List<Post>,
     loading: Boolean,
+    isBlocked: Boolean,
+    isFollowing: Boolean?,
+    followLoading: Boolean,
+    currentUsername: String?,
     onClose: () -> Unit,
+    onFollowClick: () -> Unit,
+    onBlockClick: (String) -> Unit,
+    onBlockReportClick: (String) -> Unit,
+    onUnblockClick: () -> Unit,
     onPostClick: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {}
 ) {
+    var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -1126,6 +1172,22 @@ private fun ProfileScreen(
                 text = profile?.name?.let { "@$it" } ?: "Profile",
                 style = MaterialTheme.typography.titleMedium
             )
+        }
+
+        if (isBlocked) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("You've blocked this user", style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = onUnblockClick) {
+                        Text("Unblock")
+                    }
+                }
+            }
+            return@Column
         }
 
         if (loading) {
@@ -1185,7 +1247,7 @@ private fun ProfileScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             ProfilePicture(username = profile.name, size = 56.dp, borderColor = accent)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     profile.name,
                                     style = MaterialTheme.typography.titleLarge,
@@ -1196,6 +1258,14 @@ private fun ProfileScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            }
+                            if (currentUsername?.equals(profile.name, ignoreCase = true) != true) {
+                                Button(
+                                    onClick = onFollowClick,
+                                    enabled = currentUsername != null && !followLoading
+                                ) {
+                                    Text(if (isFollowing == true) "Unfollow" else "Follow")
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
@@ -1208,6 +1278,24 @@ private fun ProfileScreen(
                             ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
                             ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
                             ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
+                            Spacer(modifier = Modifier.weight(1f))
+                            Box {
+                                IconButton(onClick = { profileMenuExpanded = true }) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = "Profile options")
+                                }
+                                UserActionsMenu(
+                                    expanded = profileMenuExpanded,
+                                    onDismiss = { profileMenuExpanded = false },
+                                    onBlock = {
+                                        profileMenuExpanded = false
+                                        onBlockClick(profile.name)
+                                    },
+                                    onBlockReport = {
+                                        profileMenuExpanded = false
+                                        onBlockReportClick(profile.name)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -1223,7 +1311,9 @@ private fun ProfileScreen(
                             onMentionClick = onMentionClick,
                             onProfileClick = onProfileClick,
                             onLoveClick = onLoveClick,
-                            onPostClick = onPostClick
+                            onPostClick = onPostClick,
+                            onBlockUser = onBlockClick,
+                            onBlockReportUser = onBlockReportClick
                         )
                     }
                 }
@@ -1253,6 +1343,25 @@ private fun ProfileStat(label: String, value: Int, accentColor: Color? = null) {
 }
 
 @Composable
+private fun UserActionsMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onBlock: () -> Unit,
+    onBlockReport: () -> Unit
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Block") },
+            onClick = onBlock
+        )
+        DropdownMenuItem(
+            text = { Text("Block & Report") },
+            onClick = onBlockReport
+        )
+    }
+}
+
+@Composable
 private fun PostCard(
     post: Post,
     onClick: () -> Unit,
@@ -1261,10 +1370,13 @@ private fun PostCard(
     onMentionClick: ((String) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: ((Post) -> Unit)? = null,
-    onPostClick: ((Post) -> Unit)? = null
+    onPostClick: ((Post) -> Unit)? = null,
+    onBlockUser: ((String) -> Unit)? = null,
+    onBlockReportUser: ((String) -> Unit)? = null
 ) {
     val imageUrls = extractImages(post.content)
     val displayContent = autoLinkAndMentions(stripImages(post.content))
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -1292,6 +1404,25 @@ private fun PostCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(post.poster.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (onBlockUser != null && onBlockReportUser != null) {
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Post options")
+                        }
+                        UserActionsMenu(
+                            expanded = menuExpanded,
+                            onDismiss = { menuExpanded = false },
+                            onBlock = {
+                                menuExpanded = false
+                                onBlockUser?.invoke(post.poster.name)
+                            },
+                            onBlockReport = {
+                                menuExpanded = false
+                                onBlockReportUser?.invoke(post.poster.name)
+                            }
+                        )
+                    }
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.data.storage.AuthPreferences
+import wombat.joshattic.us.data.storage.BlockedUsersDatabase
 import wombat.joshattic.us.ui.screens.HomeScreen
 import wombat.joshattic.us.ui.theme.WombatTheme
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
@@ -19,7 +20,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val repository = WombatRepository(
             apiService = RetrofitClient.apiService,
-            authPreferences = AuthPreferences(applicationContext)
+            authPreferences = AuthPreferences(applicationContext),
+            blockedUsersDatabase = BlockedUsersDatabase(applicationContext)
         )
         enableEdgeToEdge()
         setContent {

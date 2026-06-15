@@ -27,6 +27,7 @@ class HomeViewModel(
 
     init {
         observeSessionAndRefresh()
+        observeBlockedUsers()
     }
 
     fun selectTab(tab: BottomTab) {
@@ -36,6 +37,8 @@ class HomeViewModel(
             viewingProfile = null,
             viewingProfilePosts = emptyList(),
             viewingProfileLoading = false,
+            viewingProfileIsFollowing = null,
+            viewingProfileFollowLoading = false,
             selectedPost = null,
             comments = emptyList(),
             commentDraft = "",
@@ -134,7 +137,8 @@ class HomeViewModel(
             val currentSession = _uiState.value.session
             runCatching {
                 val response = repository.loadTrendingPosts(currentSession)
-                if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
+                val posts = if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
+                filterBlockedPosts(posts)
             }.onSuccess { posts ->
                 _uiState.value = _uiState.value.copy(
                     exploreTrendingPosts = posts,
@@ -150,29 +154,38 @@ class HomeViewModel(
     }
 
     fun openProfile(username: String) {
+        val normalizedUsername = username.trim()
+        val isBlocked = _uiState.value.blockedUsernames.contains(normalizedUsername.lowercase())
         _uiState.value = _uiState.value.copy(
-            viewingProfileUsername = username,
+            viewingProfileUsername = normalizedUsername,
             viewingProfile = null,
             viewingProfilePosts = emptyList(),
-            viewingProfileLoading = true,
+            viewingProfileLoading = !isBlocked,
+            viewingProfileIsFollowing = null,
+            viewingProfileFollowLoading = false,
             selectedPost = null,
             comments = emptyList(),
             commentDraft = "",
             commentsLoading = false,
             commentReplyParent = null
         )
+        if (isBlocked) return
         viewModelScope.launch {
             val currentSession = _uiState.value.session
             runCatching {
-                val profile = repository.loadUserProfile(username)
-                val rawPosts = repository.loadUserPosts(currentSession, username).posts
+                val profile = repository.loadUserProfile(normalizedUsername)
+                val rawPosts = repository.loadUserPosts(currentSession, normalizedUsername).posts
                 val posts = if (currentSession != null) augmentLoveStatuses(rawPosts, currentSession) else rawPosts
-                profile to posts
-            }.onSuccess { (profile, posts) ->
+                val isFollowing = currentSession
+                    ?.takeUnless { it.username.equals(normalizedUsername, ignoreCase = true) }
+                    ?.let { repository.getFollowStatus(it, normalizedUsername, it.username) }
+                Triple(profile, posts, isFollowing)
+            }.onSuccess { (profile, posts, isFollowing) ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfile = profile,
-                    viewingProfilePosts = posts,
-                    viewingProfileLoading = false
+                    viewingProfilePosts = filterBlockedPosts(posts),
+                    viewingProfileLoading = false,
+                    viewingProfileIsFollowing = isFollowing
                 )
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
@@ -188,7 +201,9 @@ class HomeViewModel(
             viewingProfileUsername = null,
             viewingProfile = null,
             viewingProfilePosts = emptyList(),
-            viewingProfileLoading = false
+            viewingProfileLoading = false,
+            viewingProfileIsFollowing = null,
+            viewingProfileFollowLoading = false
         )
     }
 
@@ -323,6 +338,60 @@ class HomeViewModel(
         }
     }
 
+    fun blockUser(username: String, reported: Boolean = false) {
+        viewModelScope.launch {
+            repository.blockUser(username)
+            val normalized = username.lowercase()
+            val current = _uiState.value
+            _uiState.value = current.copy(
+                feed = current.feed.filterNotBlocked(normalized),
+                exploreTrendingPosts = current.exploreTrendingPosts.filterNotBlocked(normalized),
+                accountPosts = current.accountPosts.filterNotBlocked(normalized),
+                viewingProfilePosts = current.viewingProfilePosts.filterNotBlocked(normalized),
+                selectedPost = current.selectedPost?.takeUnless { it.poster.name.equals(username, ignoreCase = true) },
+                toastMessage = if (reported) "You've reported this user" else null
+            )
+        }
+    }
+
+    fun unblockViewedProfile() {
+        val username = _uiState.value.viewingProfileUsername ?: return
+        viewModelScope.launch {
+            repository.unblockUser(username)
+            openProfile(username)
+        }
+    }
+
+    fun toggleViewedProfileFollow() {
+        val session = _uiState.value.session ?: return
+        val username = _uiState.value.viewingProfileUsername ?: return
+        if (session.username.equals(username, ignoreCase = true)) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(viewingProfileFollowLoading = true)
+            runCatching { repository.toggleFollow(session, username) }
+                .onSuccess { response ->
+                    val currentProfile = _uiState.value.viewingProfile
+                    _uiState.value = _uiState.value.copy(
+                        viewingProfile = currentProfile?.copy(
+                            stats = currentProfile.stats?.copy(followers = response.new.followers)
+                        ),
+                        viewingProfileIsFollowing = response.new.isFollowing,
+                        viewingProfileFollowLoading = false
+                    )
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        viewingProfileFollowLoading = false,
+                        errorMessage = throwable.message ?: "Unable to update follow"
+                    )
+                }
+        }
+    }
+
+    fun clearToast() {
+        _uiState.value = _uiState.value.copy(toastMessage = null)
+    }
+
     private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
         val current = _uiState.value
         fun transform(p: Post) = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
@@ -334,6 +403,15 @@ class HomeViewModel(
             selectedPost = if (current.selectedPost?.id == postId) transform(current.selectedPost) else current.selectedPost
         )
     }
+
+    private fun filterBlockedPosts(posts: List<Post>): List<Post> =
+        posts.filterNotBlocked(_uiState.value.blockedUsernames)
+
+    private fun List<Post>.filterNotBlocked(username: String): List<Post> =
+        filterNot { it.poster.name.equals(username, ignoreCase = true) }
+
+    private fun List<Post>.filterNotBlocked(blockedUsernames: Set<String>): List<Post> =
+        filterNot { blockedUsernames.contains(it.poster.name.lowercase()) }
 
     private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = coroutineScope {
         posts.map { post ->
@@ -364,11 +442,30 @@ class HomeViewModel(
         }
     }
 
+    private fun observeBlockedUsers() {
+        viewModelScope.launch {
+            repository.blockedUsernamesFlow.collectLatest { blockedUsernames ->
+                val current = _uiState.value
+                _uiState.value = current.copy(
+                    blockedUsernames = blockedUsernames,
+                    feed = current.feed.filterNotBlocked(blockedUsernames),
+                    exploreTrendingPosts = current.exploreTrendingPosts.filterNotBlocked(blockedUsernames),
+                    accountPosts = current.accountPosts.filterNotBlocked(blockedUsernames),
+                    viewingProfilePosts = current.viewingProfilePosts.filterNotBlocked(blockedUsernames),
+                    selectedPost = current.selectedPost?.takeUnless {
+                        blockedUsernames.contains(it.poster.name.lowercase())
+                    }
+                )
+            }
+        }
+    }
+
     private suspend fun loadFeedForCurrentSession(session: AuthSession?) {
         _uiState.value = _uiState.value.copy(feedLoading = true, errorMessage = null)
         runCatching {
             val response = repository.loadFeed(session)
-            if (session != null) augmentLoveStatuses(response.posts, session) else response.posts
+            val posts = if (session != null) augmentLoveStatuses(response.posts, session) else response.posts
+            filterBlockedPosts(posts)
         }.onSuccess { posts ->
             _uiState.value = _uiState.value.copy(
                 feed = posts,
@@ -406,7 +503,7 @@ class HomeViewModel(
             }
         runCatching {
             val rawPosts = repository.loadUserPosts(session, session.username).posts
-            augmentLoveStatuses(rawPosts, session)
+            filterBlockedPosts(augmentLoveStatuses(rawPosts, session))
         }.onSuccess { posts ->
             _uiState.value = _uiState.value.copy(accountPosts = posts)
         }

@@ -89,3 +89,14 @@ data class LoveState(
     val isLoving: Boolean,
     val loves: Int
 )
+
+data class FollowToggleResponse(
+    val ok: String,
+    val new: FollowState
+)
+
+data class FollowState(
+    val isFollowing: Boolean,
+    val followers: Int,
+    val following: Int
+)

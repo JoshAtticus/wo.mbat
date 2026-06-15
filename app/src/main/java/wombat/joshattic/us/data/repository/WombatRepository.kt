@@ -14,12 +14,15 @@ import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.network.ApiService
 import wombat.joshattic.us.data.storage.AuthPreferences
+import wombat.joshattic.us.data.storage.BlockedUsersDatabase
 
 class WombatRepository(
     private val apiService: ApiService,
-    private val authPreferences: AuthPreferences
+    private val authPreferences: AuthPreferences,
+    private val blockedUsersDatabase: BlockedUsersDatabase
 ) {
     val sessionFlow: Flow<AuthSession?> = authPreferences.sessionFlow
+    val blockedUsernamesFlow: Flow<Set<String>> = blockedUsersDatabase.blockedUsernamesFlow
 
     suspend fun login(username: String, password: String): Result<AuthSession> = runCatching {
         val loginResponse = apiService.login(LoginRequest(username = username, password = password))
@@ -82,6 +85,21 @@ class WombatRepository(
 
     suspend fun getPostLoveStatus(session: AuthSession?, postId: String, username: String): Boolean {
         return apiService.getPostLoveStatus(postId, username, session?.token)
+    }
+
+    suspend fun getFollowStatus(session: AuthSession?, username: String, follower: String): Boolean {
+        return apiService.getFollowStatus(username, follower, session?.token)
+    }
+
+    suspend fun toggleFollow(session: AuthSession, username: String) =
+        apiService.toggleFollow(username, session.token)
+
+    suspend fun blockUser(username: String) {
+        blockedUsersDatabase.block(username)
+    }
+
+    suspend fun unblockUser(username: String) {
+        blockedUsersDatabase.unblock(username)
     }
 
     suspend fun logout() {
