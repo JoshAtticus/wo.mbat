@@ -1529,15 +1529,21 @@ private fun PostCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onProfileClick(post.poster.name) }
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ProfilePicture(username = post.poster.name, size = 40.dp)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(post.poster.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onProfileClick(post.poster.name) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ProfilePicture(username = post.poster.name, size = 40.dp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(post.poster.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 if (onBlockUser != null && onBlockReportUser != null) {
                     Box {
@@ -1564,7 +1570,8 @@ private fun PostCard(
                     displayContent,
                     modifier = Modifier.padding(horizontal = 16.dp),
                     maxLines = if (truncated) 6 else Int.MAX_VALUE,
-                    onMentionClick = onMentionClick
+                    onMentionClick = onMentionClick,
+                    onClick = onClick
                 )
                 post.repost?.let { repostPost ->
                     val repostDisplay = autoLinkAndMentions(stripImages(repostPost.content))
@@ -1591,7 +1598,7 @@ private fun PostCard(
                                     Text(repostPost.poster.name, style = MaterialTheme.typography.titleSmall)
                                 }
                             }
-                            HtmlText(repostDisplay, maxLines = 4)
+                            HtmlText(repostDisplay, maxLines = 4, onClick = { onPostClick?.invoke(repostPost) })
                         }
                     }
                 }
@@ -1703,13 +1710,15 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
                 HtmlText(
                     html = content,
                     modifier = Modifier.padding(top = 4.dp),
-                    maxLines = 3
+                    maxLines = 3,
+                    onClick = onClick
                 )
             } else if (notification.data.post != null) {
                 HtmlText(
                     html = notification.data.post.content,
                     modifier = Modifier.padding(top = 4.dp),
-                    maxLines = 2
+                    maxLines = 2,
+                    onClick = onClick
                 )
             }
         }
@@ -1760,7 +1769,8 @@ private fun HtmlText(
     html: String,
     modifier: Modifier = Modifier,
     maxLines: Int = Int.MAX_VALUE,
-    onMentionClick: ((String) -> Unit)? = null
+    onMentionClick: ((String) -> Unit)? = null,
+    onClick: (() -> Unit)? = null
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val linkColor = MaterialTheme.colorScheme.onBackground.toArgb()
@@ -1781,6 +1791,13 @@ private fun HtmlText(
         update = { textView ->
             textView.setTextColor(textColor)
             textView.setLinkTextColor(linkColor)
+
+            // Override click listener on the TextView to trigger the parent's onClick
+            // while LinkMovementMethod still handles the spans.
+            textView.setOnClickListener { onClick?.invoke() }
+            textView.isClickable = onClick != null
+            textView.isFocusable = false
+
             if (maxLines != Int.MAX_VALUE) {
                 textView.maxLines = maxLines
                 textView.ellipsize = android.text.TextUtils.TruncateAt.END
