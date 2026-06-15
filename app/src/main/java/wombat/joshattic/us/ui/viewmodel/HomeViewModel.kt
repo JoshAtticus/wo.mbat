@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
+import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.ui.state.BottomTab
@@ -207,16 +208,47 @@ class HomeViewModel(
         )
     }
 
-    fun openPost(post: Post) {
+    fun openPost(post: Post, scrollToCommentId: String? = null) {
         _uiState.value = _uiState.value.copy(
             selectedPost = post,
             showComposer = false,
             commentDraft = "",
             comments = emptyList(),
             commentsLoading = false,
-            commentReplyParent = null
+            commentReplyParent = null,
+            scrollToCommentId = scrollToCommentId
         )
         // Comments are loaded lazily when user swipes up in the details sheet to expand
+    }
+
+    fun clearScrollToComment() {
+        _uiState.value = _uiState.value.copy(scrollToCommentId = null)
+    }
+
+    fun handleNotificationClick(notification: Notification) {
+        when (notification.type.lowercase()) {
+            "comment" -> {
+                notification.data.post?.let { post ->
+                    openPost(post, scrollToCommentId = notification.data.comment?.id)
+                }
+            }
+            "post_mention", "repost" -> {
+                notification.data.post?.let { post ->
+                    openPost(post)
+                }
+            }
+            "follow" -> {
+                openProfile(notification.data.actor.name)
+            }
+            "wall_comment", "wall_comment_reply" -> {
+                _uiState.value = _uiState.value.copy(toastMessage = "Wall support hasn't been added yet")
+            }
+            "love" -> {
+                notification.data.post?.let { post ->
+                    openPost(post)
+                }
+            }
+        }
     }
 
     fun closePost() {

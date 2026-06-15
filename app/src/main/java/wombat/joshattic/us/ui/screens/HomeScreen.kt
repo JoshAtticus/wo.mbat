@@ -101,6 +101,7 @@ import android.text.style.UnderlineSpan
 import android.text.style.URLSpan
 import android.text.TextPaint
 import android.view.View
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -121,6 +122,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.Notification
@@ -265,7 +267,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             readNotifications = uiState.readNotifications,
                             loading = uiState.notificationsLoading,
                             onRefresh = viewModel::refreshNotifications,
-                            onMarkAllRead = viewModel::markAllNotificationsRead
+                            onMarkAllRead = viewModel::markAllNotificationsRead,
+                            onNotificationClick = viewModel::handleNotificationClick
                         )
                         BottomTab.Account -> AccountTab(
                             session = uiState.session,
@@ -326,10 +329,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onReplyToComment = viewModel::setCommentReplyParent,
                     onProfileClick = viewModel::openProfile,
                     onLoveClick = viewModel::togglePostLove,
-                    onPostClick = viewModel::openPost
-                    ,
+                    onPostClick = viewModel::openPost,
                     onBlockUser = { username -> viewModel.blockUser(username) },
-                    onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
+                    onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) },
+                    scrollToCommentId = uiState.scrollToCommentId,
+                    onScrollToCommentComplete = viewModel::clearScrollToComment
                 )
             }
         }
@@ -414,7 +418,8 @@ private fun NotificationsTab(
     readNotifications: List<Notification>,
     loading: Boolean,
     onRefresh: () -> Unit,
-    onMarkAllRead: () -> Unit
+    onMarkAllRead: () -> Unit,
+    onNotificationClick: (Notification) -> Unit
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -466,7 +471,7 @@ private fun NotificationsTab(
             }
 
             items(unreadNotifications, key = { it.id }) { notification ->
-                NotificationCard(notification)
+                NotificationCard(notification, onClick = { onNotificationClick(notification) })
             }
 
             if (readNotifications.isNotEmpty()) {
@@ -495,7 +500,7 @@ private fun NotificationsTab(
                 }
 
                 items(readNotifications, key = { it.id }) { notification ->
-                    NotificationCard(notification)
+                    NotificationCard(notification, onClick = { onNotificationClick(notification) })
                 }
             }
         }
@@ -954,9 +959,12 @@ private fun PostDetailsSheet(
     onLoveClick: (Post) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
     onBlockUser: ((String) -> Unit)? = null,
-    onBlockReportUser: ((String) -> Unit)? = null
+    onBlockReportUser: ((String) -> Unit)? = null,
+    scrollToCommentId: String? = null,
+    onScrollToCommentComplete: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val listState = rememberLazyListState()
 
     // Use local state to track if user has expanded (to prevent auto-expand on future post opens)
     var hasUserExpandedComments by remember { mutableStateOf(false) }
@@ -965,6 +973,18 @@ private fun PostDetailsSheet(
     val currentComments by rememberUpdatedState(comments)
     val currentOnCollapse by rememberUpdatedState(onCollapseComments)
     val currentOnExpand by rememberUpdatedState(onExpandComments)
+
+    LaunchedEffect(scrollToCommentId, loading, comments) {
+        if (scrollToCommentId != null && !loading && comments.isNotEmpty()) {
+            val index = comments.indexOfFirst { it.id == scrollToCommentId }
+            if (index != -1) {
+                hasUserExpandedComments = true
+                onExpandComments()
+                listState.animateScrollToItem(index + 1) // +1 for post header
+                onScrollToCommentComplete()
+            }
+        }
+    }
 
     // React to sheet value changes, but *ignore the very first value report* after the composable mounts for this post.
     // This ensures that even if the sheet opens already reporting Expanded (due to tall content or animation),
@@ -1000,6 +1020,7 @@ private fun PostDetailsSheet(
             val showCommentsSection = hasUserExpandedComments || comments.isNotEmpty()
 
             LazyColumn(
+                state = listState,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1145,7 +1166,11 @@ private fun WombatBottomNavigationBar(
             icon = {
                 if (profilePictureUrl != null) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(profilePictureUrl).crossfade(true).build(),
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(profilePictureUrl)
+                            .decoderFactory(SvgDecoder.Factory())
+                            .crossfade(true)
+                            .build(),
                         contentDescription = accountLabel,
                         modifier = Modifier.size(28.dp).clip(CircleShape)
                     )
@@ -1575,11 +1600,22 @@ private fun CommentCard(comment: Comment, onReply: (Comment) -> Unit = {}, onPro
 }
 
 @Composable
-private fun NotificationCard(notification: Notification) {
+private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (!notification.read) Modifier.border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(20.dp)
+                ) else Modifier
+            )
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(
+            containerColor = if (notification.read) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1587,15 +1623,36 @@ private fun NotificationCard(notification: Notification) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(notification.data.actor.name, style = MaterialTheme.typography.titleMedium)
-                    Text(notificationLabel(notification.type), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = notificationLabel(notification.type),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Text(formatTime(notification.time), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            notification.data.post?.let {
                 Text(
-                    text = "Related to a post",
-                    style = MaterialTheme.typography.bodyMedium,
+                    formatTime(notification.time),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val content = when (notification.type.lowercase()) {
+                "comment", "wall_comment", "wall_comment_reply" -> notification.data.comment?.content
+                "post_mention", "repost" -> notification.data.post?.content
+                else -> null
+            }
+
+            if (content != null) {
+                HtmlText(
+                    html = content,
+                    modifier = Modifier.padding(top = 4.dp),
+                    maxLines = 3
+                )
+            } else if (notification.data.post != null) {
+                HtmlText(
+                    html = notification.data.post.content,
+                    modifier = Modifier.padding(top = 4.dp),
+                    maxLines = 2
                 )
             }
         }
@@ -1604,6 +1661,15 @@ private fun NotificationCard(notification: Notification) {
 
 @Composable
 private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderColor: Color? = null) {
+    val context = LocalContext.current
+    val imageRequest = remember(username) {
+        ImageRequest.Builder(context)
+            .data("https://api.wasteof.money/users/$username/picture")
+            .decoderFactory(SvgDecoder.Factory())
+            .crossfade(true)
+            .build()
+    }
+
     if (borderColor != null) {
         Box(
             modifier = Modifier.size(size),
@@ -1616,10 +1682,7 @@ private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, 
                     .border(3.dp, borderColor, CircleShape)
             )
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data("https://api.wasteof.money/users/$username/picture")
-                    .crossfade(true)
-                    .build(),
+                model = imageRequest,
                 contentDescription = username,
                 modifier = Modifier
                     .size(size - 6.dp)
@@ -1628,10 +1691,7 @@ private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, 
         }
     } else {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data("https://api.wasteof.money/users/$username/picture")
-                .crossfade(true)
-                .build(),
+            model = imageRequest,
             contentDescription = username,
             modifier = Modifier.size(size).clip(CircleShape)
         )
@@ -1780,6 +1840,9 @@ private fun notificationLabel(type: String): String {
         "comment" -> "Commented on your post"
         "repost" -> "Reposted your content"
         "follow" -> "Followed you"
+        "post_mention" -> "Mentioned you in a post"
+        "wall_comment" -> "Left a comment on your wall"
+        "wall_comment_reply" -> "Replied to a comment on your wall"
         else -> type.replaceFirstChar { it.uppercase() }
     }
 }

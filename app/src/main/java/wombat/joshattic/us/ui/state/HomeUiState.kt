@@ -42,7 +42,8 @@ data class HomeUiState(
     val selectedTab: BottomTab = BottomTab.Home,
     val showComposer: Boolean = false,
     val composerDrafts: List<String> = emptyList(),
-    val commentReplyParent: Comment? = null
+    val commentReplyParent: Comment? = null,
+    val scrollToCommentId: String? = null
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size

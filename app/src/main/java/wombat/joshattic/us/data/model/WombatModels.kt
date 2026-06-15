@@ -49,7 +49,12 @@ data class Notification(
     val time: Long
 )
 
-data class NotificationData(val actor: Poster, val post: Post? = null)
+data class NotificationData(
+    val actor: Poster,
+    val post: Post? = null,
+    val comment: Comment? = null,
+    val wall: Poster? = null
+)
 
 data class CommentResponse(val comments: List<Comment>, val last: Boolean)
 
