@@ -30,6 +30,7 @@ interface ApiService {
     @GET("users/{username}/following/posts")
     suspend fun getFeed(
         @Path("username") username: String,
+        @Query("page") page: Int = 1,
         @Header("authorization") token: String? = null
     ): FeedResponse
 

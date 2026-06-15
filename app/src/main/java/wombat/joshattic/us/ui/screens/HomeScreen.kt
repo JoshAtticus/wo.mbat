@@ -125,6 +125,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -234,7 +235,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     },
                     onProfileClick = viewModel::openProfile,
                     onLoveClick = viewModel::togglePostLove,
-                    onImageClick = viewModel::openFullScreenImages
+                    onImageClick = viewModel::openFullScreenImages,
+                    onLoadNextPage = viewModel::loadNextProfilePage
                 )
             } else {
                 val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
@@ -269,7 +271,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             onLoveClick = viewModel::togglePostLove,
                             onImageClick = viewModel::openFullScreenImages,
                             onBlockUser = { username -> viewModel.blockUser(username) },
-                            onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
+                            onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) },
+                            onLoadNextPage = viewModel::loadNextFeedPage
                         )
                         BottomTab.Explore -> ExploreTab(
                             trendingPosts = uiState.exploreTrendingPosts,
@@ -313,7 +316,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 viewModel.openProfile(username)
                             },
                             onLoveClick = viewModel::togglePostLove,
-                            onImageClick = viewModel::openFullScreenImages
+                            onImageClick = viewModel::openFullScreenImages,
+                            onLoadNextPage = viewModel::loadNextAccountPage
                         )
                     }
                 }
@@ -385,7 +389,8 @@ private fun FeedTab(
     onLoveClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
-    onBlockReportUser: ((String) -> Unit)? = null
+    onBlockReportUser: ((String) -> Unit)? = null,
+    onLoadNextPage: () -> Unit = {}
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -394,7 +399,20 @@ private fun FeedTab(
         isRefreshing = loading,
         onRefresh = onRefresh
     ) {
+        val listState = rememberLazyListState()
+        
+        // Load more when reaching near the end
+        LaunchedEffect(listState, posts.size) {
+            snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                .collect { lastVisibleIndex ->
+                    if (lastVisibleIndex != null && lastVisibleIndex >= posts.size - 5) {
+                        onLoadNextPage()
+                    }
+                }
+        }
+
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize()
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
@@ -587,7 +605,8 @@ private fun AccountTab(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onLoadNextPage: () -> Unit = {}
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -596,7 +615,20 @@ private fun AccountTab(
         isRefreshing = loading,
         onRefresh = onRefresh
     ) {
+        val listState = rememberLazyListState()
+
+        // Load more when reaching near the end
+        LaunchedEffect(listState, posts.size) {
+            snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                .collect { lastVisibleIndex ->
+                    if (lastVisibleIndex != null && lastVisibleIndex >= posts.size - 5 && session != null) {
+                        onLoadNextPage()
+                    }
+                }
+        }
+
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize()
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
@@ -1354,7 +1386,8 @@ private fun ProfileScreen(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onLoadNextPage: () -> Unit = {}
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -1390,7 +1423,7 @@ private fun ProfileScreen(
             return@Column
         }
 
-        if (loading) {
+        if (loading && posts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -1404,10 +1437,23 @@ private fun ProfileScreen(
             return@Column
         }
 
+        val listState = rememberLazyListState()
+
+        // Load more when reaching near the end
+        LaunchedEffect(listState, posts.size) {
+            snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                .collect { lastVisibleIndex ->
+                    if (lastVisibleIndex != null && lastVisibleIndex >= posts.size - 5) {
+                        onLoadNextPage()
+                    }
+                }
+        }
+
         // Load user's banner with a subtle themed fallback background using their profile colour.
         // Keep the banner modest so it doesn't eat the screen.
         val accent = getUserColorSchemeColors(profile.color).first
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),

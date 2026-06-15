@@ -30,9 +30,9 @@ class WombatRepository(
         AuthSession(token = loginResponse.token, username = username)
     }
 
-    suspend fun loadFeed(session: AuthSession?): FeedResponse {
+    suspend fun loadFeed(session: AuthSession?, page: Int = 1): FeedResponse {
         val username = session?.username ?: DEFAULT_GUEST_USER
-        return apiService.getFeed(username = username, token = session?.token)
+        return apiService.getFeed(username = username, page = page, token = session?.token)
     }
 
     suspend fun loadUserProfile(username: String): User {

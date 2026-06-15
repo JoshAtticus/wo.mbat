@@ -44,7 +44,13 @@ class HomeViewModel(
             comments = emptyList(),
             commentDraft = "",
             commentsLoading = false,
-            commentReplyParent = null
+            commentReplyParent = null,
+            feedPage = 1,
+            feedLast = false,
+            accountPage = 1,
+            accountLast = false,
+            viewingProfilePage = 1,
+            viewingProfileLast = false
         )
         refreshForSelectedTab(tab)
     }
@@ -127,7 +133,35 @@ class HomeViewModel(
 
     fun refreshFeed() {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(feedPage = 1, feedLast = false)
             loadFeedForCurrentSession(_uiState.value.session)
+        }
+    }
+
+    fun loadNextFeedPage() {
+        val current = _uiState.value
+        if (current.feedLoading || current.feedLast) return
+        viewModelScope.launch {
+            val nextPage = current.feedPage + 1
+            _uiState.value = current.copy(feedLoading = true)
+            runCatching {
+                val response = repository.loadFeed(current.session, nextPage)
+                val posts = if (current.session != null) augmentLoveStatuses(response.posts, current.session) else response.posts
+                val filtered = filterBlockedPosts(posts)
+                Pair(filtered, response.last)
+            }.onSuccess { (newPosts, isLast) ->
+                _uiState.value = _uiState.value.copy(
+                    feed = _uiState.value.feed + newPosts,
+                    feedLoading = false,
+                    feedPage = nextPage,
+                    feedLast = isLast
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    feedLoading = false,
+                    errorMessage = throwable.message ?: "Unable to load next page"
+                )
+            }
         }
     }
 
@@ -172,25 +206,28 @@ class HomeViewModel(
             comments = emptyList(),
             commentDraft = "",
             commentsLoading = false,
-            commentReplyParent = null
+            commentReplyParent = null,
+            viewingProfilePage = 1,
+            viewingProfileLast = false
         )
         if (isBlocked) return
         viewModelScope.launch {
             val currentSession = _uiState.value.session
             runCatching {
                 val profile = repository.loadUserProfile(normalizedUsername)
-                val rawPosts = repository.loadUserPosts(currentSession, normalizedUsername).posts
-                val posts = if (currentSession != null) augmentLoveStatuses(rawPosts, currentSession) else rawPosts
+                val response = repository.loadUserPosts(currentSession, normalizedUsername, 1)
+                val posts = if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
                 val isFollowing = currentSession
                     ?.takeUnless { it.username.equals(normalizedUsername, ignoreCase = true) }
                     ?.let { repository.getFollowStatus(it, normalizedUsername, it.username) }
-                Triple(profile, posts, isFollowing)
-            }.onSuccess { (profile, posts, isFollowing) ->
+                Triple(profile, posts, isFollowing to response.last)
+            }.onSuccess { (profile, posts, followAndLast) ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfile = profile,
                     viewingProfilePosts = filterBlockedPosts(posts),
                     viewingProfileLoading = false,
-                    viewingProfileIsFollowing = isFollowing
+                    viewingProfileIsFollowing = followAndLast.first,
+                    viewingProfileLast = followAndLast.second
                 )
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
@@ -208,8 +245,38 @@ class HomeViewModel(
             viewingProfilePosts = emptyList(),
             viewingProfileLoading = false,
             viewingProfileIsFollowing = null,
-            viewingProfileFollowLoading = false
+            viewingProfileFollowLoading = false,
+            viewingProfilePage = 1,
+            viewingProfileLast = false
         )
+    }
+
+    fun loadNextProfilePage() {
+        val current = _uiState.value
+        val username = current.viewingProfileUsername ?: return
+        if (current.viewingProfileLoading || current.viewingProfileLast) return
+        viewModelScope.launch {
+            val nextPage = current.viewingProfilePage + 1
+            _uiState.value = current.copy(viewingProfileLoading = true)
+            runCatching {
+                val response = repository.loadUserPosts(current.session, username, nextPage)
+                val posts = if (current.session != null) augmentLoveStatuses(response.posts, current.session) else response.posts
+                val filtered = filterBlockedPosts(posts)
+                Pair(filtered, response.last)
+            }.onSuccess { (newPosts, isLast) ->
+                _uiState.value = _uiState.value.copy(
+                    viewingProfilePosts = _uiState.value.viewingProfilePosts + newPosts,
+                    viewingProfileLoading = false,
+                    viewingProfilePage = nextPage,
+                    viewingProfileLast = isLast
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    viewingProfileLoading = false,
+                    errorMessage = throwable.message ?: "Unable to load next page"
+                )
+            }
+        }
     }
 
     fun openPost(post: Post, scrollToCommentId: String? = null) {
@@ -523,13 +590,15 @@ class HomeViewModel(
     private suspend fun loadFeedForCurrentSession(session: AuthSession?) {
         _uiState.value = _uiState.value.copy(feedLoading = true, errorMessage = null)
         runCatching {
-            val response = repository.loadFeed(session)
+            val response = repository.loadFeed(session, 1)
             val posts = if (session != null) augmentLoveStatuses(response.posts, session) else response.posts
-            filterBlockedPosts(posts)
-        }.onSuccess { posts ->
+            filterBlockedPosts(posts) to response.last
+        }.onSuccess { (posts, isLast) ->
             _uiState.value = _uiState.value.copy(
                 feed = posts,
-                feedLoading = false
+                feedLoading = false,
+                feedLast = isLast,
+                feedPage = 1
             )
         }.onFailure { throwable ->
             _uiState.value = _uiState.value.copy(
@@ -557,7 +626,13 @@ class HomeViewModel(
 
     private suspend fun loadAccountProfile(session: AuthSession?) {
         if (session == null) {
-            _uiState.value = _uiState.value.copy(accountProfile = null, accountPosts = emptyList(), accountLoading = false)
+            _uiState.value = _uiState.value.copy(
+                accountProfile = null,
+                accountPosts = emptyList(),
+                accountLoading = false,
+                accountPage = 1,
+                accountLast = false
+            )
             return
         }
 
@@ -567,12 +642,45 @@ class HomeViewModel(
                 _uiState.value = _uiState.value.copy(accountProfile = profile)
             }
         runCatching {
-            val rawPosts = repository.loadUserPosts(session, session.username).posts
-            filterBlockedPosts(augmentLoveStatuses(rawPosts, session))
-        }.onSuccess { posts ->
-            _uiState.value = _uiState.value.copy(accountPosts = posts)
+            val response = repository.loadUserPosts(session, session.username, 1)
+            val posts = filterBlockedPosts(augmentLoveStatuses(response.posts, session))
+            posts to response.last
+        }.onSuccess { (posts, isLast) ->
+            _uiState.value = _uiState.value.copy(
+                accountPosts = posts,
+                accountLast = isLast,
+                accountPage = 1
+            )
         }
         _uiState.value = _uiState.value.copy(accountLoading = false)
+    }
+
+    fun loadNextAccountPage() {
+        val current = _uiState.value
+        val session = current.session ?: return
+        if (current.accountLoading || current.accountLast) return
+        viewModelScope.launch {
+            val nextPage = current.accountPage + 1
+            _uiState.value = current.copy(accountLoading = true)
+            runCatching {
+                val response = repository.loadUserPosts(session, session.username, nextPage)
+                val posts = augmentLoveStatuses(response.posts, session)
+                val filtered = filterBlockedPosts(posts)
+                Pair(filtered, response.last)
+            }.onSuccess { (newPosts, isLast) ->
+                _uiState.value = _uiState.value.copy(
+                    accountPosts = _uiState.value.accountPosts + newPosts,
+                    accountLoading = false,
+                    accountPage = nextPage,
+                    accountLast = isLast
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    accountLoading = false,
+                    errorMessage = throwable.message ?: "Unable to load next page"
+                )
+            }
+        }
     }
 
     private suspend fun loadComments(postId: String) {

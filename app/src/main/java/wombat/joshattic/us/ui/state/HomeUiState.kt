@@ -45,7 +45,13 @@ data class HomeUiState(
     val commentReplyParent: Comment? = null,
     val scrollToCommentId: String? = null,
     val fullScreenImages: List<String>? = null,
-    val initialFullScreenImageIndex: Int = 0
+    val initialFullScreenImageIndex: Int = 0,
+    val feedPage: Int = 1,
+    val feedLast: Boolean = false,
+    val accountPage: Int = 1,
+    val accountLast: Boolean = false,
+    val viewingProfilePage: Int = 1,
+    val viewingProfileLast: Boolean = false
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size
