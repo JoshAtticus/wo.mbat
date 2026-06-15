@@ -1292,7 +1292,7 @@ private fun ProfileScreen(
     onLoveClick: (Post) -> Unit = {}
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1373,7 +1373,6 @@ private fun ProfileScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
                         .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
@@ -1438,7 +1437,7 @@ private fun ProfileScreen(
 
             if (posts.isNotEmpty()) {
                 items(posts, key = { it.id }) { post ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Box() {
                         PostCard(
                             post = post,
                             onClick = { onPostClick(post) },
