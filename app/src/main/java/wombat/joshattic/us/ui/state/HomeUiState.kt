@@ -43,7 +43,9 @@ data class HomeUiState(
     val showComposer: Boolean = false,
     val composerDrafts: List<String> = emptyList(),
     val commentReplyParent: Comment? = null,
-    val scrollToCommentId: String? = null
+    val scrollToCommentId: String? = null,
+    val fullScreenImages: List<String>? = null,
+    val initialFullScreenImageIndex: Int = 0
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size

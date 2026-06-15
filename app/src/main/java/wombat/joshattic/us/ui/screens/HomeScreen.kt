@@ -2,14 +2,25 @@
 
 package wombat.joshattic.us.ui.screens
 
+import android.app.DownloadManager
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.AnnotatedString
@@ -41,12 +52,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
@@ -88,6 +102,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.runtime.key
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
@@ -126,6 +141,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
@@ -216,7 +233,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         viewModel.openProfile(username)
                     },
                     onProfileClick = viewModel::openProfile,
-                    onLoveClick = viewModel::togglePostLove
+                    onLoveClick = viewModel::togglePostLove,
+                    onImageClick = viewModel::openFullScreenImages
                 )
             } else {
                 val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
@@ -248,8 +266,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 viewModel.openProfile(username)
                             },
                             onProfileClick = viewModel::openProfile,
-                            onLoveClick = viewModel::togglePostLove
-                            ,
+                            onLoveClick = viewModel::togglePostLove,
+                            onImageClick = viewModel::openFullScreenImages,
                             onBlockUser = { username -> viewModel.blockUser(username) },
                             onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
                         )
@@ -262,8 +280,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 viewModel.openProfile(username)
                             },
                             onProfileClick = viewModel::openProfile,
-                            onLoveClick = viewModel::togglePostLove
-                            ,
+                            onLoveClick = viewModel::togglePostLove,
+                            onImageClick = viewModel::openFullScreenImages,
                             onBlockUser = { username -> viewModel.blockUser(username) },
                             onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
                         )
@@ -294,7 +312,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             onMentionClick = { username ->
                                 viewModel.openProfile(username)
                             },
-                            onLoveClick = viewModel::togglePostLove
+                            onLoveClick = viewModel::togglePostLove,
+                            onImageClick = viewModel::openFullScreenImages
                         )
                     }
                 }
@@ -336,13 +355,22 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onProfileClick = viewModel::openProfile,
                     onLoveClick = viewModel::togglePostLove,
                     onPostClick = viewModel::openPost,
-                    onBlockUser = { username -> viewModel.blockUser(username) },
-                    onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) },
+                    onBlockUser = { username: String -> viewModel.blockUser(username) },
+                    onBlockReportUser = { username: String -> viewModel.blockUser(username, reported = true) },
                     scrollToCommentId = uiState.scrollToCommentId,
-                    onScrollToCommentComplete = viewModel::clearScrollToComment
+                    onScrollToCommentComplete = viewModel::clearScrollToComment,
+                    onImageClick = viewModel::openFullScreenImages
                 )
             }
         }
+    }
+
+    uiState.fullScreenImages?.let { images ->
+        FullScreenImageViewer(
+            images = images,
+            initialIndex = uiState.initialFullScreenImageIndex,
+            onDismiss = viewModel::closeFullScreenImages
+        )
     }
 }
 
@@ -355,6 +383,7 @@ private fun FeedTab(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null
 ) {
@@ -376,7 +405,18 @@ private fun FeedTab(
             }
 
             items(posts, key = { it.id }) { post ->
-                PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onPostClick, onBlockUser = onBlockUser, onBlockReportUser = onBlockReportUser)
+                PostCard(
+                    post = post,
+                    onClick = { onPostClick(post) },
+                    truncated = true,
+                    onMentionClick = onMentionClick,
+                    onProfileClick = onProfileClick,
+                    onLoveClick = onLoveClick,
+                    onPostClick = onPostClick,
+                    onImageClick = onImageClick,
+                    onBlockUser = onBlockUser,
+                    onBlockReportUser = onBlockReportUser
+                )
             }
         }
     }
@@ -391,6 +431,7 @@ private fun ExploreTab(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null
 ) {
@@ -413,7 +454,18 @@ private fun ExploreTab(
             }
 
             items(trendingPosts, key = { it.id }) { post ->
-                PostCard(post = post, onClick = { onOpenPost(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onOpenPost, onBlockUser = onBlockUser, onBlockReportUser = onBlockReportUser)
+                PostCard(
+                    post = post,
+                    onClick = { onOpenPost(post) },
+                    truncated = true,
+                    onMentionClick = onMentionClick,
+                    onProfileClick = onProfileClick,
+                    onLoveClick = onLoveClick,
+                    onPostClick = onOpenPost,
+                    onImageClick = onImageClick,
+                    onBlockUser = onBlockUser,
+                    onBlockReportUser = onBlockReportUser
+                )
             }
         }
     }
@@ -534,7 +586,8 @@ private fun AccountTab(
     onPostClick: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
-    onLoveClick: (Post) -> Unit = {}
+    onLoveClick: (Post) -> Unit = {},
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -601,7 +654,16 @@ private fun AccountTab(
                     }
 
                     items(posts, key = { it.id }) { post ->
-                        PostCard(post = post, onClick = { onPostClick(post) }, truncated = true, onMentionClick = onMentionClick, onProfileClick = onProfileClick, onLoveClick = onLoveClick, onPostClick = onPostClick)
+                        PostCard(
+                            post = post,
+                            onClick = { onPostClick(post) },
+                            truncated = true,
+                            onMentionClick = onMentionClick,
+                            onProfileClick = onProfileClick,
+                            onLoveClick = onLoveClick,
+                            onPostClick = onPostClick,
+                            onImageClick = onImageClick
+                        )
                     }
                 }
             } else {
@@ -1015,6 +1077,7 @@ private fun PostDetailsSheet(
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null,
     scrollToCommentId: String? = null,
@@ -1095,6 +1158,7 @@ private fun PostDetailsSheet(
                         onProfileClick = onProfileClick,
                         onLoveClick = onLoveClick,
                         onPostClick = onPostClick,
+                        onImageClick = onImageClick,
                         onBlockUser = onBlockUser,
                         onBlockReportUser = onBlockReportUser
                     )
@@ -1289,7 +1353,8 @@ private fun ProfileScreen(
     onPostClick: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
-    onLoveClick: (Post) -> Unit = {}
+    onLoveClick: (Post) -> Unit = {},
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -1446,6 +1511,7 @@ private fun ProfileScreen(
                             onProfileClick = onProfileClick,
                             onLoveClick = onLoveClick,
                             onPostClick = onPostClick,
+                            onImageClick = onImageClick,
                             onBlockUser = onBlockClick,
                             onBlockReportUser = onBlockReportClick
                         )
@@ -1499,12 +1565,14 @@ private fun UserActionsMenu(
 private fun PostCard(
     post: Post,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     clickable: Boolean = true,
     truncated: Boolean = false,
     onMentionClick: ((String) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: ((Post) -> Unit)? = null,
     onPostClick: ((Post) -> Unit)? = null,
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null
 ) {
@@ -1515,7 +1583,7 @@ private fun PostCard(
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Column(
             modifier = if (clickable) Modifier
@@ -1604,7 +1672,12 @@ private fun PostCard(
                 }
             }
             if (imageUrls.isNotEmpty()) {
-                PostImageCarousel(imageUrls, modifier = Modifier.padding(horizontal = 16.dp))
+                PostImageCarousel(
+                    images = imageUrls,
+                    onImageClick = onImageClick,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    isDetailView = !truncated
+                )
             }
             Divider(modifier = Modifier.padding(horizontal = 16.dp))
             Row(
@@ -2019,15 +2092,23 @@ private fun autoLinkAndMentions(html: String): String {
 }
 
 @Composable
-private fun PostImageCarousel(images: List<String>, modifier: Modifier = Modifier) {
+private fun PostImageCarousel(
+    images: List<String>,
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier,
+    isDetailView: Boolean = false
+) {
     if (images.isEmpty()) return
-    val pagerState = rememberPagerState(pageCount = { images.size })
+    // Keying by the images list hash ensures the state resets when the images change (e.g., when a different post is selected)
+    val pagerState = key(images) {
+        rememberPagerState(pageCount = { images.size })
+    }
     Column(modifier = modifier.padding(top = 8.dp)) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(if (isDetailView) 300.dp else 200.dp)
                 .clip(RoundedCornerShape(12.dp))
         ) { page ->
             AsyncImage(
@@ -2036,8 +2117,10 @@ private fun PostImageCarousel(images: List<String>, modifier: Modifier = Modifie
                     .crossfade(true)
                     .build(),
                 contentDescription = "Image ${page + 1} of ${images.size}",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onImageClick(images, page) },
+                contentScale = if (isDetailView) ContentScale.Fit else ContentScale.Crop
             )
         }
         if (images.size > 1) {
@@ -2055,4 +2138,137 @@ private fun PostImageCarousel(images: List<String>, modifier: Modifier = Modifie
             }
         }
     }
+}
+
+@Composable
+private fun FullScreenImageViewer(
+    images: List<String>,
+    initialIndex: Int,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { images.size })
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.Black
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    pageSpacing = 16.dp,
+                    userScrollEnabled = true // Ensure scrolling is enabled
+                ) { page ->
+                    var scale by remember { mutableStateOf(1f) }
+                    var offset by remember { mutableStateOf(Offset.Zero) }
+                    val state = rememberTransformableState { zoomChange, offsetChange, _ ->
+                        scale = (scale * zoomChange).coerceIn(1f, 5f)
+                        // Only allow panning if zoomed in
+                        if (scale > 1f) {
+                            offset += offsetChange
+                        } else {
+                            offset = Offset.Zero
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .transformable(state = state)
+                            .pointerInput(Unit) {
+                                // Reset scale and offset on double tap
+                                detectTapGestures(
+                                    onDoubleTap = {
+                                        scale = if (scale > 1f) 1f else 3f
+                                        offset = Offset.Zero
+                                    }
+                                )
+                            }
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(images[page])
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Full screen image ${page + 1}",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offset.x,
+                                    translationY = offset.y
+                                ),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+
+                // Top Controls
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(WindowInsets.statusBars.asPaddingValues())
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
+                    }
+
+                    IconButton(
+                        onClick = {
+                            downloadImage(context, images[pagerState.currentPage])
+                        },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(Icons.Filled.Download, contentDescription = "Download", tint = Color.White)
+                    }
+                }
+
+                // Bottom Indicator
+                if (images.size > 1) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(24.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            "${pagerState.currentPage + 1} / ${images.size}",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun downloadImage(context: Context, url: String) {
+    val request = DownloadManager.Request(Uri.parse(url))
+        .setTitle("Wombat Image")
+        .setDescription("Downloading image from Wombat")
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "wombat_${System.currentTimeMillis()}.jpg")
+        .setAllowedOverMetered(true)
+        .setAllowedOverRoaming(true)
+
+    val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    downloadManager.enqueue(request)
+    Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
 }

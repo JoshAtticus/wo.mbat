@@ -223,6 +223,18 @@ class HomeViewModel(
             scrollToCommentId = scrollToCommentId
         )
         // Comments are loaded lazily when user swipes up in the details sheet to expand
+
+        // Verify/augment love status for this post if we have a session
+        val session = _uiState.value.session
+        if (session != null) {
+            viewModelScope.launch {
+                runCatching {
+                    repository.getPostLoveStatus(session, post.id, session.username)
+                }.onSuccess { loved ->
+                    updatePostsWithLove(post.id, post.loves, loved)
+                }
+            }
+        }
     }
 
     fun clearScrollToComment() {
@@ -263,6 +275,14 @@ class HomeViewModel(
             commentsLoading = false,
             commentReplyParent = null
         )
+    }
+
+    fun openFullScreenImages(images: List<String>, index: Int) {
+        _uiState.value = _uiState.value.copy(fullScreenImages = images, initialFullScreenImageIndex = index)
+    }
+
+    fun closeFullScreenImages() {
+        _uiState.value = _uiState.value.copy(fullScreenImages = null, initialFullScreenImageIndex = 0)
     }
 
     fun setCommentDraft(comment: String) {
