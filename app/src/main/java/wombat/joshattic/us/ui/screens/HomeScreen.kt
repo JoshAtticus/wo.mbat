@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -360,7 +361,8 @@ private fun FeedTab(
         onRefresh = onRefresh
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
+                .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -395,7 +397,8 @@ private fun ExploreTab(
         onRefresh = onRefresh
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
+                .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -429,7 +432,8 @@ private fun NotificationsTab(
         onRefresh = onRefresh
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
+                .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -535,7 +539,8 @@ private fun AccountTab(
         onRefresh = onRefresh
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
+                .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -1235,11 +1240,12 @@ private fun ProfileScreen(
     onLoveClick: (Post) -> Unit = {}
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(vertical = 4.dp)
+                .offset(x = (-8).dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onClose) {
@@ -1287,7 +1293,8 @@ private fun ProfileScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -1296,6 +1303,7 @@ private fun ProfileScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = -16.dp)
                         .height(80.dp)
                         .background(accent.copy(alpha = 0.18f))
                 ) {
@@ -1315,7 +1323,6 @@ private fun ProfileScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
                         .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
