@@ -1,11 +1,13 @@
 package wombat.joshattic.us.ui.state
 
+import androidx.compose.runtime.Immutable
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 
+@Immutable
 data class HomeUiState(
     val session: AuthSession? = null,
     val feed: List<Post> = emptyList(),

@@ -8,7 +8,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.AuthSession
@@ -321,7 +324,7 @@ class HomeViewModel(
                 }
             }
             "follow" -> {
-                openProfile(notification.data.actor.name)
+                notification.data.actor?.name?.let { openProfile(it) }
             }
             "wall_comment", "wall_comment_reply" -> {
                 _uiState.value = _uiState.value.copy(toastMessage = "Wall support hasn't been added yet")
@@ -330,6 +333,11 @@ class HomeViewModel(
                 notification.data.post?.let { post ->
                     openPost(post)
                 }
+            }
+            "admin_notification" -> {
+                _uiState.value = _uiState.value.copy(
+                    toastMessage = notification.data.content ?: "Admin notification"
+                )
             }
         }
     }
@@ -540,7 +548,7 @@ class HomeViewModel(
     private fun List<Post>.filterNotBlocked(blockedUsernames: Set<String>): List<Post> =
         filterNot { blockedUsernames.contains(it.poster.name.lowercase()) }
 
-    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = coroutineScope {
+    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = withContext(Dispatchers.IO) {
         posts.map { post ->
             async {
                 val loved = runCatching {
@@ -548,7 +556,7 @@ class HomeViewModel(
                 }.getOrDefault(post.isLoving ?: false)
                 post.copy(isLoving = loved)
             }
-        }.map { it.await() }
+        }.awaitAll()
     }
 
     private fun observeSessionAndRefresh() {

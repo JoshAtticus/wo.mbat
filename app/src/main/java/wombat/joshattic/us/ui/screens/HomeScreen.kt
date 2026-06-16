@@ -147,7 +147,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
+import coil.request.CachePolicy
 import coil.request.ImageRequest
+import coil.size.Precision
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Post
@@ -422,7 +424,7 @@ private fun FeedTab(
                 item { EmptyStateCard(title = "Nothing here yet", message = "Pull down to refresh.") }
             }
 
-            items(posts, key = { it.id }) { post ->
+            items(posts, key = { it.id }, contentType = { "post" }) { post ->
                 PostCard(
                     post = post,
                     onClick = { onPostClick(post) },
@@ -471,7 +473,7 @@ private fun ExploreTab(
                 item { EmptyStateCard("No trending posts (bug?)", "Pull to refresh to load trending posts.") }
             }
 
-            items(trendingPosts, key = { it.id }) { post ->
+            items(trendingPosts, key = { it.id }, contentType = { "post" }) { post ->
                 PostCard(
                     post = post,
                     onClick = { onOpenPost(post) },
@@ -549,7 +551,7 @@ private fun NotificationsTab(
                 item { EmptyStateCard("All clear", "No unread notifications right now.") }
             }
 
-            items(unreadNotifications, key = { it.id }) { notification ->
+            items(unreadNotifications, key = { it.id }, contentType = { "notification" }) { notification ->
                 NotificationCard(notification, onClick = { onNotificationClick(notification) })
             }
 
@@ -578,7 +580,7 @@ private fun NotificationsTab(
                     }
                 }
 
-                items(readNotifications, key = { it.id }) { notification ->
+                items(readNotifications, key = { it.id }, contentType = { "notification" }) { notification ->
                     NotificationCard(notification, onClick = { onNotificationClick(notification) })
                 }
             }
@@ -685,7 +687,7 @@ private fun AccountTab(
                         item { EmptyStateCard(title = "No posts yet", message = "Pull down to refresh or create your first post.") }
                     }
 
-                    items(posts, key = { it.id }) { post ->
+                    items(posts, key = { it.id }, contentType = { "post" }) { post ->
                         PostCard(
                             post = post,
                             onClick = { onPostClick(post) },
@@ -1547,7 +1549,7 @@ private fun ProfileScreen(
             }
 
             if (posts.isNotEmpty()) {
-                items(posts, key = { it.id }) { post ->
+                items(posts, key = { it.id }, contentType = { "post" }) { post ->
                     Box() {
                         PostCard(
                             post = post,
@@ -1622,8 +1624,8 @@ private fun PostCard(
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null
 ) {
-    val imageUrls = extractImages(post.content)
-    val displayContent = autoLinkAndMentions(stripImages(post.content))
+    val imageUrls = remember(post.content) { extractImages(post.content) }
+    val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
     var menuExpanded by remember { mutableStateOf(false) }
 
     Card(
@@ -1688,7 +1690,7 @@ private fun PostCard(
                     onClick = onClick
                 )
                 post.repost?.let { repostPost ->
-                    val repostDisplay = autoLinkAndMentions(stripImages(repostPost.content))
+                    val repostDisplay = remember(repostPost.content) { autoLinkAndMentions(stripImages(repostPost.content)) }
                     Card(
                         shape = androidx.compose.ui.graphics.RectangleShape,
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -1768,7 +1770,8 @@ private fun CommentCard(comment: Comment, onReply: (Comment) -> Unit = {}, onPro
                     Icon(Icons.Filled.Chat, contentDescription = "Reply", modifier = Modifier.size(16.dp))
                 }
             }
-            HtmlText(autoLinkAndMentions(stripImages(comment.content)))
+            val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
+            HtmlText(displayContent)
 
             val safeReplies = comment.replies ?: emptyList()
             if (safeReplies.isNotEmpty()) {
@@ -1784,6 +1787,8 @@ private fun CommentCard(comment: Comment, onReply: (Comment) -> Unit = {}, onPro
 
 @Composable
 private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
+    val type = notification.type.lowercase()
+    val actorName = notification.data.actor?.name ?: if (type == "admin_notification") "Admin" else "Unknown user"
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1802,10 +1807,10 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ProfilePicture(username = notification.data.actor.name, size = 36.dp)
+                ProfilePicture(username = actorName, size = 36.dp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(notification.data.actor.name, style = MaterialTheme.typography.titleMedium)
+                    Text(actorName, style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = notificationLabel(notification.type),
                         style = MaterialTheme.typography.bodyMedium,
@@ -1819,10 +1824,13 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
                 )
             }
 
-            val content = when (notification.type.lowercase()) {
-                "comment", "wall_comment", "wall_comment_reply" -> notification.data.comment?.content
-                "post_mention", "repost" -> notification.data.post?.content
-                else -> null
+            val content = remember(notification.id) {
+                when (type) {
+                    "admin_notification" -> notification.data.content
+                    "comment", "wall_comment", "wall_comment_reply" -> notification.data.comment?.content
+                    "post_mention", "repost" -> notification.data.post?.content
+                    else -> null
+                }
             }
 
             if (content != null) {
@@ -1833,8 +1841,9 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
                     onClick = onClick
                 )
             } else if (notification.data.post != null) {
+                val postContent = remember(notification.id) { notification.data.post.content }
                 HtmlText(
-                    html = notification.data.post.content,
+                    html = postContent,
                     modifier = Modifier.padding(top = 4.dp),
                     maxLines = 2,
                     onClick = onClick
@@ -1852,6 +1861,8 @@ private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, 
             .data("https://api.wasteof.money/users/$username/picture")
             .decoderFactory(SvgDecoder.Factory())
             .crossfade(true)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .memoryCachePolicy(CachePolicy.ENABLED)
             .build()
     }
 
@@ -1893,6 +1904,53 @@ private fun HtmlText(
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val linkColor = MaterialTheme.colorScheme.onBackground.toArgb()
+
+    val spannedText = remember(html, textColor, linkColor, onMentionClick) {
+        val processedHtml = html.trim()
+            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "</p>\n\n<p")
+
+        val spanned = HtmlCompat.fromHtml(processedHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
+        val spannable = SpannableStringBuilder(spanned)
+
+        if (onMentionClick != null) {
+            val urlSpans = spannable.getSpans(0, spannable.length, URLSpan::class.java)
+            for (span in urlSpans) {
+                val url = span.url
+                val start = spannable.getSpanStart(span)
+                val end = spannable.getSpanEnd(span)
+                if (url.startsWith("wombat://user/")) {
+                    spannable.removeSpan(span)
+                    val username = url.substringAfter("wombat://user/")
+                    val clickable = object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            onMentionClick.invoke(username)
+                        }
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.isUnderlineText = true
+                            ds.isFakeBoldText = true
+                            ds.color = linkColor
+                        }
+                    }
+                    spannable.setSpan(clickable, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+        }
+
+        // Ensure all links (URLSpans) are slightly bold + underlined
+        spannable.getSpans(0, spannable.length, URLSpan::class.java).forEach { span ->
+            val s = spannable.getSpanStart(span)
+            val e = spannable.getSpanEnd(span)
+            if (spannable.getSpans(s, e, StyleSpan::class.java).none { it.style == Typeface.BOLD }) {
+                spannable.setSpan(StyleSpan(Typeface.BOLD), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            if (spannable.getSpans(s, e, UnderlineSpan::class.java).isEmpty()) {
+                spannable.setSpan(UnderlineSpan(), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+        spannable
+    }
+
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -1901,74 +1959,36 @@ private fun HtmlText(
                 setTextColor(textColor)
                 setLinkTextColor(linkColor)
                 textSize = 16f
-                if (maxLines != Int.MAX_VALUE) {
-                    this.maxLines = maxLines
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                }
             }
         },
         update = { textView ->
-            textView.setTextColor(textColor)
-            textView.setLinkTextColor(linkColor)
+            if (textView.text != spannedText) {
+                textView.text = spannedText
+            }
+            
+            val currentTextColor = textView.currentTextColor
+            if (currentTextColor != textColor) {
+                textView.setTextColor(textColor)
+            }
+            
+            val currentLinkColor = textView.linkTextColors.defaultColor
+            if (currentLinkColor != linkColor) {
+                textView.setLinkTextColor(linkColor)
+            }
 
-            // Override click listener on the TextView to trigger the parent's onClick
-            // while LinkMovementMethod still handles the spans.
             textView.setOnClickListener { onClick?.invoke() }
             textView.isClickable = onClick != null
             textView.isFocusable = false
 
             if (maxLines != Int.MAX_VALUE) {
-                textView.maxLines = maxLines
-                textView.ellipsize = android.text.TextUtils.TruncateAt.END
-            }
-            // Normalize <br> and paragraph breaks so multiple <p> elements (and <br>) produce visible newlines/separation in the TextView
-            val htmlToRender = html.trim()
-                .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
-                .replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "</p>\n\n<p")
-                .replace(Regex("^\\n+"), "")
-                .replace(Regex("\\n+$"), "")
-            val spanned = HtmlCompat.fromHtml(htmlToRender, HtmlCompat.FROM_HTML_MODE_LEGACY)
-            if (onMentionClick != null) {
-                val spannable = SpannableStringBuilder(spanned)
-                val urlSpans = spannable.getSpans(0, spannable.length, URLSpan::class.java)
-                for (span in urlSpans) {
-                    val url = span.url
-                    val start = spannable.getSpanStart(span)
-                    val end = spannable.getSpanEnd(span)
-                    spannable.removeSpan(span)
-                    if (url.startsWith("wombat://user/")) {
-                        val username = url.substringAfter("wombat://user/")
-                        val clickable = object : ClickableSpan() {
-                            override fun onClick(widget: View) {
-                                onMentionClick.invoke(username)
-                            }
-                            override fun updateDrawState(ds: TextPaint) {
-                                ds.isUnderlineText = true
-                                ds.isFakeBoldText = true
-                                ds.color = linkColor
-                            }
-                        }
-                        spannable.setSpan(clickable, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    } else {
-                        // keep normal links (http etc) working via default
-                        spannable.setSpan(URLSpan(url), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    }
+                if (textView.maxLines != maxLines) {
+                    textView.maxLines = maxLines
+                    textView.ellipsize = android.text.TextUtils.TruncateAt.END
                 }
-                textView.text = spannable
             } else {
-                textView.text = spanned
-            }
-            // Ensure all links (URLSpans) are slightly bold + underlined (in addition to theme color)
-            (textView.text as? Spannable)?.let { spannable ->
-                spannable.getSpans(0, spannable.length, URLSpan::class.java).forEach { span ->
-                    val s = spannable.getSpanStart(span)
-                    val e = spannable.getSpanEnd(span)
-                    if (spannable.getSpans(s, e, StyleSpan::class.java).none { it.style == Typeface.BOLD }) {
-                        spannable.setSpan(StyleSpan(Typeface.BOLD), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    }
-                    if (spannable.getSpans(s, e, UnderlineSpan::class.java).isEmpty()) {
-                        spannable.setSpan(UnderlineSpan(), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    }
+                if (textView.maxLines != Int.MAX_VALUE) {
+                    textView.maxLines = Int.MAX_VALUE
+                    textView.ellipsize = null
                 }
             }
         }
@@ -2036,6 +2056,7 @@ private fun notificationLabel(type: String): String {
         "post_mention" -> "Mentioned you in a post"
         "wall_comment" -> "Left a comment on your wall"
         "wall_comment_reply" -> "Replied to a comment on your wall"
+        "admin_notification" -> "Admin notification"
         else -> type.replaceFirstChar { it.uppercase() }
     }
 }
@@ -2146,12 +2167,18 @@ private fun PostImageCarousel(
 ) {
     if (images.isEmpty()) return
 
+    val context = LocalContext.current
+
     if (images.size == 1) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
+        val imageRequest = remember(images[0]) {
+            ImageRequest.Builder(context)
                 .data(images[0])
                 .crossfade(true)
-                .build(),
+                .precision(Precision.INEXACT)
+                .build()
+        }
+        AsyncImage(
+            model = imageRequest,
             contentDescription = "Post image",
             modifier = modifier
                 .fillMaxWidth()
@@ -2181,11 +2208,15 @@ private fun PostImageCarousel(
                 .height(if (isDetailView) 400.dp else 220.dp)
                 .clip(RoundedCornerShape(12.dp))
         ) { page ->
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
+            val imageRequest = remember(images[page]) {
+                ImageRequest.Builder(context)
                     .data(images[page])
                     .crossfade(true)
-                    .build(),
+                    .precision(Precision.INEXACT)
+                    .build()
+            }
+            AsyncImage(
+                model = imageRequest,
                 contentDescription = "Image ${page + 1} of ${images.size}",
                 modifier = Modifier
                     .fillMaxSize()

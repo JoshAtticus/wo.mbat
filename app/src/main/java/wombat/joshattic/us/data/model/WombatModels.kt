@@ -1,7 +1,9 @@
 package wombat.joshattic.us.data.model
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.annotations.SerializedName
 
+@Immutable
 data class User(
     val id: String,
     val name: String,
@@ -12,10 +14,12 @@ data class User(
     val online: Boolean
 )
 
+@Immutable
 data class UserStats(val followers: Int, val following: Int, val posts: Int)
 
 data class FeedResponse(val posts: List<Post>, val last: Boolean)
 
+@Immutable
 data class Post(
     @SerializedName("_id") val id: String,
     val poster: Poster,
@@ -28,6 +32,7 @@ data class Post(
     val isLoving: Boolean? = null
 )
 
+@Immutable
 data class Poster(
     val id: String,
     val name: String,
@@ -40,6 +45,7 @@ data class NotificationResponse(
     val last: Boolean
 )
 
+@Immutable
 data class Notification(
     @SerializedName("_id") val id: String,
     val type: String,
@@ -49,15 +55,18 @@ data class Notification(
     val time: Long
 )
 
+@Immutable
 data class NotificationData(
-    val actor: Poster,
+    val actor: Poster? = null,
     val post: Post? = null,
     val comment: Comment? = null,
+    val content: String? = null,
     val wall: Poster? = null
 )
 
 data class CommentResponse(val comments: List<Comment>, val last: Boolean)
 
+@Immutable
 data class Comment(
     @SerializedName("_id") val id: String,
     val post: String,
