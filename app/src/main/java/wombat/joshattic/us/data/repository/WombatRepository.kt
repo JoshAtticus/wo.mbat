@@ -10,6 +10,7 @@ import wombat.joshattic.us.data.model.FeedResponse
 import wombat.joshattic.us.data.model.LoginRequest
 import wombat.joshattic.us.data.model.LoveToggleResponse
 import wombat.joshattic.us.data.model.Notification
+import wombat.joshattic.us.data.model.Permissions
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.network.ApiService
@@ -109,6 +110,14 @@ class WombatRepository(
 
     suspend fun logout() {
         authPreferences.clearSession()
+    }
+
+    suspend fun getAdminMessages(token: String): List<Notification> {
+        return apiService.getAdminMessages(token)
+    }
+
+    suspend fun getSession(token: String): wombat.joshattic.us.data.model.SessionResponse {
+        return apiService.getSession(token)
     }
 
     companion object {

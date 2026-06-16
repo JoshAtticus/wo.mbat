@@ -144,8 +144,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.decode.SvgDecoder
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -173,6 +181,19 @@ fun HomeScreen(viewModel: HomeViewModel) {
         }
     }
 
+    if (uiState.showBannedPopup) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { viewModel.dismissBannedPopup() },
+            title = { androidx.compose.material3.Text("Banned :(") },
+            text = { androidx.compose.material3.Text("You were banned because ${uiState.banReason ?: "unknown reasons"}. You can still browse your feed as read only, but you won't be able to make new posts or interact with anyone") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { viewModel.dismissBannedPopup() }) {
+                    androidx.compose.material3.Text("OK")
+                }
+            }
+        )
+    }
+
     LaunchedEffect(uiState.toastMessage) {
         uiState.toastMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -190,7 +211,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             )
         },
         floatingActionButton = {
-            if (uiState.selectedTab == BottomTab.Home) {
+            if (uiState.selectedTab == BottomTab.Home && !uiState.isBanned) {
                 FloatingActionButton(
                     onClick = {
                         if (uiState.session != null) {
@@ -347,6 +368,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     comments = uiState.comments,
                     loading = uiState.commentsLoading,
                     draft = uiState.commentDraft,
+                    isBanned = uiState.isBanned,
                     onDraftChange = viewModel::setCommentDraft,
                     onSubmit = viewModel::submitComment,
                     onDismiss = viewModel::closePost,
@@ -1003,27 +1025,21 @@ private fun ComposerSheet(
             }
 
             // Direct editable text input (no outer box, input itself sized and styled)
-            val wordCount = draft.split(Regex("\\s+")).filter { it.isNotBlank() }.size
+            val charCount = draft.length
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedTextField(
                     value = draft,
                     onValueChange = onDraftChange,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 220.dp)
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(12.dp),
+                        .heightIn(min = 220.dp),
+                    shape = RoundedCornerShape(16.dp),
                     placeholder = { Text("What's happening? Write words here, markdown supported.") }
                 )
                 Text(
-                    text = "$wordCount / ${HomeViewModel.MAX_WORD_COUNT} words",
+                    text = "$charCount / ${HomeViewModel.MAX_CHAR_COUNT} characters",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (wordCount > HomeViewModel.MAX_WORD_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (charCount > HomeViewModel.MAX_CHAR_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.End)
                 )
             }
@@ -1039,9 +1055,10 @@ private fun ComposerSheet(
                 ) {
                     currentImages.forEachIndexed { index, url ->
                         Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp))) {
-                            AsyncImage(
+                            SubcomposeAsyncImage(
                                 model = url,
                                 contentDescription = "Attached image",
+                                loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) } },
                                 modifier = Modifier.fillMaxSize()
                             )
                             IconButton(
@@ -1080,7 +1097,7 @@ private fun ComposerSheet(
                         onDraftChange(fullHtml)
                         onSubmit()
                     },
-                    enabled = (draft.isNotBlank() || currentImages.isNotEmpty()) && wordCount <= HomeViewModel.MAX_WORD_COUNT,
+                    enabled = (draft.isNotBlank() || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Icon(Icons.Filled.PostAdd, contentDescription = null)
@@ -1099,6 +1116,7 @@ private fun PostDetailsSheet(
     comments: List<Comment>,
     loading: Boolean,
     draft: String,
+    isBanned: Boolean,
     onDraftChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onDismiss: () -> Unit,
@@ -1221,6 +1239,7 @@ private fun PostDetailsSheet(
                         items(comments, key = { it.id }) { comment ->
                             CommentCard(
                                 comment = comment,
+                                isBanned = isBanned,
                                 onReply = onReplyToComment,
                                 onProfileClick = onProfileClick
                             )
@@ -1240,10 +1259,12 @@ private fun PostDetailsSheet(
             }
 
             // Input area (TextField + Reply button) — imePadding lifts it above the software keyboard
-            if (showCommentsSection) {
+            if (showCommentsSection && !isBanned) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(top = 8.dp, bottom = 16.dp)
                         .padding(horizontal = 16.dp)
                         .imePadding(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1470,11 +1491,16 @@ private fun ProfileScreen(
                         .height(80.dp)
                         .background(accent.copy(alpha = 0.18f))
                 ) {
-                    AsyncImage(
+                    SubcomposeAsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(bannerUrl)
                             .crossfade(true)
                             .build(),
+                        loading = {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            }
+                        },
                         contentDescription = "Profile banner",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -1631,7 +1657,9 @@ private fun PostCard(
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(300))
     ) {
         Column(
             modifier = if (clickable) Modifier
@@ -1747,10 +1775,10 @@ private fun PostCard(
 }
 
 @Composable
-private fun CommentCard(comment: Comment, onReply: (Comment) -> Unit = {}, onProfileClick: (String) -> Unit = {}) {
+private fun CommentCard(comment: Comment, isBanned: Boolean = false, onReply: (Comment) -> Unit = {}, onProfileClick: (String) -> Unit = {}) {
     val isReply = comment.parent != null
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(animationSpec = tween(300)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isReply) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
@@ -1766,8 +1794,10 @@ private fun CommentCard(comment: Comment, onReply: (Comment) -> Unit = {}, onPro
                 Text(comment.poster.name, style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.weight(1f))
                 Text(formatTime(comment.time), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                IconButton(onClick = { onReply(comment) }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Filled.Chat, contentDescription = "Reply", modifier = Modifier.size(16.dp))
+                if (!isBanned) {
+                    IconButton(onClick = { onReply(comment) }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Filled.Chat, contentDescription = "Reply", modifier = Modifier.size(16.dp))
+                    }
                 }
             }
             val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
@@ -1777,7 +1807,7 @@ private fun CommentCard(comment: Comment, onReply: (Comment) -> Unit = {}, onPro
             if (safeReplies.isNotEmpty()) {
                 Column(modifier = Modifier.padding(start = 16.dp)) {
                     safeReplies.forEach { reply ->
-                        CommentCard(comment = reply, onReply = onReply, onProfileClick = onProfileClick)
+                        CommentCard(comment = reply, isBanned = isBanned, onReply = onReply, onProfileClick = onProfileClick)
                     }
                 }
             }
@@ -1792,17 +1822,18 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(300))
             .then(
                 if (!notification.read) Modifier.border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                     shape = RoundedCornerShape(20.dp)
                 ) else Modifier
             )
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (notification.read) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            containerColor = if (notification.read) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
         )
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1877,18 +1908,20 @@ private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, 
                     .clip(CircleShape)
                     .border(3.dp, borderColor, CircleShape)
             )
-            AsyncImage(
+            SubcomposeAsyncImage(
                 model = imageRequest,
                 contentDescription = username,
+                loading = { CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp) },
                 modifier = Modifier
                     .size(size - 6.dp)
                     .clip(CircleShape)
             )
         }
     } else {
-        AsyncImage(
+        SubcomposeAsyncImage(
             model = imageRequest,
             contentDescription = username,
+            loading = { CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp) },
             modifier = Modifier.size(size).clip(CircleShape)
         )
     }
@@ -2177,9 +2210,10 @@ private fun PostImageCarousel(
                 .precision(Precision.INEXACT)
                 .build()
         }
-        AsyncImage(
+        SubcomposeAsyncImage(
             model = imageRequest,
             contentDescription = "Post image",
+            loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
             modifier = modifier
                 .fillMaxWidth()
                 .then(
@@ -2215,9 +2249,10 @@ private fun PostImageCarousel(
                     .precision(Precision.INEXACT)
                     .build()
             }
-            AsyncImage(
+            SubcomposeAsyncImage(
                 model = imageRequest,
-                contentDescription = "Image ${page + 1} of ${images.size}",
+                contentDescription = "Post image ${page + 1}",
+                loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable { onImageClick(images, page) },
@@ -2294,12 +2329,13 @@ private fun FullScreenImageViewer(
                                 )
                             }
                     ) {
-                        AsyncImage(
+                        SubcomposeAsyncImage(
                             model = ImageRequest.Builder(context)
                                 .data(images[page])
                                 .crossfade(true)
                                 .build(),
                             contentDescription = "Full screen image ${page + 1}",
+                            loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer(

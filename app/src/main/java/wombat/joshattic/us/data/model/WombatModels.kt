@@ -11,7 +11,8 @@ data class User(
     val verified: Boolean,
     val color: String,
     val stats: UserStats?,
-    val online: Boolean
+    val online: Boolean,
+    val permissions: Permissions? = null
 )
 
 @Immutable
@@ -82,6 +83,10 @@ data class Comment(
 data class LoginRequest(val username: String, val password: String)
 
 data class LoginResponse(val token: String)
+
+data class SessionResponse(val user: User? = null)
+
+data class Permissions(val admin: Boolean, val banned: Boolean)
 
 data class CreatePostRequest(val post: String, val repost: String? = null)
 

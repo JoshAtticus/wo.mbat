@@ -16,6 +16,7 @@ import wombat.joshattic.us.data.model.LoginRequest
 import wombat.joshattic.us.data.model.LoginResponse
 import wombat.joshattic.us.data.model.MarkReadRequest
 import wombat.joshattic.us.data.model.LoveToggleResponse
+import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.NotificationResponse
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
@@ -23,6 +24,9 @@ import wombat.joshattic.us.data.model.User
 interface ApiService {
     @POST("session")
     suspend fun login(@Body request: LoginRequest): LoginResponse
+
+    @GET("session")
+    suspend fun getSession(@Header("authorization") token: String): wombat.joshattic.us.data.model.SessionResponse
 
     @GET("users/{username}")
     suspend fun getUserProfile(@Path("username") username: String): User
@@ -51,6 +55,11 @@ interface ApiService {
     suspend fun getUnreadNotifications(
         @Header("authorization") token: String
     ): NotificationResponse
+
+    @GET("messages/admin")
+    suspend fun getAdminMessages(
+        @Header("authorization") token: String
+    ): List<Notification>
 
     @GET("messages/read")
     suspend fun getReadNotifications(

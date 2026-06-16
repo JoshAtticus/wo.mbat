@@ -18,6 +18,7 @@ import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.Notification
+import wombat.joshattic.us.data.model.Permissions
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.ui.state.BottomTab
@@ -68,24 +69,28 @@ class HomeViewModel(
 
     fun login() {
         val snapshot = _uiState.value
-        if (snapshot.loginUsername.isBlank() || snapshot.loginPassword.isBlank()) {
-            _uiState.value = snapshot.copy(loginError = "Enter both username and password.")
+        val username = snapshot.loginUsername.trim()
+        val password = snapshot.loginPassword
+        if (username.isBlank()) {
+            _uiState.value = snapshot.copy(loginError = "Enter your username.")
             return
         }
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(authLoading = true, loginError = null)
-            repository.login(snapshot.loginUsername.trim(), snapshot.loginPassword)
+            repository.login(username, password)
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         authLoading = false,
                         loginError = throwable.message ?: "Unable to sign in"
                     )
                 }
-                .onSuccess {
+                .onSuccess { session ->
+                    val isPasswordless = password.isBlank()
                     _uiState.value = _uiState.value.copy(
                         authLoading = false,
-                        loginPassword = ""
+                        loginPassword = "",
+                        toastMessage = if (isPasswordless) "Your account is insecure, please set a password on wasteof.money" else _uiState.value.toastMessage
                     )
                 }
         }
@@ -527,6 +532,10 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(toastMessage = null)
     }
 
+    fun dismissBannedPopup() {
+        _uiState.value = _uiState.value.copy(showBannedPopup = false)
+    }
+
     private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
         val current = _uiState.value
         fun transform(p: Post) = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
@@ -570,10 +579,35 @@ class HomeViewModel(
                     loadFeedForCurrentSession(session)
                     loadNotifications(session)
                     loadAccountProfile(session)
+                    if (session != null) {
+                        checkBanStatus(session)
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isBanned = false,
+                            banReason = null,
+                            showBannedPopup = false
+                        )
+                    }
                     if (_uiState.value.selectedTab == BottomTab.Explore) {
                         loadExploreTrending()
                     }
                 }
+        }
+    }
+
+    private fun checkBanStatus(session: AuthSession) {
+        viewModelScope.launch {
+            val sessionResponse = runCatching { repository.getSession(session.token) }.getOrNull()
+            val permissions = sessionResponse?.user?.permissions
+            if (permissions?.banned == true) {
+                val messages = runCatching { repository.getAdminMessages(session.token) }.getOrNull()
+                val banReason = messages?.firstOrNull { it.type == "admin_notification" }?.data?.content
+                _uiState.value = _uiState.value.copy(
+                    isBanned = true,
+                    banReason = banReason,
+                    showBannedPopup = true
+                )
+            }
         }
     }
 
@@ -739,7 +773,7 @@ class HomeViewModel(
 
     companion object {
         private const val DEFAULT_GUEST_USER = "jeffalo"
-        const val MAX_WORD_COUNT = 500
+        const val MAX_CHAR_COUNT = 1500
 
         fun factory(repository: WombatRepository): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
