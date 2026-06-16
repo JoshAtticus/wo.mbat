@@ -1354,7 +1354,7 @@ private fun WombatBottomNavigationBar(
                     Icon(Icons.Filled.AccountCircle, contentDescription = "Account")
                 }
             },
-            label = { Text(accountLabel) }
+            label = { Text(accountLabel, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
         )
     }
 }
