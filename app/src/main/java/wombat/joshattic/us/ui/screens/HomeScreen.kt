@@ -1111,8 +1111,32 @@ private fun ComposerSheet(
                 }
 
                 if (drafts.isEmpty()) {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        Text("No saved drafts yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.PostAdd,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                            Text(
+                                "No saved drafts yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Drafts are saved automatically when you\nclose the composer with text in it.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
                     }
                 } else {
                     LazyVerticalStaggeredGrid(
@@ -1446,24 +1470,47 @@ private fun PostDetailsSheet(
 
             // Input area (TextField + Reply button) — imePadding lifts it above the software keyboard
             if (showCommentsSection && !isBanned) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface)
-                        .padding(top = 8.dp, bottom = 16.dp)
+                        .padding(top = 12.dp, bottom = 16.dp)
                         .padding(horizontal = 16.dp)
                         .imePadding(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (replyingTo != null) {
+                    AnimatedVisibility(visible = replyingTo != null) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Replying to @${replyingTo.poster.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.width(8.dp))
-                            TextButton(onClick = onCancelReply) {
-                                Text("Cancel")
+                            Icon(
+                                Icons.Filled.Chat,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Replying to @${replyingTo?.poster?.name ?: ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Cancel reply",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -1472,12 +1519,24 @@ private fun PostDetailsSheet(
                         value = draft,
                         onValueChange = onDraftChange,
                         modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        maxLines = 6,
+                        shape = RoundedCornerShape(16.dp),
+                        minLines = 2,
+                        maxLines = 5,
                         placeholder = { Text("Write a reply") }
                     )
-                    Button(onClick = onSubmit, enabled = draft.isNotBlank()) {
-                        Text("Reply")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Button(
+                            onClick = onSubmit,
+                            enabled = draft.isNotBlank(),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Icon(Icons.Filled.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Reply")
+                        }
                     }
                 }
             }
@@ -1659,7 +1718,6 @@ private fun ProfileScreen(
         }
 
         // Load user's banner with a subtle themed fallback background using their profile colour.
-        // Keep the banner modest so it doesn't eat the screen.
         val accent = getUserColorSchemeColors(profile.color).first
         LazyColumn(
             state = listState,
@@ -1674,7 +1732,7 @@ private fun ProfileScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp)
+                        .height(140.dp)
                         .background(accent.copy(alpha = 0.18f))
                 ) {
                     SubcomposeAsyncImage(
@@ -1691,21 +1749,52 @@ private fun ProfileScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
+                    // Gradient scrim at the bottom of the banner for smoother blending
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.8f)
+                                    )
+                                )
+                            )
+                    )
                 }
             }
 
             item {
+                // Profile card overlapping the banner slightly via negative offset
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .offset(y = (-24).dp)
+                        .padding(horizontal = 4.dp)
                         .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            ProfilePicture(username = profile.name, size = 56.dp, borderColor = accent)
-                            Spacer(modifier = Modifier.width(12.dp))
+                            // Profile picture with online dot indicator
+                            Box {
+                                ProfilePicture(username = profile.name, size = 72.dp, borderColor = accent)
+                                if (profile.online) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .align(Alignment.BottomEnd)
+                                            .offset(x = (-2).dp, y = (-2).dp)
+                                            .background(Color(0xFF22C55E), CircleShape)
+                                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     profile.name,
@@ -1715,24 +1804,25 @@ private fun ProfileScreen(
                                 Text(
                                     text = if (profile.online) "Online now" else "Offline",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             if (currentUsername?.equals(profile.name, ignoreCase = true) != true) {
                                 Button(
                                     onClick = onFollowClick,
-                                    enabled = currentUsername != null && !followLoading
+                                    enabled = currentUsername != null && !followLoading,
+                                    shape = RoundedCornerShape(20.dp)
                                 ) {
                                     Text(if (isFollowing == true) "Unfollow" else "Follow")
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         HtmlText(
                             autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")),
-                            maxLines = 2
+                            maxLines = 4
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
                             ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
@@ -1760,28 +1850,49 @@ private fun ProfileScreen(
                 }
             }
 
+            // Posts section with a subtle header
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "Posts",
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
             if (posts.isNotEmpty()) {
                 items(posts, key = { it.id }, contentType = { "post" }) { post ->
-                    Box() {
-                        PostCard(
-                            post = post,
-                            onClick = { onPostClick(post) },
-                            truncated = true,
-                            onMentionClick = onMentionClick,
-                            onProfileClick = onProfileClick,
-                            onLoveClick = onLoveClick,
-                            onPostClick = onPostClick,
-                            onImageClick = onImageClick,
-                            onBlockUser = onBlockClick,
-                            onReportPost = onReportPost
-                        )
-                    }
+                    PostCard(
+                        post = post,
+                        onClick = { onPostClick(post) },
+                        truncated = true,
+                        onMentionClick = onMentionClick,
+                        onProfileClick = onProfileClick,
+                        onLoveClick = onLoveClick,
+                        onPostClick = onPostClick,
+                        onImageClick = onImageClick,
+                        onBlockUser = onBlockClick,
+                        onReportPost = onReportPost
+                    )
                 }
             } else {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("No posts yet")
-                    }
+                    EmptyStateCard("No posts yet", "This user hasn't posted anything.")
                 }
             }
         }
@@ -2192,10 +2303,27 @@ private fun HtmlText(
         modifier = modifier,
         factory = { context ->
             TextView(context).apply {
-                movementMethod = LinkMovementMethod.getInstance()
+                // Use a custom movement method that handles link clicks without scrolling.
+                // LinkMovementMethod internally calls scrollTo() which makes the
+                // TextView scrollable inside notification cards and post cards.
+                movementMethod = object : LinkMovementMethod() {
+                    override fun onTouchEvent(widget: TextView, buffer: Spannable, event: android.view.MotionEvent): Boolean {
+                        // Save scroll position before handling
+                        val scrollX = widget.scrollX
+                        val scrollY = widget.scrollY
+                        val result = super.onTouchEvent(widget, buffer, event)
+                        // Reset scroll back to prevent movement method from scrolling
+                        widget.scrollTo(scrollX, scrollY)
+                        return result
+                    }
+                }
                 setTextColor(textColor)
                 setLinkTextColor(linkColor)
                 textSize = 16f
+                // Prevent the TextView from scrolling its content
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
             }
         },
         update = { textView ->
@@ -2216,6 +2344,9 @@ private fun HtmlText(
             textView.setOnClickListener { onClick?.invoke() }
             textView.isClickable = onClick != null
             textView.isFocusable = false
+            // Ensure text doesn't become scrollable
+            textView.isVerticalScrollBarEnabled = false
+            textView.setHorizontallyScrolling(false)
 
             if (maxLines != Int.MAX_VALUE) {
                 if (textView.maxLines != maxLines) {
