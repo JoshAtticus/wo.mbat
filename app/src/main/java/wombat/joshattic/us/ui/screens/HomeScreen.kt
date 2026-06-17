@@ -127,6 +127,8 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
@@ -160,6 +162,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -187,6 +190,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
     val exploreListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
+    var confirmTitle by remember { mutableStateOf("") }
+    var confirmMessage by remember { mutableStateOf("") }
+    var confirmAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     var lastBackgroundTime by remember { mutableLongStateOf(0L) }
 
@@ -246,6 +253,27 @@ fun HomeScreen(viewModel: HomeViewModel) {
         }
     }
 
+    confirmAction?.let { action ->
+        AlertDialog(
+            onDismissRequest = { confirmAction = null },
+            title = { Text(confirmTitle) },
+            text = { Text(confirmMessage) },
+            confirmButton = {
+                TextButton(onClick = { 
+                    action()
+                    confirmAction = null 
+                }) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmAction = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
@@ -294,8 +322,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     currentUsername = uiState.session?.username,
                     onClose = viewModel::closeProfile,
                     onFollowClick = viewModel::toggleViewedProfileFollow,
-                    onBlockClick = { username -> viewModel.blockUser(username) },
-                    onBlockReportClick = { username -> viewModel.blockUser(username, reported = true) },
+                    onBlockClick = { username -> 
+                        confirmTitle = "Block User"
+                        confirmMessage = "Are you sure you want to block @$username?"
+                        confirmAction = { viewModel.blockUser(username) }
+                    },
+                    onBlockReportClick = { username -> 
+                        confirmTitle = "Report & Block"
+                        confirmMessage = "Are you sure you want to report and block @$username?"
+                        confirmAction = { viewModel.blockUser(username, reported = true) }
+                    },
                     onUnblockClick = viewModel::unblockViewedProfile,
                     onPostClick = viewModel::openPost,
                     onMentionClick = { username ->
@@ -342,8 +378,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             onProfileClick = viewModel::openProfile,
                             onLoveClick = viewModel::togglePostLove,
                             onImageClick = viewModel::openFullScreenImages,
-                            onBlockUser = { username -> viewModel.blockUser(username) },
-                            onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) },
+                            onBlockUser = { username -> 
+                                confirmTitle = "Block User"
+                                confirmMessage = "Are you sure you want to block @$username?"
+                                confirmAction = { viewModel.blockUser(username) }
+                            },
+                            onBlockReportUser = { username -> 
+                                confirmTitle = "Report & Block"
+                                confirmMessage = "Are you sure you want to report and block @$username?"
+                                confirmAction = { viewModel.blockUser(username, reported = true) }
+                            },
                             onLoadNextPage = viewModel::loadNextFeedPage
                         )
                         BottomTab.Explore -> ExploreTab(
@@ -361,8 +405,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             onProfileClick = viewModel::openProfile,
                             onLoveClick = viewModel::togglePostLove,
                             onImageClick = viewModel::openFullScreenImages,
-                            onBlockUser = { username -> viewModel.blockUser(username) },
-                            onBlockReportUser = { username -> viewModel.blockUser(username, reported = true) }
+                            onBlockUser = { username -> 
+                                confirmTitle = "Block User"
+                                confirmMessage = "Are you sure you want to block @$username?"
+                                confirmAction = { viewModel.blockUser(username) }
+                            },
+                            onBlockReportUser = { username -> 
+                                confirmTitle = "Report & Block"
+                                confirmMessage = "Are you sure you want to report and block @$username?"
+                                confirmAction = { viewModel.blockUser(username, reported = true) }
+                            }
                         )
                         BottomTab.Notifications -> NotificationsTab(
                             session = uiState.session,
@@ -383,11 +435,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             loginLoading = uiState.authLoading,
                             loginError = uiState.loginError,
                             savedAccounts = uiState.savedAccounts,
+                            savedAccountUnreadCounts = uiState.savedAccountUnreadCounts,
                             isAddingAccount = uiState.isAddingAccount,
                             onUsernameChange = viewModel::setLoginUsername,
                             onPasswordChange = viewModel::setLoginPassword,
                             onLogin = viewModel::login,
-                            onLogout = viewModel::logout,
+                            onLogout = { 
+                                confirmTitle = "Sign Out"
+                                confirmMessage = "Are you sure you want to sign out?"
+                                confirmAction = { viewModel.logout() }
+                            },
                             onSwitchAccount = viewModel::switchAccount,
                             onAddAccount = { viewModel.setAddingAccount(true) },
                             onCancelAddAccount = { viewModel.setAddingAccount(false) },
@@ -441,8 +498,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onProfileClick = viewModel::openProfile,
                     onLoveClick = viewModel::togglePostLove,
                     onPostClick = viewModel::openPost,
-                    onBlockUser = { username: String -> viewModel.blockUser(username) },
-                    onBlockReportUser = { username: String -> viewModel.blockUser(username, reported = true) },
+                    onBlockUser = { username: String -> 
+                        confirmTitle = "Block User"
+                        confirmMessage = "Are you sure you want to block @$username?"
+                        confirmAction = { viewModel.blockUser(username) }
+                    },
+                    onBlockReportUser = { username: String -> 
+                        confirmTitle = "Report & Block"
+                        confirmMessage = "Are you sure you want to report and block @$username?"
+                        confirmAction = { viewModel.blockUser(username, reported = true) }
+                    },
                     scrollToCommentId = uiState.scrollToCommentId,
                     onScrollToCommentComplete = viewModel::clearScrollToComment,
                     onImageClick = viewModel::openFullScreenImages
@@ -455,6 +520,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
         FullScreenImageViewer(
             images = images,
             initialIndex = uiState.initialFullScreenImageIndex,
+            username = uiState.fullScreenImageUsername,
             onDismiss = viewModel::closeFullScreenImages
         )
     }
@@ -470,7 +536,7 @@ private fun FeedTab(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null,
     onLoadNextPage: () -> Unit = {}
@@ -531,7 +597,7 @@ private fun ExploreTab(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null
 ) {
@@ -680,6 +746,7 @@ private fun AccountTab(
     loginLoading: Boolean,
     loginError: String?,
     savedAccounts: List<wombat.joshattic.us.data.model.AuthSession>,
+    savedAccountUnreadCounts: Map<String, Int>,
     isAddingAccount: Boolean,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
@@ -693,7 +760,7 @@ private fun AccountTab(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onLoadNextPage: () -> Unit = {}
 ) {
     val refreshState = rememberPullToRefreshState()
@@ -758,9 +825,19 @@ private fun AccountTab(
                                                             expanded = false
                                                             onSwitchAccount(account.username)
                                                         },
+                                                        leadingIcon = {
+                                                            ProfilePicture(username = account.username, size = 24.dp)
+                                                        },
                                                         trailingIcon = {
                                                             if (account.username == profile.name) {
                                                                 Icon(Icons.Filled.Check, contentDescription = "Active")
+                                                            } else {
+                                                                val unread = savedAccountUnreadCounts[account.username] ?: 0
+                                                                if (unread > 0) {
+                                                                    androidx.compose.material3.Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                                                        Text(unread.toString(), color = MaterialTheme.colorScheme.onError)
+                                                                    }
+                                                                }
                                                             }
                                                         }
                                                     )
@@ -773,6 +850,14 @@ private fun AccountTab(
                                                         onAddAccount()
                                                     },
                                                     leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Sign out") },
+                                                    onClick = {
+                                                        expanded = false
+                                                        onLogout()
+                                                    },
+                                                    leadingIcon = { Icon(Icons.Filled.ExitToApp, contentDescription = null) }
                                                 )
                                             }
                                         }
@@ -790,12 +875,6 @@ private fun AccountTab(
                                     ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
                                     ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
                                     ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    TextButton(onClick = onLogout) {
-                                        Text("Sign out")
-                                    }
                                 }
                             }
                         }
@@ -1236,7 +1315,7 @@ private fun PostDetailsSheet(
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null,
     scrollToCommentId: String? = null,
@@ -1515,7 +1594,7 @@ private fun ProfileScreen(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onLoadNextPage: () -> Unit = {}
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
@@ -1752,7 +1831,7 @@ private fun PostCard(
     onProfileClick: (String) -> Unit = {},
     onLoveClick: ((Post) -> Unit)? = null,
     onPostClick: ((Post) -> Unit)? = null,
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onBlockReportUser: ((String) -> Unit)? = null
 ) {
@@ -1856,7 +1935,7 @@ private fun PostCard(
             if (imageUrls.isNotEmpty()) {
                 PostImageCarousel(
                     images = imageUrls,
-                    onImageClick = onImageClick,
+                    onImageClick = { images, index -> onImageClick(images, index, post.poster.name) },
                     modifier = Modifier.padding(horizontal = 16.dp),
                     isDetailView = !truncated
                 )
@@ -2385,6 +2464,7 @@ private fun PostImageCarousel(
 private fun FullScreenImageViewer(
     images: List<String>,
     initialIndex: Int,
+    username: String?,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -2472,7 +2552,7 @@ private fun FullScreenImageViewer(
 
                     IconButton(
                         onClick = {
-                            downloadImage(context, images[pagerState.currentPage])
+                            downloadImage(context, images[pagerState.currentPage], username)
                         },
                         modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
@@ -2501,9 +2581,10 @@ private fun FullScreenImageViewer(
     }
 }
 
-private fun downloadImage(context: Context, url: String) {
+private fun downloadImage(context: Context, url: String, username: String?) {
+    val title = if (username != null) "Image from @$username" else "wo.mbat image"
     val request = DownloadManager.Request(Uri.parse(url))
-        .setTitle("Wombat Image")
+        .setTitle(title)
         .setDescription("Downloading image from Wombat")
         .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
         .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "wombat_${System.currentTimeMillis()}.jpg")

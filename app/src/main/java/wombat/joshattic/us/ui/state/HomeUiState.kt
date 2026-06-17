@@ -47,6 +47,7 @@ data class HomeUiState(
     val commentReplyParent: Comment? = null,
     val scrollToCommentId: String? = null,
     val fullScreenImages: List<String>? = null,
+    val fullScreenImageUsername: String? = null,
     val initialFullScreenImageIndex: Int = 0,
     val isBanned: Boolean = false,
     val banReason: String? = null,
@@ -58,6 +59,7 @@ data class HomeUiState(
     val viewingProfilePage: Int = 1,
     val viewingProfileLast: Boolean = false,
     val savedAccounts: List<AuthSession> = emptyList(),
+    val savedAccountUnreadCounts: Map<String, Int> = emptyMap(),
     val isAddingAccount: Boolean = false
 ) {
     val accountLabel: String = session?.username ?: "Account"

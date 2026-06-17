@@ -83,6 +83,14 @@ class WombatRepository(
         return apiService.getUnreadNotifications(token).unread.orEmpty()
     }
 
+    suspend fun getUnreadCount(token: String): Int {
+        return try {
+            apiService.getUnreadNotifications(token).unread.orEmpty().size
+        } catch (e: Exception) {
+            0
+        }
+    }
+
     suspend fun loadReadNotifications(session: AuthSession?): List<Notification> {
         val token = session?.token ?: return emptyList()
         return apiService.getReadNotifications(token).read.orEmpty()

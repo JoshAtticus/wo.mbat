@@ -41,7 +41,21 @@ class HomeViewModel(
         viewModelScope.launch {
             repository.sessionsFlow.collectLatest { sessions ->
                 _uiState.value = _uiState.value.copy(savedAccounts = sessions)
+                fetchSavedAccountsUnreadCounts(sessions)
             }
+        }
+    }
+
+    private fun fetchSavedAccountsUnreadCounts(sessions: List<AuthSession>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val counts = mutableMapOf<String, Int>()
+            sessions.forEach { session ->
+                if (session.username != _uiState.value.session?.username) {
+                    val count = repository.getUnreadCount(session.token)
+                    counts[session.username] = count
+                }
+            }
+            _uiState.value = _uiState.value.copy(savedAccountUnreadCounts = counts)
         }
     }
 
@@ -397,12 +411,20 @@ class HomeViewModel(
         )
     }
 
-    fun openFullScreenImages(images: List<String>, index: Int) {
-        _uiState.value = _uiState.value.copy(fullScreenImages = images, initialFullScreenImageIndex = index)
+    fun openFullScreenImages(images: List<String>, index: Int, username: String? = null) {
+        _uiState.value = _uiState.value.copy(
+            fullScreenImages = images,
+            fullScreenImageUsername = username,
+            initialFullScreenImageIndex = index
+        )
     }
 
     fun closeFullScreenImages() {
-        _uiState.value = _uiState.value.copy(fullScreenImages = null, initialFullScreenImageIndex = 0)
+        _uiState.value = _uiState.value.copy(
+            fullScreenImages = null,
+            fullScreenImageUsername = null,
+            initialFullScreenImageIndex = 0
+        )
     }
 
     fun setCommentDraft(comment: String) {
