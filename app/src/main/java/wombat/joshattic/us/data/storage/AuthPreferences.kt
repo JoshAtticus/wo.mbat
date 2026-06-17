@@ -9,35 +9,86 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import wombat.joshattic.us.data.model.AuthSession
 
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+
 private val Context.dataStore by preferencesDataStore(name = "auth")
 
 class AuthPreferences(private val context: Context) {
+    private val gson = Gson()
+    private val type = object : TypeToken<List<AuthSession>>() {}.type
+
     private object Keys {
-        val Token = stringPreferencesKey("token")
-        val Username = stringPreferencesKey("username")
+        val ActiveUsername = stringPreferencesKey("username") // Keep old key for backwards compat
+        val Sessions = stringPreferencesKey("sessions")
+        val LegacyToken = stringPreferencesKey("token")
+    }
+
+    val sessionsFlow: Flow<List<AuthSession>> = context.dataStore.data.map { preferences ->
+        preferences.toSessions()
     }
 
     val sessionFlow: Flow<AuthSession?> = context.dataStore.data.map { preferences ->
-        preferences.toSession()
+        val sessions = preferences.toSessions()
+        val activeUsername = preferences[Keys.ActiveUsername]
+        sessions.find { it.username == activeUsername } ?: sessions.firstOrNull()
     }
 
     suspend fun saveSession(token: String, username: String) {
         context.dataStore.edit { preferences ->
-            preferences[Keys.Token] = token
-            preferences[Keys.Username] = username
+            val sessions = preferences.toSessions().toMutableList()
+            sessions.removeAll { it.username == username }
+            sessions.add(AuthSession(token = token, username = username))
+            
+            preferences[Keys.Sessions] = gson.toJson(sessions)
+            preferences[Keys.ActiveUsername] = username
+        }
+    }
+
+    suspend fun switchAccount(username: String) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.ActiveUsername] = username
+        }
+    }
+
+    suspend fun removeSession(username: String) {
+        context.dataStore.edit { preferences ->
+            val sessions = preferences.toSessions().toMutableList()
+            sessions.removeAll { it.username == username }
+            preferences[Keys.Sessions] = gson.toJson(sessions)
+            
+            if (preferences[Keys.ActiveUsername] == username) {
+                val nextActive = sessions.firstOrNull()?.username
+                if (nextActive != null) {
+                    preferences[Keys.ActiveUsername] = nextActive
+                } else {
+                    preferences.remove(Keys.ActiveUsername)
+                }
+            }
         }
     }
 
     suspend fun clearSession() {
         context.dataStore.edit { preferences ->
-            preferences.remove(Keys.Token)
-            preferences.remove(Keys.Username)
+            preferences.remove(Keys.LegacyToken)
+            preferences.remove(Keys.ActiveUsername)
+            preferences.remove(Keys.Sessions)
         }
     }
 
-    private fun Preferences.toSession(): AuthSession? {
-        val token = this[Keys.Token] ?: return null
-        val username = this[Keys.Username] ?: return null
-        return AuthSession(token = token, username = username)
+    private fun Preferences.toSessions(): List<AuthSession> {
+        val json = this[Keys.Sessions]
+        if (json != null) {
+            return gson.fromJson(json, type) ?: emptyList()
+        }
+        
+        // Legacy fallback
+        val legacyToken = this[Keys.LegacyToken]
+        val legacyUsername = this[Keys.ActiveUsername]
+        if (legacyToken != null && legacyUsername != null) {
+            return listOf(AuthSession(token = legacyToken, username = legacyUsername))
+        }
+        
+        return emptyList()
     }
 }

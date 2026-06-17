@@ -58,8 +58,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -185,10 +188,18 @@ fun HomeScreen(viewModel: HomeViewModel) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { viewModel.dismissBannedPopup() },
             title = { androidx.compose.material3.Text("Banned :(") },
-            text = { androidx.compose.material3.Text("You were banned because ${uiState.banReason ?: "unknown reasons"}. You can still browse your feed as read only, but you won't be able to make new posts or interact with anyone") },
+            text = { androidx.compose.material3.Text("\"${uiState.banReason ?: "unknown reasons"}\". You can still browse your feed as read only, but you won't be able to make new posts or interact with anyone") },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { viewModel.dismissBannedPopup() }) {
                     androidx.compose.material3.Text("OK")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { 
+                    viewModel.dismissBannedPopup()
+                    viewModel.logout() 
+                }) {
+                    androidx.compose.material3.Text("Log out")
                 }
             }
         )
@@ -329,10 +340,15 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             loginPassword = uiState.loginPassword,
                             loginLoading = uiState.authLoading,
                             loginError = uiState.loginError,
+                            savedAccounts = uiState.savedAccounts,
+                            isAddingAccount = uiState.isAddingAccount,
                             onUsernameChange = viewModel::setLoginUsername,
                             onPasswordChange = viewModel::setLoginPassword,
                             onLogin = viewModel::login,
                             onLogout = viewModel::logout,
+                            onSwitchAccount = viewModel::switchAccount,
+                            onAddAccount = { viewModel.setAddingAccount(true) },
+                            onCancelAddAccount = { viewModel.setAddingAccount(false) },
                             onRefresh = viewModel::refreshAccount,
                             onPostClick = viewModel::openPost,
                             onMentionClick = { username ->
@@ -620,10 +636,15 @@ private fun AccountTab(
     loginPassword: String,
     loginLoading: Boolean,
     loginError: String?,
+    savedAccounts: List<wombat.joshattic.us.data.model.AuthSession>,
+    isAddingAccount: Boolean,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
+    onSwitchAccount: (String) -> Unit,
+    onAddAccount: () -> Unit,
+    onCancelAddAccount: () -> Unit,
     onRefresh: () -> Unit,
     onPostClick: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
@@ -658,7 +679,7 @@ private fun AccountTab(
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (session != null) {
+            if (session != null && !isAddingAccount) {
                 // Profile details card
                 item {
                     if (profile != null) {
@@ -675,7 +696,43 @@ private fun AccountTab(
                                     ProfilePicture(username = profile.name, size = 56.dp, borderColor = accent)
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(profile.name, style = MaterialTheme.typography.titleLarge, color = accent)
+                                        var expanded by remember { mutableStateOf(false) }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.clickable { expanded = true }
+                                        ) {
+                                            Text(profile.name, style = MaterialTheme.typography.titleLarge, color = accent)
+                                            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Switch Account", tint = accent)
+                                            
+                                            DropdownMenu(
+                                                expanded = expanded,
+                                                onDismissRequest = { expanded = false }
+                                            ) {
+                                                savedAccounts.forEach { account ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(account.username) },
+                                                        onClick = { 
+                                                            expanded = false
+                                                            onSwitchAccount(account.username)
+                                                        },
+                                                        trailingIcon = {
+                                                            if (account.username == profile.name) {
+                                                                Icon(Icons.Filled.Check, contentDescription = "Active")
+                                                            }
+                                                        }
+                                                    )
+                                                }
+                                                androidx.compose.material3.HorizontalDivider()
+                                                DropdownMenuItem(
+                                                    text = { Text("Add Account") },
+                                                    onClick = {
+                                                        expanded = false
+                                                        onAddAccount()
+                                                    },
+                                                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) }
+                                                )
+                                            }
+                                        }
                                         Text(
                                             text = if (profile.online) "Online now" else "Offline",
                                             style = MaterialTheme.typography.bodyMedium,
@@ -760,12 +817,19 @@ private fun AccountTab(
                                 Text(loginError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Button(onClick = onLogin, enabled = !loginLoading) {
-                                if (loginLoading) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Spacer(modifier = Modifier.width(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = onLogin, enabled = !loginLoading) {
+                                    if (loginLoading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text("Sign in")
                                 }
-                                Text("Sign in")
+                                if (isAddingAccount) {
+                                    TextButton(onClick = onCancelAddAccount) {
+                                        Text("Cancel")
+                                    }
+                                }
                             }
                         }
                     }

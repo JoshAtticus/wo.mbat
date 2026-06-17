@@ -1,6 +1,13 @@
 package wombat.joshattic.us.data.repository
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
@@ -22,8 +29,25 @@ class WombatRepository(
     private val authPreferences: AuthPreferences,
     private val blockedUsersDatabase: BlockedUsersDatabase
 ) {
+    private val socketManager = wombat.joshattic.us.data.network.WasteofSocketManager()
+    private val repositoryScope = CoroutineScope(Dispatchers.IO)
+
     val sessionFlow: Flow<AuthSession?> = authPreferences.sessionFlow
+    val sessionsFlow: Flow<List<AuthSession>> = authPreferences.sessionsFlow
     val blockedUsernamesFlow: Flow<Set<String>> = blockedUsersDatabase.blockedUsernamesFlow
+    val unreadSocketCount: StateFlow<Int> = socketManager.unreadCount
+
+    init {
+        repositoryScope.launch {
+            sessionFlow.collect { session ->
+                if (session != null) {
+                    socketManager.connect(session.token)
+                } else {
+                    socketManager.disconnect()
+                }
+            }
+        }
+    }
 
     suspend fun login(username: String, password: String): Result<AuthSession> = runCatching {
         val loginResponse = apiService.login(LoginRequest(username = username, password = password))
@@ -108,8 +132,21 @@ class WombatRepository(
         blockedUsersDatabase.unblock(username)
     }
 
-    suspend fun logout() {
-        authPreferences.clearSession()
+    suspend fun switchAccount(username: String) {
+        authPreferences.switchAccount(username)
+    }
+
+    suspend fun logout(username: String? = null) {
+        if (username != null) {
+            authPreferences.removeSession(username)
+        } else {
+            val active = sessionFlow.firstOrNull()
+            if (active != null) {
+                authPreferences.removeSession(active.username)
+            } else {
+                authPreferences.clearSession()
+            }
+        }
     }
 
     suspend fun getAdminMessages(token: String): List<Notification> {

@@ -33,6 +33,37 @@ class HomeViewModel(
     init {
         observeSessionAndRefresh()
         observeBlockedUsers()
+        observeSessions()
+        observeUnreadSocketCount()
+    }
+
+    private fun observeSessions() {
+        viewModelScope.launch {
+            repository.sessionsFlow.collectLatest { sessions ->
+                _uiState.value = _uiState.value.copy(savedAccounts = sessions)
+            }
+        }
+    }
+
+    private fun observeUnreadSocketCount() {
+        viewModelScope.launch {
+            repository.unreadSocketCount.collectLatest { count ->
+                val currentSize = _uiState.value.unreadNotifications.size
+                if (count > currentSize || (count == 0 && currentSize > 0)) {
+                    refreshNotifications()
+                }
+            }
+        }
+    }
+
+    fun switchAccount(username: String) {
+        viewModelScope.launch {
+            repository.switchAccount(username)
+        }
+    }
+
+    fun setAddingAccount(adding: Boolean) {
+        _uiState.value = _uiState.value.copy(isAddingAccount = adding, loginError = null, loginUsername = "", loginPassword = "")
     }
 
     fun selectTab(tab: BottomTab) {
@@ -90,6 +121,7 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(
                         authLoading = false,
                         loginPassword = "",
+                        isAddingAccount = false,
                         toastMessage = if (isPasswordless) "Your account is insecure, please set a password on wasteof.money" else _uiState.value.toastMessage
                     )
                 }
