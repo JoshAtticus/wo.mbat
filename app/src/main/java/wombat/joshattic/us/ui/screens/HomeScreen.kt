@@ -120,6 +120,7 @@ import android.text.style.UnderlineSpan
 import android.text.style.URLSpan
 import android.text.TextPaint
 import android.view.View
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -154,10 +155,16 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
-import coil.decode.SvgDecoder
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
@@ -176,6 +183,33 @@ fun HomeScreen(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val feedListState = rememberLazyListState()
+    val exploreListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var lastBackgroundTime by remember { mutableLongStateOf(0L) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                lastBackgroundTime = System.currentTimeMillis()
+            } else if (event == Lifecycle.Event.ON_RESUME) {
+                if (lastBackgroundTime > 0 && System.currentTimeMillis() - lastBackgroundTime > 15 * 60 * 1000) {
+                    viewModel.refreshFeed()
+                    viewModel.loadExploreTrending()
+                    coroutineScope.launch {
+                        feedListState.animateScrollToItem(0)
+                        exploreListState.animateScrollToItem(0)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
@@ -243,7 +277,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 selectedTab = uiState.selectedTab,
                 unreadCount = uiState.unreadNotificationCount,
                 accountLabel = uiState.accountLabel,
-                profilePictureUrl = uiState.session?.username?.let { "https://api.wasteof.money/users/$it/picture" },
+                profilePictureUrl = uiState.session?.username?.let { "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" },
                 onTabSelected = viewModel::selectTab
             )
         }
@@ -296,7 +330,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         BottomTab.Home -> FeedTab(
                             posts = uiState.feed,
                             loading = uiState.feedLoading,
-                            onRefresh = viewModel::refreshFeed,
+                            listState = feedListState,
+                            onRefresh = {
+                                viewModel.refreshFeed()
+                                coroutineScope.launch { feedListState.animateScrollToItem(0) }
+                            },
                             onPostClick = viewModel::openPost,
                             onMentionClick = { username ->
                                 viewModel.openProfile(username)
@@ -311,7 +349,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         BottomTab.Explore -> ExploreTab(
                             trendingPosts = uiState.exploreTrendingPosts,
                             trendingLoading = uiState.exploreTrendingLoading,
-                            onRefresh = viewModel::loadExploreTrending,
+                            listState = exploreListState,
+                            onRefresh = {
+                                viewModel.loadExploreTrending()
+                                coroutineScope.launch { exploreListState.animateScrollToItem(0) }
+                            },
                             onOpenPost = viewModel::openPost,
                             onMentionClick = { username ->
                                 viewModel.openProfile(username)
@@ -422,6 +464,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
 private fun FeedTab(
     posts: List<Post>,
     loading: Boolean,
+    listState: LazyListState = rememberLazyListState(),
     onRefresh: () -> Unit,
     onPostClick: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
@@ -439,8 +482,6 @@ private fun FeedTab(
         isRefreshing = loading,
         onRefresh = onRefresh
     ) {
-        val listState = rememberLazyListState()
-        
         // Load more when reaching near the end
         LaunchedEffect(listState, posts.size) {
             snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
@@ -484,6 +525,7 @@ private fun FeedTab(
 private fun ExploreTab(
     trendingPosts: List<Post>,
     trendingLoading: Boolean,
+    listState: LazyListState = rememberLazyListState(),
     onRefresh: () -> Unit,
     onOpenPost: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
@@ -501,6 +543,7 @@ private fun ExploreTab(
         onRefresh = onRefresh
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize()
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
@@ -1408,7 +1451,6 @@ private fun WombatBottomNavigationBar(
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(profilePictureUrl)
-                            .decoderFactory(SvgDecoder.Factory())
                             .crossfade(true)
                             .build(),
                         contentDescription = accountLabel,
@@ -1953,8 +1995,7 @@ private fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, 
     val context = LocalContext.current
     val imageRequest = remember(username) {
         ImageRequest.Builder(context)
-            .data("https://api.wasteof.money/users/$username/picture")
-            .decoderFactory(SvgDecoder.Factory())
+            .data("https://wasteof-image-proxy.tnix.dev/$username?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3")
             .crossfade(true)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)

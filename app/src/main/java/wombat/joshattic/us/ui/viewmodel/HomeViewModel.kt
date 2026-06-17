@@ -129,8 +129,9 @@ class HomeViewModel(
     }
 
     fun logout() {
+        val username = _uiState.value.session?.username ?: return
         viewModelScope.launch {
-            repository.logout()
+            repository.logout(username)
         }
     }
 
@@ -175,6 +176,13 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(feedPage = 1, feedLast = false)
             loadFeedForCurrentSession(_uiState.value.session)
+        }
+    }
+
+    fun refreshFeedAndExplore() {
+        refreshFeed()
+        if (_uiState.value.selectedTab == BottomTab.Explore) {
+            loadExploreTrending()
         }
     }
 
@@ -638,6 +646,12 @@ class HomeViewModel(
                     isBanned = true,
                     banReason = banReason,
                     showBannedPopup = true
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isBanned = false,
+                    banReason = null,
+                    showBannedPopup = false
                 )
             }
         }

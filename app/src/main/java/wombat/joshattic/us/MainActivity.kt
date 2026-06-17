@@ -12,11 +12,14 @@ import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.data.storage.AuthPreferences
 import wombat.joshattic.us.data.storage.BlockedUsersDatabase
 import wombat.joshattic.us.ui.screens.HomeScreen
+import wombat.joshattic.us.ui.screens.SplashOverlay
 import wombat.joshattic.us.ui.theme.WombatTheme
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         val repository = WombatRepository(
             apiService = RetrofitClient.apiService,
@@ -28,7 +31,9 @@ class MainActivity : ComponentActivity() {
             val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository))
             val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
             WombatTheme(userColor = uiState.accountProfile?.color) {
-                HomeScreen(viewModel = homeViewModel)
+                SplashOverlay {
+                    HomeScreen(viewModel = homeViewModel)
+                }
             }
         }
     }
