@@ -95,6 +95,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -328,10 +329,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         confirmAction = { viewModel.blockUser(username) }
                     },
                     onBlockReportClick = { username -> 
-                        confirmTitle = "Report & Block"
+                        confirmTitle = "Report & Block User"
                         confirmMessage = "Are you sure you want to report and block @$username?"
                         confirmAction = { viewModel.blockUser(username, reported = true) }
                     },
+                    onReportPost = { post -> viewModel.openReportDialog(post.id) },
                     onUnblockClick = viewModel::unblockViewedProfile,
                     onPostClick = viewModel::openPost,
                     onMentionClick = { username ->
@@ -383,11 +385,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 confirmMessage = "Are you sure you want to block @$username?"
                                 confirmAction = { viewModel.blockUser(username) }
                             },
-                            onBlockReportUser = { username -> 
-                                confirmTitle = "Report & Block"
-                                confirmMessage = "Are you sure you want to report and block @$username?"
-                                confirmAction = { viewModel.blockUser(username, reported = true) }
-                            },
+                            onReportPost = { post -> viewModel.openReportDialog(post.id) },
                             onLoadNextPage = viewModel::loadNextFeedPage
                         )
                         BottomTab.Explore -> ExploreTab(
@@ -410,11 +408,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 confirmMessage = "Are you sure you want to block @$username?"
                                 confirmAction = { viewModel.blockUser(username) }
                             },
-                            onBlockReportUser = { username -> 
-                                confirmTitle = "Report & Block"
-                                confirmMessage = "Are you sure you want to report and block @$username?"
-                                confirmAction = { viewModel.blockUser(username, reported = true) }
-                            }
+                            onReportPost = { post -> viewModel.openReportDialog(post.id) }
                         )
                         BottomTab.Notifications -> NotificationsTab(
                             session = uiState.session,
@@ -503,11 +497,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         confirmMessage = "Are you sure you want to block @$username?"
                         confirmAction = { viewModel.blockUser(username) }
                     },
-                    onBlockReportUser = { username: String -> 
-                        confirmTitle = "Report & Block"
-                        confirmMessage = "Are you sure you want to report and block @$username?"
-                        confirmAction = { viewModel.blockUser(username, reported = true) }
-                    },
+                    onReportPost = { post -> viewModel.openReportDialog(post.id) },
                     scrollToCommentId = uiState.scrollToCommentId,
                     onScrollToCommentComplete = viewModel::clearScrollToComment,
                     onImageClick = viewModel::openFullScreenImages
@@ -524,6 +514,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onDismiss = viewModel::closeFullScreenImages
         )
     }
+
+    if (uiState.showReportDialog && uiState.reportPostId != null) {
+        ReportDialog(
+            reason = uiState.reportReason,
+            onReasonChange = viewModel::setReportReason,
+            loading = uiState.reportLoading,
+            onDismiss = viewModel::closeReportDialog,
+            onSubmit = viewModel::submitReport
+        )
+    }
 }
 
 @Composable
@@ -538,7 +538,7 @@ private fun FeedTab(
     onLoveClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
-    onBlockReportUser: ((String) -> Unit)? = null,
+    onReportPost: ((Post) -> Unit)? = null,
     onLoadNextPage: () -> Unit = {}
 ) {
     val refreshState = rememberPullToRefreshState()
@@ -580,7 +580,7 @@ private fun FeedTab(
                     onPostClick = onPostClick,
                     onImageClick = onImageClick,
                     onBlockUser = onBlockUser,
-                    onBlockReportUser = onBlockReportUser
+                    onReportPost = onReportPost
                 )
             }
         }
@@ -599,7 +599,7 @@ private fun ExploreTab(
     onLoveClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
-    onBlockReportUser: ((String) -> Unit)? = null
+    onReportPost: ((Post) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -631,7 +631,7 @@ private fun ExploreTab(
                     onPostClick = onOpenPost,
                     onImageClick = onImageClick,
                     onBlockUser = onBlockUser,
-                    onBlockReportUser = onBlockReportUser
+                    onReportPost = onReportPost
                 )
             }
         }
@@ -1317,7 +1317,7 @@ private fun PostDetailsSheet(
     onPostClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
-    onBlockReportUser: ((String) -> Unit)? = null,
+    onReportPost: ((Post) -> Unit)? = null,
     scrollToCommentId: String? = null,
     onScrollToCommentComplete: () -> Unit = {}
 ) {
@@ -1398,7 +1398,7 @@ private fun PostDetailsSheet(
                         onPostClick = onPostClick,
                         onImageClick = onImageClick,
                         onBlockUser = onBlockUser,
-                        onBlockReportUser = onBlockReportUser
+                        onReportPost = onReportPost
                     )
                 }
 
@@ -1589,6 +1589,7 @@ private fun ProfileScreen(
     onFollowClick: () -> Unit,
     onBlockClick: (String) -> Unit,
     onBlockReportClick: (String) -> Unit,
+    onReportPost: ((Post) -> Unit)? = null,
     onUnblockClick: () -> Unit,
     onPostClick: (Post) -> Unit,
     onMentionClick: (String) -> Unit,
@@ -1772,7 +1773,7 @@ private fun ProfileScreen(
                             onPostClick = onPostClick,
                             onImageClick = onImageClick,
                             onBlockUser = onBlockClick,
-                            onBlockReportUser = onBlockReportClick
+                            onReportPost = onReportPost
                         )
                     }
                 }
@@ -1821,6 +1822,25 @@ private fun UserActionsMenu(
 }
 
 @Composable
+private fun PostActionsMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onBlock: () -> Unit,
+    onReport: () -> Unit
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Block") },
+            onClick = onBlock
+        )
+        DropdownMenuItem(
+            text = { Text("Report Post") },
+            onClick = onReport
+        )
+    }
+}
+
+@Composable
 private fun PostCard(
     post: Post,
     onClick: () -> Unit,
@@ -1833,7 +1853,7 @@ private fun PostCard(
     onPostClick: ((Post) -> Unit)? = null,
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
-    onBlockReportUser: ((String) -> Unit)? = null
+    onReportPost: ((Post) -> Unit)? = null
 ) {
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
@@ -1874,21 +1894,21 @@ private fun PostCard(
                         Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (onBlockUser != null && onBlockReportUser != null) {
+                if (onBlockUser != null || onReportPost != null) {
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "Post options")
                         }
-                        UserActionsMenu(
+                        PostActionsMenu(
                             expanded = menuExpanded,
                             onDismiss = { menuExpanded = false },
                             onBlock = {
                                 menuExpanded = false
                                 onBlockUser?.invoke(post.poster.name)
                             },
-                            onBlockReport = {
+                            onReport = {
                                 menuExpanded = false
-                                onBlockReportUser?.invoke(post.poster.name)
+                                onReportPost?.invoke(post)
                             }
                         )
                     }
@@ -2594,4 +2614,82 @@ private fun downloadImage(context: Context, url: String, username: String?) {
     val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     downloadManager.enqueue(request)
     Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+}
+
+@Composable
+private fun ReportDialog(
+    reason: String,
+    onReasonChange: (String) -> Unit,
+    loading: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit
+) {
+    val presets = listOf(
+        "Spam",
+        "Harrassment",
+        "Abuse/Threats",
+        "Personal Information",
+        "Impersonation",
+        "Intentional Misinformation",
+        "Other"
+    )
+    var selectedPreset by remember { mutableStateOf(presets.first()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Report Post") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                presets.forEach { preset ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedPreset = preset }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedPreset == preset,
+                            onClick = { selectedPreset = preset }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(preset, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                if (selectedPreset == "Other") {
+                    OutlinedTextField(
+                        value = reason,
+                        onValueChange = onReasonChange,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        label = { Text("Reason") },
+                        singleLine = true
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val finalReason = if (selectedPreset == "Other") {
+                        reason
+                    } else {
+                        "$selectedPreset - Reported with wo.mbat"
+                    }
+                    onSubmit(finalReason)
+                },
+                enabled = !loading && (selectedPreset != "Other" || reason.isNotBlank())
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Report")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !loading) {
+                Text("Cancel")
+            }
+        }
+    )
 }

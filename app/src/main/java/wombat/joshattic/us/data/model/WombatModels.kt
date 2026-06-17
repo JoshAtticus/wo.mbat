@@ -119,3 +119,8 @@ data class FollowState(
     val followers: Int,
     val following: Int
 )
+
+data class ReportRequest(
+    val type: String = "none",
+    val reason: String
+)

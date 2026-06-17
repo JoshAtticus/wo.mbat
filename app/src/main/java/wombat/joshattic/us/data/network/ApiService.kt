@@ -13,6 +13,7 @@ import wombat.joshattic.us.data.model.CreatePostRequest
 import wombat.joshattic.us.data.model.FeedResponse
 import wombat.joshattic.us.data.model.FollowToggleResponse
 import wombat.joshattic.us.data.model.LoginRequest
+import wombat.joshattic.us.data.model.ReportRequest
 import wombat.joshattic.us.data.model.LoginResponse
 import wombat.joshattic.us.data.model.MarkReadRequest
 import wombat.joshattic.us.data.model.LoveToggleResponse
@@ -50,6 +51,13 @@ interface ApiService {
         @Header("authorization") token: String,
         @Body request: CreatePostRequest
     ): Post
+
+    @POST("posts/{post_id}/report")
+    suspend fun reportPost(
+        @Header("authorization") token: String,
+        @Path("post_id") postId: String,
+        @Body request: ReportRequest
+    )
 
     @GET("messages/unread")
     suspend fun getUnreadNotifications(

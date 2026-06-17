@@ -103,6 +103,14 @@ class WombatRepository(
         )
     }
 
+    suspend fun reportPost(session: AuthSession, postId: String, reason: String) {
+        apiService.reportPost(
+            token = session.token,
+            postId = postId,
+            request = wombat.joshattic.us.data.model.ReportRequest(reason = reason)
+        )
+    }
+
     suspend fun createComment(session: AuthSession, postId: String, content: String, parent: String?): Comment {
         return apiService.makeComment(
             postId = postId,

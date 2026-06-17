@@ -60,7 +60,11 @@ data class HomeUiState(
     val viewingProfileLast: Boolean = false,
     val savedAccounts: List<AuthSession> = emptyList(),
     val savedAccountUnreadCounts: Map<String, Int> = emptyMap(),
-    val isAddingAccount: Boolean = false
+    val isAddingAccount: Boolean = false,
+    val showReportDialog: Boolean = false,
+    val reportPostId: String? = null,
+    val reportReason: String = "",
+    val reportLoading: Boolean = false
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size

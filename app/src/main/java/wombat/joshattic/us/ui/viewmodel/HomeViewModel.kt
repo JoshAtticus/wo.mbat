@@ -598,6 +598,54 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(showBannedPopup = false)
     }
 
+    fun openReportDialog(postId: String) {
+        _uiState.value = _uiState.value.copy(
+            showReportDialog = true,
+            reportPostId = postId,
+            reportReason = ""
+        )
+    }
+
+    fun closeReportDialog() {
+        _uiState.value = _uiState.value.copy(
+            showReportDialog = false,
+            reportPostId = null,
+            reportReason = "",
+            reportLoading = false
+        )
+    }
+
+    fun setReportReason(reason: String) {
+        _uiState.value = _uiState.value.copy(reportReason = reason)
+    }
+
+    fun submitReport(reason: String) {
+        val currentSession = _uiState.value.session ?: return
+        val postId = _uiState.value.reportPostId ?: return
+        // assuming isBlocked logic exists in your project context
+        if (_uiState.value.blockedUsernames.contains(_uiState.value.selectedPost?.poster?.name?.lowercase())) return
+
+        _uiState.value = _uiState.value.copy(reportLoading = true)
+        viewModelScope.launch {
+            runCatching {
+                repository.reportPost(currentSession, postId, reason)
+            }.onSuccess {
+                _uiState.value = _uiState.value.copy(
+                    showReportDialog = false,
+                    reportPostId = null,
+                    reportReason = "",
+                    reportLoading = false,
+                    toastMessage = "Post reported"
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    reportLoading = false,
+                    toastMessage = throwable.message ?: "Failed to report post"
+                )
+            }
+        }
+    }
+
     private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
         val current = _uiState.value
         fun transform(p: Post) = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
