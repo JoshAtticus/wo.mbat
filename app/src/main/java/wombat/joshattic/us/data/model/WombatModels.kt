@@ -18,7 +18,7 @@ data class User(
 @Immutable
 data class UserStats(val followers: Int, val following: Int, val posts: Int)
 
-data class FeedResponse(val posts: List<Post>, val last: Boolean)
+data class FeedResponse(val posts: List<Post>, val pinned: List<Post>? = null, val last: Boolean)
 
 @Immutable
 data class Post(
@@ -30,6 +30,7 @@ data class Post(
     val comments: Int,
     val loves: Int,
     val reposts: Int,
+    val pinned: Boolean? = null,
     val isLoving: Boolean? = null
 )
 

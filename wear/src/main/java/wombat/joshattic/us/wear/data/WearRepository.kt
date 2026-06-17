@@ -24,6 +24,9 @@ class WearRepository(
     suspend fun toggleLove(session: AuthSession, postId: String): LoveToggleResponse =
         api.togglePostLove(postId = postId, token = session.token)
 
+    suspend fun getPostLoveStatus(session: AuthSession?, postId: String, username: String): Boolean =
+        api.getPostLoveStatus(postId, username, session?.token)
+
     suspend fun createPost(session: AuthSession, htmlContent: String): Post =
         api.makePost(token = session.token, request = CreatePostRequest(post = htmlContent))
 

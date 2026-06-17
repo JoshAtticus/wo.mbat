@@ -278,7 +278,8 @@ class HomeViewModel(
             runCatching {
                 val profile = repository.loadUserProfile(normalizedUsername)
                 val response = repository.loadUserPosts(currentSession, normalizedUsername, 1)
-                val posts = if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
+                val allPosts = (response.pinned ?: emptyList()) + response.posts
+                val posts = if (currentSession != null) augmentLoveStatuses(allPosts, currentSession) else allPosts
                 val isFollowing = currentSession
                     ?.takeUnless { it.username.equals(normalizedUsername, ignoreCase = true) }
                     ?.let { repository.getFollowStatus(it, normalizedUsername, it.username) }
@@ -801,7 +802,8 @@ class HomeViewModel(
             }
         runCatching {
             val response = repository.loadUserPosts(session, session.username, 1)
-            val posts = filterBlockedPosts(augmentLoveStatuses(response.posts, session))
+            val allPosts = (response.pinned ?: emptyList()) + response.posts
+            val posts = filterBlockedPosts(augmentLoveStatuses(allPosts, session))
             posts to response.last
         }.onSuccess { (posts, isLast) ->
             _uiState.value = _uiState.value.copy(

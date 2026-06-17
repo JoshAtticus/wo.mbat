@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.wear.data.WearAuthPreferences
 import wombat.joshattic.us.wear.data.WearRepository
@@ -74,7 +78,9 @@ class WearViewModel(
             val page = if (refresh) 1 else _uiState.value.feedPage
             _uiState.update { it.copy(feedLoading = true) }
             runCatching {
-                repository.loadFeed(_uiState.value.session, page)
+                val posts = repository.loadFeed(_uiState.value.session, page)
+                val session = _uiState.value.session
+                if (session != null) augmentLoveStatuses(posts, session) else posts
             }.onSuccess { posts ->
                 _uiState.update { state ->
                     val newFeed = if (refresh) posts else state.feed + posts
@@ -182,6 +188,17 @@ class WearViewModel(
 
     fun clearError() = _uiState.update { it.copy(errorMessage = null) }
     fun clearPostSuccess() = _uiState.update { it.copy(postSuccess = false) }
+
+    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = withContext(Dispatchers.IO) {
+        posts.map { post ->
+            async {
+                val loved = runCatching {
+                    repository.getPostLoveStatus(session, post.id, session.username)
+                }.getOrDefault(post.isLoving ?: false)
+                post.copy(isLoving = loved)
+            }
+        }.awaitAll()
+    }
 
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {

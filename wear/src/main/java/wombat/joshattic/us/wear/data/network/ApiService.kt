@@ -41,6 +41,13 @@ interface ApiService {
         @Header("authorization") token: String
     ): LoveToggleResponse
 
+    @GET("posts/{post_id}/loves/{username}")
+    suspend fun getPostLoveStatus(
+        @Path("post_id") postId: String,
+        @Path("username") username: String,
+        @Header("authorization") token: String? = null
+    ): Boolean
+
     @GET("messages/unread")
     suspend fun getUnreadNotifications(
         @Header("authorization") token: String

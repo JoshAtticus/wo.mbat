@@ -75,6 +75,7 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -791,20 +792,74 @@ private fun AccountTab(
         ) {
             if (session != null && !isAddingAccount) {
                 // Profile details card
-                item {
-                    if (profile != null) {
-                        val accent = getUserColorSchemeColors(profile.color).first
+                if (profile != null) {
+                    val accent = getUserColorSchemeColors(profile.color).first
+                    item {
+                        val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner"
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .background(accent.copy(alpha = 0.18f))
+                        ) {
+                            SubcomposeAsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(bannerUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                loading = {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    }
+                                },
+                                contentDescription = "Profile banner",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            // Gradient scrim at the bottom of the banner for smoother blending
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .background(
+                                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Transparent,
+                                                MaterialTheme.colorScheme.background.copy(alpha = 0.8f)
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+                    }
+
+                    item {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .offset(y = (-24).dp)
+                                .padding(horizontal = 4.dp)
                                 .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    ProfilePicture(username = profile.name, size = 56.dp, borderColor = accent)
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Box {
+                                        ProfilePicture(username = profile.name, size = 72.dp, borderColor = accent)
+                                        if (profile.online) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .align(Alignment.BottomEnd)
+                                                    .offset(x = (-2).dp, y = (-2).dp)
+                                                    .background(Color(0xFF22C55E), CircleShape)
+                                                    .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(14.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         var expanded by remember { mutableStateOf(false) }
                                         Row(
@@ -864,14 +919,14 @@ private fun AccountTab(
                                         Text(
                                             text = if (profile.online) "Online now" else "Offline",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Spacer(modifier = Modifier.height(14.dp))
+                                HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")), maxLines = 4)
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
                                     ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
                                     ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
@@ -2001,7 +2056,18 @@ private fun PostCard(
                     ProfilePicture(username = post.poster.name, size = 40.dp)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(post.poster.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(post.poster.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (post.pinned == true) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Filled.PushPin,
+                                    contentDescription = "Pinned",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                         Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
