@@ -4,21 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "wombat.joshattic.us"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    namespace = "wombat.joshattic.us.wear"
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "wombat.joshattic.us"
-        minSdk = 23
+        minSdk = 30          // Wear OS 3+ required for Compose for Wear OS
         targetSdk = 37
-        versionCode = 3
+        versionCode = 1
         versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -40,33 +34,40 @@ android {
 }
 
 dependencies {
+    // Wear OS Compose
+    implementation(libs.wear.compose.material)
+    implementation(libs.wear.compose.foundation)
+    implementation(libs.wear.compose.navigation)
+
+    // Android basics
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.activity.compose)
+
+    // Compose foundation (needed for some Wear tooling)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation(libs.androidx.compose.material.icons.extended)
+
+    // Auth storage
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.gson)
+
+    // Networking
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging.interceptor)
-    implementation(libs.gson)
+
+    // Images (profile pictures only)
     implementation(libs.coil.compose)
-    implementation(libs.coil.svg)
-    implementation(libs.socketio.client)
+
+    // Wearable Data Layer (receive auth token from phone)
     implementation(libs.play.services.wearable)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+
+    // On-watch text input
+    implementation(libs.wear.input)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

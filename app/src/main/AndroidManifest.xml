@@ -26,6 +26,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Wearable Data Layer service: pushes auth session to the paired watch -->
+        <service
+            android:name=".wear.WearSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:path="/wombat/auth" />
+            </intent-filter>
+        </service>
     </application>
 
-</manifest>
+</manifest>

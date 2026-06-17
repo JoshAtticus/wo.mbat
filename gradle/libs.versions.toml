@@ -17,6 +17,10 @@ gson = "2.13.1"
 coil = "2.7.0"
 socketIo = "2.1.0"
 coreSplashscreen = "1.0.1"
+wearCompose = "1.4.1"
+wearable = "18.2.0"
+wearInput = "1.2.0"
+androidLibrary = "9.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,8 +49,14 @@ gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 coil-svg = { group = "io.coil-kt", name = "coil-svg", version.ref = "coil" }
 socketio-client = { group = "io.socket", name = "socket.io-client", version.ref = "socketIo" }
+wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wearCompose" }
+wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
+wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearCompose" }
+play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "wearable" }
+wear-input = { group = "androidx.wear", name = "wear-input", version.ref = "wearInput" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "androidLibrary" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
