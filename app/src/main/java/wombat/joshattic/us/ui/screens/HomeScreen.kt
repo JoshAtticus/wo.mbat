@@ -101,6 +101,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -140,6 +143,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -175,6 +179,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
@@ -321,7 +327,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
             )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+        Box(modifier = Modifier.padding(
+            top = innerPadding.calculateTopPadding(),
+            start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),
+            end = innerPadding.calculateEndPadding(LocalLayoutDirection.current)
+        )) {
             if (uiState.viewingProfileUsername != null) {
                 ProfileScreen(
                     profile = uiState.viewingProfile,
@@ -924,9 +934,9 @@ private fun AccountTab(
                             // Gradient scrim at the bottom of the banner for smoother blending
                             Box(
                                 modifier = Modifier
+                                    .align(Alignment.BottomCenter)
                                     .fillMaxWidth()
                                     .height(48.dp)
-                                    .align(Alignment.BottomCenter)
                                     .background(
                                         brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                                             colors = listOf(
@@ -945,9 +955,16 @@ private fun AccountTab(
                                 .fillMaxWidth()
                                 .offset(y = (-24).dp)
                                 .padding(horizontal = 4.dp)
-                                .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
+                                .background(
+                                    Brush.verticalGradient(
+                                        0.0f to Color.Transparent,
+                                        0.1f to accent.copy(alpha = 0.08f),
+                                        1.0f to accent.copy(alpha = 0.08f)
+                                    ),
+                                    RoundedCornerShape(20.dp)
+                                ),
                             shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
+                            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1527,48 +1544,19 @@ private fun PostDetailsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val listState = rememberLazyListState()
 
-    // Use local state to track if user has expanded (to prevent auto-expand on future post opens)
-    var hasUserExpandedComments by remember { mutableStateOf(false) }
-    var isFirstValueReport by remember { mutableStateOf(true) }
-
-    val currentComments by rememberUpdatedState(comments)
-    val currentOnCollapse by rememberUpdatedState(onCollapseComments)
     val currentOnExpand by rememberUpdatedState(onExpandComments)
+
+    LaunchedEffect(post.id) {
+        currentOnExpand()
+    }
 
     LaunchedEffect(scrollToCommentId, loading, comments) {
         if (scrollToCommentId != null && !loading && comments.isNotEmpty()) {
             val index = comments.indexOfFirst { it.id == scrollToCommentId }
             if (index != -1) {
-                hasUserExpandedComments = true
-                onExpandComments()
                 listState.animateScrollToItem(index + 1) // +1 for post header
                 onScrollToCommentComplete()
             }
-        }
-    }
-
-    // React to sheet value changes, but *ignore the very first value report* after the composable mounts for this post.
-    // This ensures that even if the sheet opens already reporting Expanded (due to tall content or animation),
-    // we do not auto-load or show comments. The user must perform a swipe that causes a *subsequent* change
-    // to Expanded.
-    LaunchedEffect(sheetState.currentValue) {
-        val current = sheetState.currentValue
-        if (isFirstValueReport) {
-            isFirstValueReport = false
-            return@LaunchedEffect
-        }
-        when (current) {
-            SheetValue.Expanded -> {
-                hasUserExpandedComments = true
-                currentOnExpand()
-            }
-            SheetValue.PartiallyExpanded -> {
-                if (currentComments.isEmpty()) {
-                    hasUserExpandedComments = false
-                    currentOnCollapse()
-                }
-            }
-            else -> {}
         }
     }
 
@@ -1579,11 +1567,16 @@ private fun PostDetailsSheet(
         containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxHeight()) {
-            val showCommentsSection = hasUserExpandedComments || comments.isNotEmpty()
+            val isReplyBoxVisible by remember {
+                derivedStateOf {
+                    listState.layoutInfo.visibleItemsInfo.any { it.index > 0 }
+                }
+            }
 
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 96.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -1608,61 +1601,58 @@ private fun PostDetailsSheet(
                     )
                 }
 
-                if (showCommentsSection) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Comments", style = MaterialTheme.typography.titleMedium)
-                            if (loading) {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Loading comments...", style = MaterialTheme.typography.bodyMedium)
-                                }
-                            } else if (comments.isEmpty()) {
-                                EmptyStateCard("No comments yet", "Start the conversation.")
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Comments", style = MaterialTheme.typography.titleMedium)
+                        if (loading) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Loading comments...", style = MaterialTheme.typography.bodyMedium)
                             }
+                        } else if (comments.isEmpty()) {
+                            EmptyStateCard("No comments yet", "Start the conversation.")
                         }
                     }
+                }
 
-                    if (!loading && comments.isNotEmpty()) {
-                        items(comments, key = { it.id }) { comment ->
-                            CommentCard(
-                                comment = comment,
-                                isBanned = isBanned,
-                                onReply = onReplyToComment,
-                                onProfileClick = onProfileClick
-                            )
-                        }
-                    }
-                } else {
-                    item {
-                        // Hint for less verbose UI; user must swipe up on the sheet to reveal comments
-                        Text(
-                            "Swipe up to view comments",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                if (!loading && comments.isNotEmpty()) {
+                    items(comments, key = { it.id }) { comment ->
+                        CommentCard(
+                            comment = comment,
+                            isBanned = isBanned,
+                            onReply = onReplyToComment,
+                            onProfileClick = onProfileClick
                         )
                     }
                 }
             }
 
             // Input area (TextField + Reply button) — imePadding lifts it above the software keyboard
-            if (showCommentsSection && !isBanned) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(top = 12.dp, bottom = 16.dp)
-                        .padding(horizontal = 16.dp)
-                        .imePadding(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (!isBanned) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isReplyBoxVisible,
+                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }),
+                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it })
                 ) {
-                    AnimatedVisibility(visible = replyingTo != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .imePadding()
+                    ) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp, bottom = 16.dp)
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            androidx.compose.animation.AnimatedVisibility(visible = replyingTo != null) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1724,6 +1714,8 @@ private fun PostDetailsSheet(
             }
         }
     }
+        }
+    }
 }
 
 @Composable
@@ -1734,7 +1726,9 @@ private fun WombatBottomNavigationBar(
     profilePictureUrl: String?,
     onTabSelected: (BottomTab) -> Unit
 ) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
         NavigationBarItem(
             selected = selectedTab == BottomTab.Home,
             onClick = { onTabSelected(BottomTab.Home) },
@@ -1961,9 +1955,16 @@ private fun ProfileScreen(
                         .fillMaxWidth()
                         .offset(y = (-24).dp)
                         .padding(horizontal = 4.dp)
-                        .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
+                        .background(
+                            Brush.verticalGradient(
+                                0.0f to Color.Transparent,
+                                0.1f to accent.copy(alpha = 0.08f),
+                                1.0f to accent.copy(alpha = 0.08f)
+                            ),
+                            RoundedCornerShape(20.dp)
+                        ),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
