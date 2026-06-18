@@ -362,7 +362,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 ComposerSheet(
                     draft = uiState.composeDraft,
                     onDraftChange = viewModel::setComposeDraft,
-                    onSubmit = viewModel::submitPost,
+                    onSubmit = { htmlContent -> viewModel.submitPost(contentOverride = htmlContent) },
                     onDismiss = {
                         viewModel.saveCurrentDraft()
                         viewModel.setComposeDraft("")

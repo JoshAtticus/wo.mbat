@@ -2,7 +2,20 @@
 
 package wombat.joshattic.us.ui.screens
 
+import android.content.Context
+import android.graphics.Typeface
+import android.text.Editable
+import android.text.Spannable
+import android.text.Spanned
+import android.text.TextWatcher
+import android.text.style.CharacterStyle
+import android.text.style.StrikethroughSpan
+import android.text.style.StyleSpan
+import android.text.style.UnderlineSpan
+import android.view.View
+import android.widget.EditText
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +41,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FormatBold
+import androidx.compose.material.icons.filled.FormatItalic
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.FormatStrikethrough
+import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.Restore
@@ -40,6 +58,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +66,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,17 +75,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.text.HtmlCompat
 import coil.compose.SubcomposeAsyncImage
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
+
+class RichEditText(context: Context) : EditText(context) {
+    var onSelectionChangedListener: ((start: Int, end: Int) -> Unit)? = null
+
+    override fun onSelectionChanged(selStart: Int, selEnd: Int) {
+        super.onSelectionChanged(selStart, selEnd)
+        onSelectionChangedListener?.invoke(selStart, selEnd)
+    }
+}
 
 @Composable
 fun ComposerSheet(
     draft: String,
     onDraftChange: (String) -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (String) -> Unit,
     onDismiss: () -> Unit,
     drafts: List<String>,
     onRestoreDraft: (String) -> Unit,
@@ -79,8 +111,40 @@ fun ComposerSheet(
     var imageError by remember { mutableStateOf<String?>(null) }
     var showDraftsDialog by remember { mutableStateOf(false) }
 
-    // Images attached (separate from text markdown, shown as thumbnails below)
-    var currentImages by remember(draft) { mutableStateOf(extractImages(draft)) }
+    // Unified HTML draft synchronization states
+    var currentImages by remember { mutableStateOf(extractImages(draft)) }
+    var lastSyncedDraft by remember { mutableStateOf("") }
+    var richEditTextRef by remember { mutableStateOf<RichEditText?>(null) }
+    var charCount by remember { mutableStateOf(0) }
+
+    // Active formatting states for toolbar highlights
+    var isBoldActive by remember { mutableStateOf(false) }
+    var isItalicActive by remember { mutableStateOf(false) }
+    var isUnderlineActive by remember { mutableStateOf(false) }
+    var isStrikethroughActive by remember { mutableStateOf(false) }
+    var isQuoteActive by remember { mutableStateOf(false) }
+
+    fun updateFormattingStates(editText: EditText) {
+        val text = editText.text ?: return
+        val start = editText.selectionStart
+        val end = editText.selectionEnd
+        if (start < 0 || end < 0) return
+
+        isBoldActive = hasSpan(text, start, end, StyleSpan::class.java) { it.style == Typeface.BOLD }
+        isItalicActive = hasSpan(text, start, end, StyleSpan::class.java) { it.style == Typeface.ITALIC }
+        isUnderlineActive = hasSpan(text, start, end, UnderlineSpan::class.java)
+        isStrikethroughActive = hasSpan(text, start, end, StrikethroughSpan::class.java)
+        isQuoteActive = hasSpan(text, start, end, android.text.style.QuoteSpan::class.java)
+    }
+
+    fun updateDraft(text: Spanned, images: List<String>) {
+        val textHtml = HtmlCompat.toHtml(text, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+        val imgTags = images.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
+        val combinedHtml = if (imgTags.isBlank()) textHtml else "$textHtml\n$imgTags"
+        
+        lastSyncedDraft = combinedHtml
+        onDraftChange(combinedHtml)
+    }
 
     fun addImage() {
         val url = imageUrl.trim()
@@ -92,7 +156,9 @@ fun ComposerSheet(
             imageError = "Image URL must be from i.ibb.co or u.cubeupload.com"
             return
         }
-        currentImages = currentImages + url
+        val updatedImages = currentImages + url
+        currentImages = updatedImages
+        richEditTextRef?.let { updateDraft(it.text, updatedImages) }
         imageUrl = ""
         imageError = null
         showAddImage = false
@@ -222,9 +288,89 @@ fun ComposerSheet(
                     }
                 }
 
-                // Image attach button only (styling removed - use markdown manually in the text box)
-                IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(56.dp)) {
-                    Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(24.dp))
+                // Formatting toolbar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            richEditTextRef?.let { editText ->
+                                toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.BOLD) }, { it.style == Typeface.BOLD })
+                                updateFormattingStates(editText)
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isBoldActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            contentColor = if (isBoldActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Filled.FormatBold, contentDescription = "Bold", modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            richEditTextRef?.let { editText ->
+                                toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.ITALIC) }, { it.style == Typeface.ITALIC })
+                                updateFormattingStates(editText)
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isItalicActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            contentColor = if (isItalicActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Filled.FormatItalic, contentDescription = "Italic", modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            richEditTextRef?.let { editText ->
+                                toggleSpan(editText, StrikethroughSpan::class.java, { StrikethroughSpan() })
+                                updateFormattingStates(editText)
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isStrikethroughActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            contentColor = if (isStrikethroughActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Filled.FormatStrikethrough, contentDescription = "Strikethrough", modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            richEditTextRef?.let { editText ->
+                                toggleSpan(editText, UnderlineSpan::class.java, { UnderlineSpan() })
+                                updateFormattingStates(editText)
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isUnderlineActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            contentColor = if (isUnderlineActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Filled.FormatUnderlined, contentDescription = "Underline", modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            richEditTextRef?.let { editText ->
+                                toggleBlockquote(editText)
+                                updateFormattingStates(editText)
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isQuoteActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            contentColor = if (isQuoteActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Filled.FormatQuote, contentDescription = "Blockquote", modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(44.dp)) {
+                        Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(22.dp))
+                    }
                 }
 
                 if (showAddImage) {
@@ -255,18 +401,88 @@ fun ComposerSheet(
                     }
                 }
 
-                // Direct editable text input (no outer box, input itself sized and styled)
-                val charCount = draft.length
+                // Styled wrapping container around the rich text editor
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    OutlinedTextField(
-                        value = draft,
-                        onValueChange = onDraftChange,
+                    var isFocused by remember { mutableStateOf(false) }
+                    val borderColors = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                    val borderWidth = if (isFocused) 2.dp else 1.dp
+                    val textColor = MaterialTheme.colorScheme.onSurface
+
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 220.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        placeholder = { Text("What's happening? Write words here, markdown supported.") }
-                    )
+                            .heightIn(min = 220.dp)
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                            .border(borderWidth, borderColors, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        AndroidView(
+                            factory = { context ->
+                                RichEditText(context).apply {
+                                    richEditTextRef = this
+                                    this.setBackground(null)
+                                    this.setGravity(android.view.Gravity.TOP or android.view.Gravity.START)
+                                    this.inputType = android.text.InputType.TYPE_CLASS_TEXT or 
+                                                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or 
+                                                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                                    this.setHorizontallyScrolling(false)
+                                    this.hint = "What's happening? Write words here."
+                                    this.setHintTextColor(textColor.copy(alpha = 0.6f).toArgb())
+                                    this.setTextColor(textColor.toArgb())
+                                    this.textSize = 16f
+                                    
+                                    this.layoutParams = android.view.ViewGroup.LayoutParams(
+                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
+
+                                    this.addTextChangedListener(object : TextWatcher {
+                                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                                            val currentText = this@apply.text ?: return
+                                            charCount = currentText.length
+                                            val textHtml = HtmlCompat.toHtml(currentText as Spanned, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+                                            val imgTags = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
+                                            val combinedHtml = if (imgTags.isBlank()) textHtml else "$textHtml\n$imgTags"
+                                            if (combinedHtml != lastSyncedDraft) {
+                                                lastSyncedDraft = combinedHtml
+                                                onDraftChange(combinedHtml)
+                                            }
+                                        }
+                                        override fun afterTextChanged(s: Editable?) {}
+                                    })
+
+                                    this.onSelectionChangedListener = { _, _ ->
+                                        updateFormattingStates(this)
+                                    }
+
+                                    this.onFocusChangeListener = android.view.View.OnFocusChangeListener { _, hasFocus ->
+                                        isFocused = hasFocus
+                                    }
+                                }
+                            },
+                            update = { editText ->
+                                if (draft != lastSyncedDraft) {
+                                    lastSyncedDraft = draft
+                                    val newImages = extractImages(draft)
+                                    if (newImages != currentImages) {
+                                        currentImages = newImages
+                                    }
+                                    val textHtml = stripImages(draft)
+                                    val spanned = HtmlCompat.fromHtml(textHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
+                                    val cleanSpanned = trimTrailingNewlines(spanned)
+                                    replaceQuoteSpans(cleanSpanned)
+                                    
+                                    editText.setText(cleanSpanned)
+                                    editText.setSelection(cleanSpanned.length)
+                                    charCount = cleanSpanned.length
+                                    updateFormattingStates(editText)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
                     Text(
                         text = "$charCount / ${HomeViewModel.MAX_CHAR_COUNT} characters",
                         style = MaterialTheme.typography.labelSmall,
@@ -275,7 +491,7 @@ fun ComposerSheet(
                     )
                 }
 
-                // Image attachments preview - shown below the text editor like normal post composer (thumbnails, removable)
+                // Image attachments preview
                 if (currentImages.isNotEmpty()) {
                     Row(
                         modifier = Modifier
@@ -294,7 +510,9 @@ fun ComposerSheet(
                                 )
                                 IconButton(
                                     onClick = {
-                                        currentImages = currentImages.toMutableList().apply { removeAt(index) }
+                                        val updatedImages = currentImages.toMutableList().apply { removeAt(index) }
+                                        currentImages = updatedImages
+                                        richEditTextRef?.let { updateDraft(it.text, updatedImages) }
                                     },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
@@ -323,15 +541,9 @@ fun ComposerSheet(
             ) {
                 Button(
                     onClick = {
-                        // Convert markdown to HTML AFTER pressing post. Append attached images.
-                        val md = draft
-                        val htmlText = markdownToHtml(md)
-                        val imgTags = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
-                        val fullHtml = if (imgTags.isBlank()) htmlText else "$htmlText\n$imgTags"
-                        onDraftChange(fullHtml)
-                        onSubmit()
+                        onSubmit(draft)
                     },
-                    enabled = (draft.isNotBlank() || currentImages.isNotEmpty()) && draft.length <= HomeViewModel.MAX_CHAR_COUNT,
+                    enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Icon(Icons.Filled.PostAdd, contentDescription = null)
@@ -340,6 +552,189 @@ fun ComposerSheet(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------
+// Rich Editor Helpers
+// ------------------------------------------------------------------------------------------------
+
+fun <T> hasSpan(
+    text: Spanned,
+    start: Int,
+    end: Int,
+    spanClass: Class<T>,
+    predicate: (T) -> Boolean = { true }
+): Boolean {
+    if (start < 0 || end < 0) return false
+    val spans = text.getSpans(start, end, spanClass)
+    return if (start == end) {
+        // Cursor (no selection). A span only counts as "active" if typing here would extend it.
+        // We distinguish three valid-active cases:
+        //  1. Zero-width INCLUSIVE_INCLUSIVE marker sitting exactly at cursor (style-on mode)
+        //  2. Cursor is strictly *inside* the span (not at either edge)
+        //  3. Span ends at cursor AND is INCLUSIVE at its right edge — still open/growing
+        //
+        // A SPAN_EXCLUSIVE_EXCLUSIVE span that merely ends at cursor is "closed" — NOT active.
+        spans.any { span ->
+            if (!predicate(span)) return@any false
+            val s = text.getSpanStart(span)
+            val e = text.getSpanEnd(span)
+            val flags = text.getSpanFlags(span)
+            val inclusiveRight = (flags and Spanned.SPAN_INCLUSIVE_INCLUSIVE) == Spanned.SPAN_INCLUSIVE_INCLUSIVE
+            when {
+                s == start && e == start -> true           // zero-width marker at cursor
+                s < start && e > start  -> true            // cursor strictly inside span
+                e == start && inclusiveRight -> true       // open span whose end is at cursor
+                else -> false                              // closed span ending here — ignore
+            }
+        }
+    } else {
+        spans.any { span ->
+            val s = text.getSpanStart(span)
+            val e = text.getSpanEnd(span)
+            s <= start && e >= end && predicate(span)
+        }
+    }
+}
+
+
+fun <T : CharacterStyle> toggleSpan(
+    editText: EditText,
+    spanClass: Class<T>,
+    creator: () -> T,
+    matcher: (T) -> Boolean = { true }
+) {
+    val text = editText.text ?: return
+    val start = editText.selectionStart
+    val end = editText.selectionEnd
+    if (start < 0 || end < 0) return
+
+    if (start == end) {
+        val spans = text.getSpans(start, start, spanClass)
+        val activeSpan = spans.firstOrNull(matcher)
+        if (activeSpan != null) {
+            // Span is active at cursor — toggle it OFF.
+            val spanStart = text.getSpanStart(activeSpan)
+            val spanEnd = text.getSpanEnd(activeSpan)
+            text.removeSpan(activeSpan)
+            // If the span covers real text before the cursor, preserve it up to the cursor.
+            // This means already-typed styled text stays styled; new typing won't be.
+            if (spanStart < start) {
+                text.setSpan(creator(), spanStart, start, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            // If the span extends beyond the cursor (rare), preserve that portion too.
+            if (spanEnd > start) {
+                text.setSpan(creator(), start, spanEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        } else {
+            // Span is NOT active — toggle it ON. Use INCLUSIVE_INCLUSIVE so typing extends it.
+            text.setSpan(creator(), start, start, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
+        }
+    } else {
+        val spans = text.getSpans(start, end, spanClass)
+        val matchingSpans = spans.filter(matcher)
+        
+        var isFullyStyled = false
+        for (span in matchingSpans) {
+            val s = text.getSpanStart(span)
+            val e = text.getSpanEnd(span)
+            if (s <= start && e >= end) {
+                isFullyStyled = true
+                break
+            }
+        }
+
+        if (isFullyStyled) {
+            for (span in matchingSpans) {
+                val s = text.getSpanStart(span)
+                val e = text.getSpanEnd(span)
+                text.removeSpan(span)
+                if (s < start) {
+                    text.setSpan(creator(), s, start, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+                if (e > end) {
+                    text.setSpan(creator(), end, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+        } else {
+            for (span in matchingSpans) {
+                text.removeSpan(span)
+            }
+            text.setSpan(creator(), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
+}
+
+fun toggleBlockquote(editText: EditText) {
+    val text = editText.text ?: return
+    val start = editText.selectionStart
+    val end = editText.selectionEnd
+    if (start < 0 || end < 0) return
+
+    val (lineStart, lineEnd) = getLineBoundaries(text, start, end)
+
+    val spans = text.getSpans(lineStart, lineEnd, android.text.style.QuoteSpan::class.java)
+    if (spans.isNotEmpty()) {
+        for (span in spans) {
+            text.removeSpan(span)
+        }
+    } else {
+        val brandColor = 0xFF6366F1.toInt()
+        val quoteSpan = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            android.text.style.QuoteSpan(brandColor, 6, 24)
+        } else {
+            android.text.style.QuoteSpan(brandColor)
+        }
+        text.setSpan(quoteSpan, lineStart, lineEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+}
+
+fun getLineBoundaries(text: CharSequence, start: Int, end: Int): Pair<Int, Int> {
+    var lineStart = start
+    while (lineStart > 0 && text[lineStart - 1] != '\n') {
+        lineStart--
+    }
+    var lineEnd = end
+    while (lineEnd < text.length && text[lineEnd] != '\n') {
+        lineEnd++
+    }
+    if (lineEnd < text.length && text[lineEnd] == '\n') {
+        lineEnd++
+    }
+    return Pair(lineStart, lineEnd)
+}
+
+fun trimTrailingNewlines(s: CharSequence): Spannable {
+    var end = s.length
+    while (end > 0 && (s[end - 1] == '\n' || s[end - 1] == '\r')) {
+        end--
+    }
+    val builder = android.text.SpannableStringBuilder(s)
+    if (end < s.length) {
+        builder.delete(end, s.length)
+    }
+    return builder
+}
+
+fun replaceQuoteSpans(spannable: Spannable) {
+    val brandColor = 0xFF6366F1.toInt()
+    spannable.getSpans(0, spannable.length, android.text.style.QuoteSpan::class.java).forEach { span ->
+        val start = spannable.getSpanStart(span)
+        val end = spannable.getSpanEnd(span)
+        val flags = spannable.getSpanFlags(span)
+        spannable.removeSpan(span)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            spannable.setSpan(
+                android.text.style.QuoteSpan(brandColor, 6, 24),
+                start, end, flags
+            )
+        } else {
+            spannable.setSpan(
+                android.text.style.QuoteSpan(brandColor),
+                start, end, flags
+            )
         }
     }
 }

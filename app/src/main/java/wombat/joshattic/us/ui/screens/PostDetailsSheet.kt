@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 
 package wombat.joshattic.us.ui.screens
 
@@ -13,8 +16,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -102,9 +107,10 @@ fun PostDetailsSheet(
         containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxHeight()) {
-            val isReplyBoxVisible by remember {
+            val isImeVisible = WindowInsets.isImeVisible
+            val isReplyBoxVisible by remember(isImeVisible) {
                 derivedStateOf {
-                    listState.layoutInfo.visibleItemsInfo.any { it.index > 0 }
+                    isImeVisible || listState.layoutInfo.visibleItemsInfo.any { it.index > 0 }
                 }
             }
 

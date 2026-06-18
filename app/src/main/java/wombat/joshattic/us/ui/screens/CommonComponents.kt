@@ -857,6 +857,26 @@ fun HtmlText(
                 spannable.setSpan(UnderlineSpan(), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
+
+        // Replace default blockquote spans with branded ones
+        val brandColor = 0xFF6366F1.toInt()
+        spannable.getSpans(0, spannable.length, android.text.style.QuoteSpan::class.java).forEach { span ->
+            val start = spannable.getSpanStart(span)
+            val end = spannable.getSpanEnd(span)
+            val flags = spannable.getSpanFlags(span)
+            spannable.removeSpan(span)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                spannable.setSpan(
+                    android.text.style.QuoteSpan(brandColor, 6, 24),
+                    start, end, flags
+                )
+            } else {
+                spannable.setSpan(
+                    android.text.style.QuoteSpan(brandColor),
+                    start, end, flags
+                )
+            }
+        }
         spannable
     }
 
