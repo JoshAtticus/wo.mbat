@@ -103,6 +103,17 @@ class WearViewModel(
         _uiState.update { it.copy(selectedPost = post, comments = emptyList()) }
         viewModelScope.launch {
             _uiState.update { it.copy(commentsLoading = true) }
+            
+            val session = _uiState.value.session
+            if (session != null && post.isLoving == null) {
+                runCatching { augmentLoveStatuses(listOf(post), session).first() }
+                    .onSuccess { augmentedPost ->
+                        _uiState.update { state ->
+                            if (state.selectedPost?.id == post.id) state.copy(selectedPost = augmentedPost) else state
+                        }
+                    }
+            }
+
             runCatching {
                 repository.loadComments(_uiState.value.session, post.id)
             }.onSuccess { comments ->

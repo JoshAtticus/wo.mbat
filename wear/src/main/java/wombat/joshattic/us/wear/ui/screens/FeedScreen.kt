@@ -224,8 +224,8 @@ fun WearPostCard(
                         modifier = Modifier
                             .size(20.dp)
                             .clip(CircleShape)
-                            .padding(end = 4.dp)
                     )
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = post.poster.name,
                         style = MaterialTheme.typography.caption1,
