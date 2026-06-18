@@ -125,3 +125,11 @@ data class ReportRequest(
     val type: String = "none",
     val reason: String
 )
+
+data class FollowersResponse(
+    val followers: List<User>
+)
+
+data class FollowingResponse(
+    val following: List<User>
+)

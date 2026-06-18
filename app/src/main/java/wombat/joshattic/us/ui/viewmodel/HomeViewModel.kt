@@ -629,6 +629,62 @@ class HomeViewModel(
         }
     }
 
+    fun showFollowers(username: String) {
+        _uiState.value = _uiState.value.copy(
+            userListTitle = "Followers",
+            userListToShow = emptyList(),
+            userListLoading = true
+        )
+        viewModelScope.launch {
+            runCatching {
+                repository.getFollowers(_uiState.value.session, username)
+            }.onSuccess { followers ->
+                _uiState.value = _uiState.value.copy(
+                    userListToShow = followers,
+                    userListLoading = false
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    userListToShow = null,
+                    userListLoading = false,
+                    toastMessage = throwable.message ?: "Failed to load followers"
+                )
+            }
+        }
+    }
+
+    fun showFollowing(username: String) {
+        _uiState.value = _uiState.value.copy(
+            userListTitle = "Following",
+            userListToShow = emptyList(),
+            userListLoading = true
+        )
+        viewModelScope.launch {
+            runCatching {
+                repository.getFollowing(_uiState.value.session, username)
+            }.onSuccess { following ->
+                _uiState.value = _uiState.value.copy(
+                    userListToShow = following,
+                    userListLoading = false
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    userListToShow = null,
+                    userListLoading = false,
+                    toastMessage = throwable.message ?: "Failed to load following"
+                )
+            }
+        }
+    }
+
+    fun dismissUserList() {
+        _uiState.value = _uiState.value.copy(
+            userListToShow = null,
+            userListTitle = "",
+            userListLoading = false
+        )
+    }
+
     fun toggleViewedProfileFollow() {
         val session = _uiState.value.session ?: return
         val username = _uiState.value.viewingProfileUsername ?: return

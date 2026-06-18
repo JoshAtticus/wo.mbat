@@ -144,6 +144,14 @@ class WombatRepository(
     suspend fun toggleFollow(session: AuthSession, username: String) =
         apiService.toggleFollow(username, session.token)
 
+    suspend fun getFollowers(session: AuthSession?, username: String): List<User> {
+        return apiService.getFollowers(username, session?.token).followers
+    }
+
+    suspend fun getFollowing(session: AuthSession?, username: String): List<User> {
+        return apiService.getFollowing(username, session?.token).following
+    }
+
     suspend fun blockUser(username: String) {
         blockedUsersDatabase.block(username)
     }

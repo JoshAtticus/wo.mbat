@@ -22,6 +22,8 @@ import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.NotificationResponse
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
+import wombat.joshattic.us.data.model.FollowersResponse
+import wombat.joshattic.us.data.model.FollowingResponse
 
 interface ApiService {
     @POST("session")
@@ -137,4 +139,16 @@ interface ApiService {
         @Path("username") username: String,
         @Header("authorization") token: String
     ): FollowToggleResponse
+
+    @GET("users/{username}/followers")
+    suspend fun getFollowers(
+        @Path("username") username: String,
+        @Header("authorization") token: String? = null
+    ): FollowersResponse
+
+    @GET("users/{username}/following")
+    suspend fun getFollowing(
+        @Path("username") username: String,
+        @Header("authorization") token: String? = null
+    ): FollowingResponse
 }

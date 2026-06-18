@@ -352,7 +352,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onLoadNextPage = viewModel::loadNextProfilePage,
                     onRepostClick = { viewModel.submitRepost(it.id) },
                     onQuoteClick = { viewModel.openQuoteComposer(it.id) },
-                    onDeletePost = { viewModel.deletePost(it.id) }
+                    onDeletePost = { viewModel.deletePost(it.id) },
+                    onShowFollowers = viewModel::showFollowers,
+                    onShowFollowing = viewModel::showFollowing
                 )
             } else {
                 val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
@@ -479,7 +481,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             onRepostClick = { viewModel.submitRepost(it.id) },
                             onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                             currentUsername = uiState.session?.username,
-                            onDeletePost = { viewModel.deletePost(it.id) }
+                            onDeletePost = { viewModel.deletePost(it.id) },
+                            onShowFollowers = viewModel::showFollowers,
+                            onShowFollowing = viewModel::showFollowing
                         )
                     }
                 }
@@ -584,6 +588,19 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 viewModel.clearInAppNotification()
             }
         }
+    }
+
+    if (uiState.userListToShow != null) {
+        UserListBottomSheet(
+            title = uiState.userListTitle,
+            users = uiState.userListToShow,
+            loading = uiState.userListLoading,
+            onDismiss = viewModel::dismissUserList,
+            onUserClick = { user ->
+                viewModel.dismissUserList()
+                viewModel.openProfile(user.name)
+            }
+        )
     }
 }
 }
@@ -843,7 +860,9 @@ private fun AccountTab(
     onRepostClick: (Post) -> Unit = {},
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
-    onDeletePost: ((Post) -> Unit)? = null
+    onDeletePost: ((Post) -> Unit)? = null,
+    onShowFollowers: (String) -> Unit = {},
+    onShowFollowing: (String) -> Unit = {}
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -998,18 +1017,18 @@ private fun AccountTab(
                                             }
                                         }
                                         Text(
-                                            text = if (profile.online) "Online now" else "Offline",
+                                            text = if (profile.online) "Online" else "Offline",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(14.dp))
-                                HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")), maxLines = 4)
+                                HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")), maxLines = 4)
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
-                                    ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
+                                    ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent, onClick = { onShowFollowers(profile.name) })
+                                    ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent, onClick = { onShowFollowing(profile.name) })
                                     ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
                                 }
                             }
@@ -1815,7 +1834,9 @@ private fun ProfileScreen(
     onLoadNextPage: () -> Unit = {},
     onRepostClick: (Post) -> Unit = {},
     onQuoteClick: (Post) -> Unit = {},
-    onDeletePost: ((Post) -> Unit)? = null
+    onDeletePost: ((Post) -> Unit)? = null,
+    onShowFollowers: (String) -> Unit = {},
+    onShowFollowing: (String) -> Unit = {}
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -1984,8 +2005,8 @@ private fun ProfileScreen(
                         )
                         Spacer(modifier = Modifier.height(14.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent)
-                            ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent)
+                            ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent, onClick = { onShowFollowers(profile.name) })
+                            ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent, onClick = { onShowFollowing(profile.name) })
                             ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
                             Spacer(modifier = Modifier.weight(1f))
                             Box {
@@ -2060,8 +2081,12 @@ private fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileStat(label: String, value: Int, accentColor: Color? = null) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+private fun ProfileStat(label: String, value: Int, accentColor: Color? = null, onClick: (() -> Unit)? = null) {
+    Surface(
+        shape = RoundedCornerShape(16.dp), 
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 value.toString(),
@@ -3095,4 +3120,81 @@ private fun ReportDialog(
             }
         }
     )
+}
+
+@Composable
+private fun UserListBottomSheet(
+    title: String,
+    users: List<User>?,
+    loading: Boolean,
+    onDismiss: () -> Unit,
+    onUserClick: (User) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.8f)
+                .padding(horizontal = 16.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
+            if (loading && users.isNullOrEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (users.isNullOrEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No users found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(users, key = { it.id }) { user ->
+                        val accent = getUserColorSchemeColors(user.color).first
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onUserClick(user) },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box {
+                                    ProfilePicture(username = user.name, size = 48.dp, borderColor = accent)
+                                    if (user.online) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .align(Alignment.BottomEnd)
+                                                .offset(x = (-2).dp, y = (-2).dp)
+                                                .background(Color(0xFF22C55E), CircleShape)
+                                                .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(user.name, style = MaterialTheme.typography.titleMedium, color = accent)
+                                    if (!user.bio.isNullOrBlank()) {
+                                        HtmlText(
+                                            stripImages(user.bio),
+                                            maxLines = 2
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
