@@ -1,6 +1,7 @@
 package wombat.joshattic.us.data.network
 
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -51,6 +52,12 @@ interface ApiService {
         @Header("authorization") token: String,
         @Body request: CreatePostRequest
     ): Post
+
+    @POST("posts/{id}/reposts")
+    suspend fun createRepost(@Header("Authorization") token: String, @Path("id") postId: String): Post
+
+    @DELETE("posts/{id}")
+    suspend fun deletePost(@Header("Authorization") token: String, @Path("id") postId: String)
 
     @POST("posts/{post_id}/report")
     suspend fun reportPost(

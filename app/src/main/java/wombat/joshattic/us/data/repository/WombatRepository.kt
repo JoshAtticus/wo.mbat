@@ -96,17 +96,21 @@ class WombatRepository(
         return apiService.getReadNotifications(token).read.orEmpty()
     }
 
-    suspend fun createPost(session: AuthSession, htmlContent: String): Post {
+    suspend fun createPost(session: AuthSession, htmlContent: String, repostId: String? = null): Post {
         return apiService.makePost(
             token = session.token,
-            request = CreatePostRequest(post = htmlContent, repost = null)
+            request = CreatePostRequest(post = htmlContent, repost = repostId)
         )
+    }
+
+    suspend fun deletePost(session: AuthSession, postId: String) {
+        apiService.deletePost(session.token, postId)
     }
 
     suspend fun reportPost(session: AuthSession, postId: String, reason: String) {
         apiService.reportPost(
-            token = session.token,
             postId = postId,
+            token = session.token,
             request = wombat.joshattic.us.data.model.ReportRequest(reason = reason)
         )
     }

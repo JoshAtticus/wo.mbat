@@ -159,6 +159,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -276,8 +280,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
         )
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -343,13 +348,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onProfileClick = viewModel::openProfile,
                     onLoveClick = viewModel::togglePostLove,
                     onImageClick = viewModel::openFullScreenImages,
-                    onLoadNextPage = viewModel::loadNextProfilePage
+                    onLoadNextPage = viewModel::loadNextProfilePage,
+                    onRepostClick = { viewModel.submitRepost(it.id) },
+                    onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                    onDeletePost = { viewModel.deletePost(it.id) }
                 )
             } else {
                 val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
 
                 LaunchedEffect(pagerState.settledPage) {
-                    val targetTab = BottomTab.values()[pagerState.settledPage]
+                    val targetTab = BottomTab.entries[pagerState.settledPage]
                     if (uiState.selectedTab != targetTab) {
                         viewModel.selectTab(targetTab)
                     }
@@ -365,7 +373,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     state = pagerState,
                     modifier = Modifier.fillMaxSize()
                 ) { page ->
-                    when (BottomTab.values()[page]) {
+                    when (BottomTab.entries[page]) {
                         BottomTab.Home -> FeedTab(
                             posts = uiState.feed,
                             loading = uiState.feedLoading,
@@ -387,7 +395,15 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 confirmAction = { viewModel.blockUser(username) }
                             },
                             onReportPost = { post -> viewModel.openReportDialog(post.id) },
-                            onLoadNextPage = viewModel::loadNextFeedPage
+                            onLoadNextPage = viewModel::loadNextFeedPage,
+                            onRepostClick = { 
+                                viewModel.submitRepost(it.id) {
+                                    coroutineScope.launch { feedListState.animateScrollToItem(0) }
+                                }
+                            },
+                            onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                            currentUsername = uiState.session?.username,
+                            onDeletePost = { viewModel.deletePost(it.id) }
                         )
                         BottomTab.Explore -> ExploreTab(
                             trendingPosts = uiState.exploreTrendingPosts,
@@ -409,7 +425,15 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 confirmMessage = "Are you sure you want to block @$username?"
                                 confirmAction = { viewModel.blockUser(username) }
                             },
-                            onReportPost = { post -> viewModel.openReportDialog(post.id) }
+                            onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                            onRepostClick = { 
+                                viewModel.submitRepost(it.id) {
+                                    coroutineScope.launch { exploreListState.animateScrollToItem(0) }
+                                }
+                            },
+                            onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                            currentUsername = uiState.session?.username,
+                            onDeletePost = { viewModel.deletePost(it.id) }
                         )
                         BottomTab.Notifications -> NotificationsTab(
                             session = uiState.session,
@@ -450,7 +474,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             },
                             onLoveClick = viewModel::togglePostLove,
                             onImageClick = viewModel::openFullScreenImages,
-                            onLoadNextPage = viewModel::loadNextAccountPage
+                            onLoadNextPage = viewModel::loadNextAccountPage,
+                            onRepostClick = { viewModel.submitRepost(it.id) },
+                            onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                            currentUsername = uiState.session?.username,
+                            onDeletePost = { viewModel.deletePost(it.id) }
                         )
                     }
                 }
@@ -468,7 +496,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     },
                     drafts = uiState.composerDrafts,
                     onRestoreDraft = viewModel::restoreDraft,
-                    onDeleteDraft = viewModel::deleteDraft
+                    onDeleteDraft = viewModel::deleteDraft,
+                    currentUsername = uiState.session?.username,
+                    onDeletePost = { viewModel.deletePost(it.id) }
                 )
             }
 
@@ -501,7 +531,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onReportPost = { post -> viewModel.openReportDialog(post.id) },
                     scrollToCommentId = uiState.scrollToCommentId,
                     onScrollToCommentComplete = viewModel::clearScrollToComment,
-                    onImageClick = viewModel::openFullScreenImages
+                    onImageClick = viewModel::openFullScreenImages,
+                    onRepostClick = { viewModel.submitRepost(it.id) },
+                    onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                    currentUsername = uiState.session?.username,
+                    onDeletePost = { viewModel.deletePost(it.id) }
                 )
             }
         }
@@ -525,6 +559,30 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onSubmit = viewModel::submitReport
         )
     }
+
+    // In-App Notification Overlay
+    AnimatedVisibility(
+        visible = uiState.inAppNotification != null,
+        enter = slideInVertically(initialOffsetY = { -it }),
+        exit = slideOutVertically(targetOffsetY = { -it }),
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .zIndex(100f)
+    ) {
+        uiState.inAppNotification?.let { notif ->
+            NotificationCard(
+                notification = notif,
+                onClick = { viewModel.handleNotificationClick(notif) }
+            )
+            
+            LaunchedEffect(notif.id) {
+                delay(5000)
+                viewModel.clearInAppNotification()
+            }
+        }
+    }
+}
 }
 
 @Composable
@@ -540,7 +598,11 @@ private fun FeedTab(
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onReportPost: ((Post) -> Unit)? = null,
-    onLoadNextPage: () -> Unit = {}
+    onLoadNextPage: () -> Unit = {},
+    onRepostClick: (Post) -> Unit = {},
+    onQuoteClick: (Post) -> Unit = {},
+    currentUsername: String? = null,
+    onDeletePost: ((Post) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -575,13 +637,17 @@ private fun FeedTab(
                     post = post,
                     onClick = { onPostClick(post) },
                     truncated = true,
+                    currentUsername = currentUsername,
                     onMentionClick = onMentionClick,
                     onProfileClick = onProfileClick,
                     onLoveClick = onLoveClick,
                     onPostClick = onPostClick,
                     onImageClick = onImageClick,
                     onBlockUser = onBlockUser,
-                    onReportPost = onReportPost
+                    onReportPost = onReportPost,
+                    onRepostClick = onRepostClick,
+                    onQuoteClick = onQuoteClick,
+                    onDeletePost = onDeletePost
                 )
             }
         }
@@ -600,7 +666,11 @@ private fun ExploreTab(
     onLoveClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
-    onReportPost: ((Post) -> Unit)? = null
+    onReportPost: ((Post) -> Unit)? = null,
+    onRepostClick: (Post) -> Unit = {},
+    onQuoteClick: (Post) -> Unit = {},
+    currentUsername: String? = null,
+    onDeletePost: ((Post) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -626,13 +696,17 @@ private fun ExploreTab(
                     post = post,
                     onClick = { onOpenPost(post) },
                     truncated = true,
+                    currentUsername = currentUsername,
                     onMentionClick = onMentionClick,
                     onProfileClick = onProfileClick,
                     onLoveClick = onLoveClick,
                     onPostClick = onOpenPost,
                     onImageClick = onImageClick,
                     onBlockUser = onBlockUser,
-                    onReportPost = onReportPost
+                    onReportPost = onReportPost,
+                    onRepostClick = onRepostClick,
+                    onQuoteClick = onQuoteClick,
+                    onDeletePost = onDeletePost
                 )
             }
         }
@@ -762,7 +836,11 @@ private fun AccountTab(
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
-    onLoadNextPage: () -> Unit = {}
+    onLoadNextPage: () -> Unit = {},
+    onRepostClick: (Post) -> Unit = {},
+    onQuoteClick: (Post) -> Unit = {},
+    currentUsername: String? = null,
+    onDeletePost: ((Post) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -889,7 +967,7 @@ private fun AccountTab(
                                                             } else {
                                                                 val unread = savedAccountUnreadCounts[account.username] ?: 0
                                                                 if (unread > 0) {
-                                                                    androidx.compose.material3.Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                                                    Badge(containerColor = MaterialTheme.colorScheme.error) {
                                                                         Text(unread.toString(), color = MaterialTheme.colorScheme.onError)
                                                                     }
                                                                 }
@@ -897,7 +975,7 @@ private fun AccountTab(
                                                         }
                                                     )
                                                 }
-                                                androidx.compose.material3.HorizontalDivider()
+                                                HorizontalDivider()
                                                 DropdownMenuItem(
                                                     text = { Text("Add Account") },
                                                     onClick = {
@@ -934,7 +1012,6 @@ private fun AccountTab(
                             }
                         }
                     }
-                    // no loading box - PTR handles it
                 }
 
                 // User's posts under the account details (only after profile available)
@@ -948,11 +1025,15 @@ private fun AccountTab(
                             post = post,
                             onClick = { onPostClick(post) },
                             truncated = true,
+                            currentUsername = currentUsername,
                             onMentionClick = onMentionClick,
                             onProfileClick = onProfileClick,
                             onLoveClick = onLoveClick,
                             onPostClick = onPostClick,
-                            onImageClick = onImageClick
+                            onImageClick = onImageClick,
+                            onRepostClick = onRepostClick,
+                            onQuoteClick = onQuoteClick,
+                            onDeletePost = onDeletePost
                         )
                     }
                 }
@@ -1115,7 +1196,9 @@ private fun ComposerSheet(
     onDismiss: () -> Unit,
     drafts: List<String>,
     onRestoreDraft: (String) -> Unit,
-    onDeleteDraft: (String) -> Unit
+    onDeleteDraft: (String) -> Unit,
+    currentUsername: String? = null,
+    onDeletePost: ((Post) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showAddImage by remember { mutableStateOf(false) }
@@ -1398,7 +1481,11 @@ private fun PostDetailsSheet(
     onBlockUser: ((String) -> Unit)? = null,
     onReportPost: ((Post) -> Unit)? = null,
     scrollToCommentId: String? = null,
-    onScrollToCommentComplete: () -> Unit = {}
+    onScrollToCommentComplete: () -> Unit = {},
+    onRepostClick: (Post) -> Unit = {},
+    onQuoteClick: (Post) -> Unit = {},
+    currentUsername: String? = null,
+    onDeletePost: ((Post) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val listState = rememberLazyListState()
@@ -1477,7 +1564,9 @@ private fun PostDetailsSheet(
                         onPostClick = onPostClick,
                         onImageClick = onImageClick,
                         onBlockUser = onBlockUser,
-                        onReportPost = onReportPost
+                        onReportPost = onReportPost,
+                        onRepostClick = onRepostClick,
+                        onQuoteClick = onQuoteClick
                     )
                 }
 
@@ -1710,7 +1799,10 @@ private fun ProfileScreen(
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
-    onLoadNextPage: () -> Unit = {}
+    onLoadNextPage: () -> Unit = {},
+    onRepostClick: (Post) -> Unit = {},
+    onQuoteClick: (Post) -> Unit = {},
+    onDeletePost: ((Post) -> Unit)? = null
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -1991,18 +2083,29 @@ private fun UserActionsMenu(
 private fun PostActionsMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
-    onBlock: () -> Unit,
-    onReport: () -> Unit
+    onBlock: (() -> Unit)? = null,
+    onReport: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text("Block") },
-            onClick = onBlock
-        )
-        DropdownMenuItem(
-            text = { Text("Report Post") },
-            onClick = onReport
-        )
+        if (onBlock != null) {
+            DropdownMenuItem(
+                text = { Text("Block") },
+                onClick = onBlock
+            )
+        }
+        if (onReport != null) {
+            DropdownMenuItem(
+                text = { Text("Report Post") },
+                onClick = onReport
+            )
+        }
+        if (onDelete != null) {
+            DropdownMenuItem(
+                text = { Text("Delete Post", color = MaterialTheme.colorScheme.error) },
+                onClick = onDelete
+            )
+        }
     }
 }
 
@@ -2013,17 +2116,70 @@ private fun PostCard(
     modifier: Modifier = Modifier,
     clickable: Boolean = true,
     truncated: Boolean = false,
+    currentUsername: String? = null,
     onMentionClick: ((String) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: ((Post) -> Unit)? = null,
     onPostClick: ((Post) -> Unit)? = null,
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
-    onReportPost: ((Post) -> Unit)? = null
+    onReportPost: ((Post) -> Unit)? = null,
+    onRepostClick: ((Post) -> Unit)? = null,
+    onQuoteClick: ((Post) -> Unit)? = null,
+    onDeletePost: ((Post) -> Unit)? = null
 ) {
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
     var menuExpanded by remember { mutableStateOf(false) }
+
+    val isPureRepost = remember(post) {
+        post.repost != null &&
+        post.content.replace(Regex("<.*?>"), "").trim().isBlank() &&
+        imageUrls.isEmpty()
+    }
+
+    if (isPureRepost) {
+        Column(modifier = modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 24.dp, vertical = 6.dp)
+                    .clickable { onProfileClick(post.poster.name) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.Repeat,
+                    contentDescription = "Repost",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    "@${post.poster.name} reposted this",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            PostCard(
+                post = post.repost!!,
+                onClick = onClick,
+                modifier = Modifier,
+                clickable = clickable,
+                truncated = truncated,
+                currentUsername = currentUsername,
+                onMentionClick = onMentionClick,
+                onProfileClick = onProfileClick,
+                onLoveClick = onLoveClick,
+                onPostClick = onPostClick,
+                onImageClick = onImageClick,
+                onBlockUser = onBlockUser,
+                onReportPost = onReportPost,
+                onRepostClick = onRepostClick,
+                onQuoteClick = onQuoteClick,
+                onDeletePost = onDeletePost
+            )
+        }
+        return
+    }
 
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -2071,7 +2227,9 @@ private fun PostCard(
                         Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (onBlockUser != null || onReportPost != null) {
+                
+                val isOwnPost = currentUsername == post.poster.name
+                if (onBlockUser != null || onReportPost != null || onDeletePost != null) {
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "Post options")
@@ -2079,14 +2237,9 @@ private fun PostCard(
                         PostActionsMenu(
                             expanded = menuExpanded,
                             onDismiss = { menuExpanded = false },
-                            onBlock = {
-                                menuExpanded = false
-                                onBlockUser?.invoke(post.poster.name)
-                            },
-                            onReport = {
-                                menuExpanded = false
-                                onReportPost?.invoke(post)
-                            }
+                            onBlock = if (!isOwnPost) onBlockUser?.let { { menuExpanded = false; it(post.poster.name) } } else null,
+                            onReport = if (!isOwnPost) onReportPost?.let { { menuExpanded = false; it(post) } } else null,
+                            onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null
                         )
                     }
                 }
@@ -2150,7 +2303,34 @@ private fun PostCard(
                     onClick = onLoveClick?.let { { onLoveClick(post) } }
                 )
                 PostMetric(post.comments, "comments", Icons.Filled.Chat)
-                PostMetric(post.reposts, "reposts", Icons.Filled.Repeat)
+                Box {
+                    var repostMenuExpanded by remember { mutableStateOf(false) }
+                    PostMetric(
+                        value = post.reposts,
+                        label = "reposts",
+                        icon = Icons.Filled.Repeat,
+                        onClick = if (onRepostClick != null || onQuoteClick != null) { { repostMenuExpanded = true } } else null
+                    )
+                    DropdownMenu(
+                        expanded = repostMenuExpanded,
+                        onDismissRequest = { repostMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Repost") },
+                            onClick = {
+                                repostMenuExpanded = false
+                                onRepostClick?.invoke(post)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Quote") },
+                            onClick = {
+                                repostMenuExpanded = false
+                                onQuoteClick?.invoke(post)
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -2240,8 +2420,8 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
             val content = remember(notification.id) {
                 when (type) {
                     "admin_notification" -> notification.data.content
-                    "comment", "wall_comment", "wall_comment_reply" -> notification.data.comment?.content
-                    "post_mention", "repost" -> notification.data.post?.content
+                    "comment", "wall_comment", "wall_comment_reply", "comment_reply", "comment_mention" -> notification.data.comment?.content
+                    "post_mention", "mention", "repost" -> notification.data.post?.content
                     else -> null
                 }
             }
@@ -2253,13 +2433,21 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
                     maxLines = 3,
                     onClick = onClick
                 )
-            } else if (notification.data.post != null) {
+            } else if (notification.data.post != null && notification.data.post.content != null) {
                 val postContent = remember(notification.id) { notification.data.post.content }
                 HtmlText(
                     html = postContent,
                     modifier = Modifier.padding(top = 4.dp),
                     maxLines = 2,
                     onClick = onClick
+                )
+            } else if (type in listOf("repost", "comment", "comment_reply", "mention", "post_mention", "comment_mention", "wall_comment", "wall_comment_reply")) {
+                Text(
+                    text = "This post/comment was deleted.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
@@ -2485,9 +2673,12 @@ private fun notificationLabel(type: String): String {
     return when (type.lowercase()) {
         "love" -> "Loved your post"
         "comment" -> "Commented on your post"
-        "repost" -> "Reposted your content"
+        "comment_reply" -> "Replied to your comment"
+        "repost" -> "Reposted your post"
         "follow" -> "Followed you"
+        "mention" -> "Mentioned you"
         "post_mention" -> "Mentioned you in a post"
+        "comment_mention" -> "Mentioned you in a comment"
         "wall_comment" -> "Left a comment on your wall"
         "wall_comment_reply" -> "Replied to a comment on your wall"
         "admin_notification" -> "Admin notification"

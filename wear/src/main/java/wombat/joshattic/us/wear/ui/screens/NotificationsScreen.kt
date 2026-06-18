@@ -90,10 +90,11 @@ fun NotificationsScreen(
                 
                 val summary = androidx.compose.runtime.remember(notif) {
                     when (notif.type) {
-                        "comment" -> "commented: " + (notif.data.comment?.content?.stripHtml() ?: "...")
+                        "comment", "wall_comment", "wall_comment_reply", "comment_reply" -> if (notif.data.comment == null) "This comment was deleted." else "commented: " + (notif.data.comment.content.stripHtml())
                         "love" -> "loved your post"
                         "follow" -> "followed you"
-                        "mention" -> "mentioned you"
+                        "mention", "post_mention", "comment_mention" -> if (notif.data.post == null && notif.data.comment == null) "This post/comment was deleted." else "mentioned you"
+                        "repost" -> if (notif.data.post == null) "This post was deleted." else "reposted your post"
                         else -> notif.type
                     }
                 }

@@ -153,7 +153,8 @@ class HomeViewModel(
         val nextVisible = !_uiState.value.showComposer
         _uiState.value = _uiState.value.copy(
             showComposer = nextVisible,
-            selectedPost = if (nextVisible) null else _uiState.value.selectedPost
+            selectedPost = if (nextVisible) null else _uiState.value.selectedPost,
+            composeRepostId = if (!nextVisible) null else _uiState.value.composeRepostId
         )
     }
 
@@ -165,14 +166,15 @@ class HomeViewModel(
         viewModelScope.launch {
             val session = _uiState.value.session ?: return@launch
             val draft = contentOverride?.trim() ?: _uiState.value.composeDraft.trim()
-            if (draft.isBlank()) {
+            val repostId = _uiState.value.composeRepostId
+            if (draft.isBlank() && repostId == null) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Write something before posting.")
                 return@launch
             }
 
-            runCatching { repository.createPost(session, draft) }
+            runCatching { repository.createPost(session, draft, repostId) }
                 .onSuccess {
-                    _uiState.value = _uiState.value.copy(showComposer = false, composeDraft = "")
+                    _uiState.value = _uiState.value.copy(showComposer = false, composeDraft = "", composeRepostId = null)
                     refreshFeed()
                     refreshAccount()
                 }
@@ -180,6 +182,30 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
                 }
         }
+    }
+
+    fun submitRepost(postId: String, onSuccess: () -> Unit = {}) {
+        viewModelScope.launch {
+            val session = _uiState.value.session ?: return@launch
+            runCatching { repository.createPost(session, "", postId) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(toastMessage = "Reposted!")
+                    refreshFeed()
+                    refreshAccount()
+                    onSuccess()
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(errorMessage = throwable.message ?: "Failed to repost")
+                }
+        }
+    }
+
+    fun openQuoteComposer(postId: String) {
+        _uiState.value = _uiState.value.copy(
+            showComposer = true,
+            composeRepostId = postId,
+            selectedPost = null
+        )
     }
 
     fun clearAllDrafts() {
@@ -371,7 +397,25 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(scrollToCommentId = null)
     }
 
+    fun clearInAppNotification() {
+        _uiState.value = _uiState.value.copy(inAppNotification = null)
+    }
+
     fun handleNotificationClick(notification: Notification) {
+        // Mark as read immediately
+        if (!notification.read) {
+            viewModelScope.launch {
+                val session = _uiState.value.session ?: return@launch
+                runCatching {
+                    repository.markNotificationsRead(session, listOf(notification.id))
+                }.onSuccess {
+                    refreshNotifications()
+                }
+            }
+        }
+
+        clearInAppNotification()
+
         when (notification.type.lowercase()) {
             "comment" -> {
                 notification.data.post?.let { post ->
@@ -430,6 +474,26 @@ class HomeViewModel(
 
     fun setCommentDraft(comment: String) {
         _uiState.value = _uiState.value.copy(commentDraft = comment, errorMessage = null)
+    }
+
+    fun deletePost(postId: String) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            runCatching {
+                repository.deletePost(session, postId)
+            }.onSuccess {
+                _uiState.value = _uiState.value.copy(
+                    feed = _uiState.value.feed.filter { it.id != postId },
+                    explorePosts = _uiState.value.explorePosts.filter { it.id != postId },
+                    exploreTrendingPosts = _uiState.value.exploreTrendingPosts.filter { it.id != postId },
+                    viewingProfilePosts = _uiState.value.viewingProfilePosts.filter { it.id != postId },
+                    accountPosts = _uiState.value.accountPosts.filter { it.id != postId },
+                    toastMessage = "Post deleted"
+                )
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(toastMessage = "Failed to delete post: ${e.message}")
+            }
+        }
     }
 
     fun submitComment() {
@@ -776,10 +840,21 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(notificationsLoading = true)
         val unread = runCatching { repository.loadUnreadNotifications(session) }.getOrDefault(emptyList())
         val read = runCatching { repository.loadReadNotifications(session) }.getOrDefault(emptyList())
+        val oldUnreadIds = _uiState.value.unreadNotifications.map { it.id }.toSet()
+        val isInitialLoad = !_uiState.value.hasInitialNotificationsLoaded
+        
+        val newNotification = if (!isInitialLoad) {
+            unread.firstOrNull { it.id !in oldUnreadIds }
+        } else {
+            null
+        }
+
         _uiState.value = _uiState.value.copy(
             unreadNotifications = unread,
             readNotifications = read,
-            notificationsLoading = false
+            notificationsLoading = false,
+            hasInitialNotificationsLoaded = true,
+            inAppNotification = newNotification ?: _uiState.value.inAppNotification
         )
     }
 
