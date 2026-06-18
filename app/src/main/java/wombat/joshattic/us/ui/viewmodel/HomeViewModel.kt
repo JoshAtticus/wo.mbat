@@ -713,7 +713,13 @@ class HomeViewModel(
 
     private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
         val current = _uiState.value
-        fun transform(p: Post) = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
+        fun transform(p: Post): Post {
+            var updated = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
+            if (updated.repost?.id == postId) {
+                updated = updated.copy(repost = updated.repost.copy(loves = newLoves, isLoving = newIsLoving))
+            }
+            return updated
+        }
         _uiState.value = current.copy(
             feed = current.feed.map(::transform),
             exploreTrendingPosts = current.exploreTrendingPosts.map(::transform),
@@ -732,13 +738,24 @@ class HomeViewModel(
     private fun List<Post>.filterNotBlocked(blockedUsernames: Set<String>): List<Post> =
         filterNot { blockedUsernames.contains(it.poster.name.lowercase()) }
 
-    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = withContext(Dispatchers.IO) {
+    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = coroutineScope {
         posts.map { post ->
-            async {
+            async(Dispatchers.IO) {
                 val loved = runCatching {
                     repository.getPostLoveStatus(session, post.id, session.username)
                 }.getOrDefault(post.isLoving ?: false)
-                post.copy(isLoving = loved)
+                
+                val repostLoved = if (post.repost != null) {
+                    runCatching {
+                        repository.getPostLoveStatus(session, post.repost.id, session.username)
+                    }.getOrDefault(post.repost.isLoving ?: false)
+                } else null
+                
+                var p = post.copy(isLoving = loved)
+                if (repostLoved != null) {
+                    p = p.copy(repost = p.repost?.copy(isLoving = repostLoved))
+                }
+                p
             }
         }.awaitAll()
     }

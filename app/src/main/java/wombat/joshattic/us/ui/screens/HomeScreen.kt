@@ -1325,110 +1325,120 @@ private fun ComposerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = null
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("New post", style = MaterialTheme.typography.titleLarge)
-                TextButton(onClick = { showDraftsDialog = true }) {
-                    Text("Drafts (${drafts.size})")
-                }
-            }
-
-            // Image attach button only (styling removed - use markdown manually in the text box)
-            IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(24.dp))
-            }
-
-            if (showAddImage) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(
-                        value = imageUrl,
-                        onValueChange = { imageUrl = it; imageError = null },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        placeholder = { Text("https://i.ibb.co/xxx or https://u.cubeupload.com/xxx") },
-                        label = { Text("Image URL (i.ibb.co or u.cubeupload.com only)") }
-                    )
-                    if (imageError != null) {
-                        Text(imageError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { addImage() }, enabled = imageUrl.isNotBlank()) {
-                            Text("Insert Image")
-                        }
-                        TextButton(onClick = {
-                            showAddImage = false
-                            imageUrl = ""
-                            imageError = null
-                        }) {
-                            Text("Cancel")
-                        }
-                    }
-                }
-            }
-
-            // Direct editable text input (no outer box, input itself sized and styled)
-            val charCount = draft.length
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = onDraftChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 220.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    placeholder = { Text("What's happening? Write words here, markdown supported.") }
-                )
-                Text(
-                    text = "$charCount / ${HomeViewModel.MAX_CHAR_COUNT} characters",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (charCount > HomeViewModel.MAX_CHAR_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.End)
-                )
-            }
-
-            // Image attachments preview - shown below the text editor like normal post composer (thumbnails, removable)
-            if (currentImages.isNotEmpty()) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    currentImages.forEachIndexed { index, url ->
-                        Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp))) {
-                            SubcomposeAsyncImage(
-                                model = url,
-                                contentDescription = "Attached image",
-                                loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) } },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            IconButton(
-                                onClick = {
-                                    currentImages = currentImages.toMutableList().apply { removeAt(index) }
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .size(20.dp)
-                                    .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                            ) {
-                                Icon(
-                                    Icons.Filled.Close,
-                                    contentDescription = "Remove image",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(12.dp)
+                    Text("New post", style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClick = { showDraftsDialog = true }) {
+                        Text("Drafts (${drafts.size})")
+                    }
+                }
+
+                // Image attach button only (styling removed - use markdown manually in the text box)
+                IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(24.dp))
+                }
+
+                if (showAddImage) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedTextField(
+                            value = imageUrl,
+                            onValueChange = { imageUrl = it; imageError = null },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("https://i.ibb.co/xxx or https://u.cubeupload.com/xxx") },
+                            label = { Text("Image URL (i.ibb.co or u.cubeupload.com only)") }
+                        )
+                        if (imageError != null) {
+                            Text(imageError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { addImage() }, enabled = imageUrl.isNotBlank()) {
+                                Text("Insert Image")
+                            }
+                            TextButton(onClick = {
+                                showAddImage = false
+                                imageUrl = ""
+                                imageError = null
+                            }) {
+                                Text("Cancel")
+                            }
+                        }
+                    }
+                }
+
+                // Direct editable text input (no outer box, input itself sized and styled)
+                val charCount = draft.length
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = onDraftChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 220.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        placeholder = { Text("What's happening? Write words here, markdown supported.") }
+                    )
+                    Text(
+                        text = "$charCount / ${HomeViewModel.MAX_CHAR_COUNT} characters",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (charCount > HomeViewModel.MAX_CHAR_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.End)
+                    )
+                }
+
+                // Image attachments preview - shown below the text editor like normal post composer (thumbnails, removable)
+                if (currentImages.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        currentImages.forEachIndexed { index, url ->
+                            Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp))) {
+                                SubcomposeAsyncImage(
+                                    model = url,
+                                    contentDescription = "Attached image",
+                                    loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) } },
+                                    modifier = Modifier.fillMaxSize()
                                 )
+                                IconButton(
+                                    onClick = {
+                                        currentImages = currentImages.toMutableList().apply { removeAt(index) }
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(20.dp)
+                                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = "Remove image",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+            
+            Spacer(modifier = Modifier.height(16.dp))
 
             Column(
                 modifier = Modifier
@@ -1445,7 +1455,7 @@ private fun ComposerSheet(
                         onDraftChange(fullHtml)
                         onSubmit()
                     },
-                    enabled = (draft.isNotBlank() || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
+                    enabled = (draft.isNotBlank() || currentImages.isNotEmpty()) && draft.length <= HomeViewModel.MAX_CHAR_COUNT,
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Icon(Icons.Filled.PostAdd, contentDescription = null)
