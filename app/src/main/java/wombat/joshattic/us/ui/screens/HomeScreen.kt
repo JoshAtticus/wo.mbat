@@ -1575,7 +1575,8 @@ private fun PostDetailsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = null
+        dragHandle = null,
+        containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxHeight()) {
             val showCommentsSection = hasUserExpandedComments || comments.isNotEmpty()
@@ -3141,7 +3142,8 @@ private fun UserListBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
