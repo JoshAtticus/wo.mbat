@@ -11,8 +11,8 @@ val Brand = Color(0xFF6366F1)
 val BrandVariant = Color(0xFF4F46E5)
 val BrandLight = Color(0xFF818CF8)
 
-val Neutral10 = Color(0xFF111111)
-val Neutral20 = Color(0xFF1E1E1E)
+val Neutral10 = Color(0xFF111827)
+val Neutral20 = Color(0xFF1F2937)
 val Neutral90 = Color(0xFFF5F3EF)
 val Neutral95 = Color(0xFFFAF9F7)
 
@@ -33,7 +33,7 @@ fun getUserColorSchemeColors(userColor: String?): Triple<Color, Color, Color> {
         "purple" -> Color(0xFF9333EA)
         "fuchsia" -> Color(0xFFC026FF)
         "pink" -> Color(0xFFDB2777)
-        "gray" -> Color(0xFF4B5563)
+        "gray" -> Color(0xFF1F2937)
         else -> Color(0xFF6366F1) // default indigo
     }
     val variant = base.copy(
