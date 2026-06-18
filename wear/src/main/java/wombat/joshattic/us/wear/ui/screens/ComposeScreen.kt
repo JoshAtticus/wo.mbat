@@ -34,15 +34,24 @@ import wombat.joshattic.us.wear.WearUiState
 @Composable
 fun ComposeScreen(
     uiState: WearUiState,
-    onSubmit: (String) -> Unit
+    onSubmit: (String) -> Unit,
+    onCancel: () -> Unit
 ) {
     var draft by remember { mutableStateOf("") }
     
     val KEY_POST = "post_text"
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val bundle: Bundle? = RemoteInput.getResultsFromIntent(result.data ?: Intent())
-        bundle?.getCharSequence(KEY_POST)?.toString()?.takeIf { it.isNotBlank() }?.let {
-            draft = it
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val bundle: Bundle? = RemoteInput.getResultsFromIntent(result.data ?: Intent())
+            bundle?.getCharSequence(KEY_POST)?.toString()?.takeIf { it.isNotBlank() }?.let {
+                draft = it
+            } ?: run {
+                if (draft.isEmpty()) onCancel()
+            }
+        } else {
+            if (draft.isEmpty()) {
+                onCancel()
+            }
         }
     }
 

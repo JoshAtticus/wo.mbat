@@ -161,6 +161,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle

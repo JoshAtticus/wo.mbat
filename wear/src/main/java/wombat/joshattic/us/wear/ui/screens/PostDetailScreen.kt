@@ -22,6 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,12 +53,15 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.ModeComment
 import coil.compose.AsyncImage
 import wombat.joshattic.us.wear.WearUiState
+import wombat.joshattic.us.wear.data.model.Post
 
 @Composable
 fun PostDetailScreen(
     uiState: WearUiState,
     onLoveClick: () -> Unit,
     onSubmitComment: (String) -> Unit,
+    onRepostClick: (Post) -> Unit,
+    onQuoteClick: (Post) -> Unit,
     onBack: () -> Unit
 ) {
     val post = uiState.selectedPost ?: return
@@ -191,33 +198,73 @@ fun PostDetailScreen(
                     
                     Spacer(Modifier.height(8.dp))
                     // Actions
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Button(
-                            onClick = onLoveClick,
-                            modifier = Modifier.size(32.dp),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color.Transparent)
-                        ) {
-                            Icon(
-                                imageVector = if (post.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = "Love",
-                                modifier = Modifier.size(18.dp),
-                                tint = if (post.isLoving == true) Color(0xFFEF4444) else MaterialTheme.colors.onSurface
-                            )
-                        }
-                        Text("${post.loves}", style = MaterialTheme.typography.caption2)
-                        Spacer(Modifier.width(12.dp))
+                    var showRepostDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Chip(
-                            onClick = { launchCommentInput() },
-                            label = { Text("Reply", style = MaterialTheme.typography.caption2) },
+                            onClick = onLoveClick,
+                            label = { Text("${post.loves}", style = MaterialTheme.typography.caption2) },
                             icon = {
                                 Icon(
-                                    Icons.Filled.ModeComment,
-                                    contentDescription = "Reply",
+                                    imageVector = if (post.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    contentDescription = "Love",
+                                    tint = if (post.isLoving == true) Color(0xFFEF4444) else MaterialTheme.colors.onSurface,
                                     modifier = Modifier.size(16.dp)
                                 )
                             },
-                            colors = ChipDefaults.primaryChipColors(),
-                            modifier = Modifier.height(32.dp)
+                            colors = ChipDefaults.secondaryChipColors(),
+                            modifier = Modifier.weight(1f).height(36.dp)
+                        )
+                        Chip(
+                            onClick = { showRepostDialog = true },
+                            label = { Text("${post.reposts}", style = MaterialTheme.typography.caption2) },
+                            icon = {
+                                Icon(Icons.Filled.Repeat, "Repost", modifier = Modifier.size(16.dp))
+                            },
+                            colors = ChipDefaults.secondaryChipColors(),
+                            modifier = Modifier.weight(1f).height(36.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Chip(
+                        onClick = { launchCommentInput() },
+                        label = { Text("Reply (${post.comments})", style = MaterialTheme.typography.caption2) },
+                        icon = {
+                            Icon(
+                                Icons.Filled.ModeComment,
+                                contentDescription = "Reply",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        colors = ChipDefaults.primaryChipColors(),
+                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                    )
+
+                    androidx.wear.compose.material.dialog.Dialog(
+                        showDialog = showRepostDialog,
+                        onDismissRequest = { showRepostDialog = false },
+                    ) {
+                        androidx.wear.compose.material.dialog.Alert(
+                            title = { Text("Repost", textAlign = androidx.compose.ui.text.style.TextAlign.Center) },
+                            negativeButton = {
+                                Button(
+                                    onClick = { showRepostDialog = false; onRepostClick(post) },
+                                    colors = ButtonDefaults.secondaryButtonColors()
+                                ) {
+                                    Icon(Icons.Filled.Repeat, "Repost")
+                                }
+                            },
+                            positiveButton = {
+                                Button(
+                                    onClick = { showRepostDialog = false; onQuoteClick(post) }
+                                ) {
+                                    Icon(Icons.Filled.FormatQuote, "Quote")
+                                }
+                            }
                         )
                     }
                 }

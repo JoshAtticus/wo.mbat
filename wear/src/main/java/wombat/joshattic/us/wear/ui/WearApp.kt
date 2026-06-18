@@ -21,6 +21,7 @@ import wombat.joshattic.us.wear.ui.screens.ComposeScreen
 import wombat.joshattic.us.wear.ui.screens.FeedScreen
 import wombat.joshattic.us.wear.ui.screens.NotificationsScreen
 import wombat.joshattic.us.wear.ui.screens.PostDetailScreen
+import wombat.joshattic.us.wear.data.model.Post
 
 object WearRoutes {
     const val FEED = "feed"
@@ -79,6 +80,14 @@ fun WearApp(viewModel: WearViewModel) {
                 onSubmitComment = { text ->
                     uiState.selectedPost?.let { viewModel.submitComment(it.id, text) }
                 },
+                onRepostClick = { post ->
+                    viewModel.submitRepost(post.id)
+                    navController.popBackStack()
+                },
+                onQuoteClick = { post ->
+                    viewModel.setComposeQuote(post.id)
+                    navController.navigate(WearRoutes.COMPOSE)
+                },
                 onBack = {
                     viewModel.closePost()
                     navController.popBackStack()
@@ -103,7 +112,16 @@ fun WearApp(viewModel: WearViewModel) {
             ComposeScreen(
                 uiState = uiState,
                 onSubmit = { text ->
-                    viewModel.submitPost(text)
+                    if (uiState.composeQuotePostId != null) {
+                        viewModel.submitQuote(uiState.composeQuotePostId!!, text)
+                        viewModel.setComposeQuote(null)
+                    } else {
+                        viewModel.submitPost(text)
+                    }
+                    navController.popBackStack()
+                },
+                onCancel = {
+                    viewModel.setComposeQuote(null)
                     navController.popBackStack()
                 }
             )

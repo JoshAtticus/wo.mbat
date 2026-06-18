@@ -35,6 +35,12 @@ interface ApiService {
         @Body request: CreatePostRequest
     ): Post
 
+    @POST("posts/{id}/reposts")
+    suspend fun createRepost(
+        @Header("authorization") token: String,
+        @Path("id") postId: String
+    ): Post
+
     @POST("posts/{post_id}/loves")
     suspend fun togglePostLove(
         @Path("post_id") postId: String,
@@ -50,6 +56,11 @@ interface ApiService {
 
     @GET("messages/unread")
     suspend fun getUnreadNotifications(
+        @Header("authorization") token: String
+    ): NotificationResponse
+
+    @GET("messages/read")
+    suspend fun getReadNotifications(
         @Header("authorization") token: String
     ): NotificationResponse
 

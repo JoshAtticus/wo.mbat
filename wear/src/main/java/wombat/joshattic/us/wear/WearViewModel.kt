@@ -35,7 +35,8 @@ data class WearUiState(
     val comments: List<Comment> = emptyList(),
     val commentsLoading: Boolean = false,
     val errorMessage: String? = null,
-    val postSuccess: Boolean = false
+    val postSuccess: Boolean = false,
+    val composeQuotePostId: String? = null
 )
 
 class WearViewModel(
@@ -145,8 +146,35 @@ class WearViewModel(
         val session = _uiState.value.session ?: return
         viewModelScope.launch {
             runCatching { repository.createPost(session, "<p>$text</p>") }
-                .onSuccess { newPost ->
-                    _uiState.update { it.copy(feed = listOf(newPost) + it.feed, postSuccess = true) }
+                .onSuccess {
+                    _uiState.update { it.copy(postSuccess = true) }
+                    loadFeed(refresh = true)
+                }.onFailure { e ->
+                    _uiState.update { it.copy(errorMessage = e.message) }
+                }
+        }
+    }
+
+    fun submitRepost(postId: String) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            runCatching { repository.createRepost(session, postId) }
+                .onSuccess {
+                    _uiState.update { it.copy(postSuccess = true) }
+                    loadFeed(refresh = true)
+                }.onFailure { e ->
+                    _uiState.update { it.copy(errorMessage = e.message) }
+                }
+        }
+    }
+
+    fun submitQuote(postId: String, text: String) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            runCatching { repository.createQuote(session, postId, "<p>$text</p>") }
+                .onSuccess {
+                    _uiState.update { it.copy(postSuccess = true) }
+                    loadFeed(refresh = true)
                 }.onFailure { e ->
                     _uiState.update { it.copy(errorMessage = e.message) }
                 }
@@ -188,14 +216,26 @@ class WearViewModel(
 
     fun clearError() = _uiState.update { it.copy(errorMessage = null) }
     fun clearPostSuccess() = _uiState.update { it.copy(postSuccess = false) }
+    fun setComposeQuote(postId: String?) = _uiState.update { it.copy(composeQuotePostId = postId) }
 
-    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = withContext(Dispatchers.IO) {
+    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = kotlinx.coroutines.coroutineScope {
         posts.map { post ->
-            async {
+            async(Dispatchers.IO) {
                 val loved = runCatching {
                     repository.getPostLoveStatus(session, post.id, session.username)
                 }.getOrDefault(post.isLoving ?: false)
-                post.copy(isLoving = loved)
+                
+                val repostLoved = if (post.repost != null) {
+                    runCatching {
+                        repository.getPostLoveStatus(session, post.repost.id, session.username)
+                    }.getOrDefault(post.repost.isLoving ?: false)
+                } else null
+                
+                var p = post.copy(isLoving = loved)
+                if (repostLoved != null) {
+                    p = p.copy(repost = p.repost?.copy(isLoving = repostLoved))
+                }
+                p
             }
         }.awaitAll()
     }

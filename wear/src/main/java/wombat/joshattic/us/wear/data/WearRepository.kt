@@ -1,5 +1,8 @@
 package wombat.joshattic.us.wear.data
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import wombat.joshattic.us.wear.data.model.*
 import wombat.joshattic.us.wear.data.network.ApiService
 
@@ -30,6 +33,12 @@ class WearRepository(
     suspend fun createPost(session: AuthSession, htmlContent: String): Post =
         api.makePost(token = session.token, request = CreatePostRequest(post = htmlContent))
 
+    suspend fun createRepost(session: AuthSession, postId: String): Post =
+        api.createRepost(token = session.token, postId = postId)
+
+    suspend fun createQuote(session: AuthSession, postId: String, htmlContent: String): Post =
+        api.makePost(token = session.token, request = CreatePostRequest(post = htmlContent, repost = postId))
+
     suspend fun createComment(
         session: AuthSession,
         postId: String,
@@ -41,8 +50,13 @@ class WearRepository(
         request = CreateCommentRequest(content = content, parent = parent)
     )
 
-    suspend fun loadUnreadNotifications(session: AuthSession): List<Notification> =
-        api.getUnreadNotifications(session.token).unread.orEmpty()
+    suspend fun loadUnreadNotifications(session: AuthSession): List<Notification> = coroutineScope {
+        val unreadDeferred = async(Dispatchers.IO) { api.getUnreadNotifications(session.token).unread.orEmpty() }
+        val readDeferred = async(Dispatchers.IO) { api.getReadNotifications(session.token).read.orEmpty() }
+        val unread = unreadDeferred.await()
+        val read = readDeferred.await()
+        (unread + read).sortedByDescending { it.time }
+    }
 
     suspend fun markNotificationsRead(session: AuthSession, ids: List<String>) {
         if (ids.isNotEmpty()) api.markRead(session.token, MarkReadRequest(ids))
