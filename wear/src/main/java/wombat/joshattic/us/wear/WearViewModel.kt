@@ -196,12 +196,14 @@ class WearViewModel(
     fun submitComment(postId: String, text: String, parentId: String? = null) {
         val session = _uiState.value.session ?: return
         viewModelScope.launch {
-            runCatching { repository.createComment(session, postId, text, parentId) }
-                .onSuccess { comment ->
-                    _uiState.update { it.copy(comments = it.comments + comment) }
-                }.onFailure { e ->
-                    _uiState.update { it.copy(errorMessage = e.message) }
-                }
+            runCatching { 
+                repository.createComment(session, postId, text, parentId)
+                val id = _uiState.value.selectedPost?.id ?: return@runCatching
+                val comments = repository.loadComments(session, id)
+                _uiState.update { it.copy(comments = comments) }
+            }.onFailure { e ->
+                _uiState.update { it.copy(errorMessage = e.message) }
+            }
         }
     }
 
