@@ -78,73 +78,99 @@ fun NotificationsScreen(
                 }
             }
 
-            items(uiState.notifications, key = { it.id }) { notif ->
-                val icon = androidx.compose.runtime.remember(notif.type) {
-                    when (notif.type) {
-                        "comment" -> Icons.AutoMirrored.Filled.Comment
-                        "love" -> Icons.Filled.Favorite
-                        "follow" -> Icons.Filled.PersonAdd
-                        else -> Icons.Filled.Notifications
-                    }
-                }
-                
-                val summary = androidx.compose.runtime.remember(notif) {
-                    when (notif.type) {
-                        "comment", "wall_comment", "wall_comment_reply", "comment_reply" -> if (notif.data.comment == null) "This comment was deleted." else "commented: " + (notif.data.comment.content.stripHtml())
-                        "love" -> "loved your post"
-                        "follow" -> "followed you"
-                        "mention", "post_mention", "comment_mention" -> if (notif.data.post == null && notif.data.comment == null) "This post/comment was deleted." else "mentioned you"
-                        "repost" -> if (notif.data.post == null) "This post was deleted." else "reposted your post"
-                        else -> notif.type
-                    }
-                }
+            val unreadNotifs = uiState.notifications.filter { !it.read }
+            val readNotifs = uiState.notifications.filter { it.read }
 
-                Chip(
-                    onClick = { onNotificationClick(notif) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    colors = ChipDefaults.secondaryChipColors(),
-                    label = {
-                        Column(Modifier.fillMaxWidth()) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = notif.type,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colors.primary
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                // Actor avatar and name
-                                val actor = notif.data.actor
-                                if (actor != null) {
-                                    AsyncImage(
-                                        model = "https://wasteof-image-proxy.tnix.dev/${actor.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
-                                        contentDescription = actor.name,
-                                        modifier = Modifier.size(24.dp).clip(CircleShape)
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        text = actor.name,
-                                        style = MaterialTheme.typography.caption2,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                } else {
-                                    Text("System", style = MaterialTheme.typography.caption2)
-                                }
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            // Summary text
-                            Text(
-                                text = summary,
-                                style = MaterialTheme.typography.caption2,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+            if (unreadNotifs.isNotEmpty()) {
+                items(unreadNotifs, key = { it.id }) { notif ->
+                    NotificationItem(notif, onNotificationClick)
+                }
+            }
+
+            if (readNotifs.isNotEmpty()) {
+                if (unreadNotifs.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Previous",
+                            style = MaterialTheme.typography.caption2,
+                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                        )
                     }
-                )
+                }
+                items(readNotifs, key = { it.id }) { notif ->
+                    NotificationItem(notif, onNotificationClick)
+                }
             }
         }
     }
+}
+
+@Composable
+private fun NotificationItem(notif: Notification, onNotificationClick: (Notification) -> Unit) {
+    val icon = androidx.compose.runtime.remember(notif.type) {
+        when (notif.type) {
+            "comment" -> Icons.AutoMirrored.Filled.Comment
+            "love" -> Icons.Filled.Favorite
+            "follow" -> Icons.Filled.PersonAdd
+            else -> Icons.Filled.Notifications
+        }
+    }
+    
+    val summary = androidx.compose.runtime.remember(notif) {
+        when (notif.type) {
+            "comment", "wall_comment", "wall_comment_reply", "comment_reply" -> if (notif.data.comment == null) "This comment was deleted." else "commented: " + (notif.data.comment.content.stripHtml())
+            "love" -> "loved your post"
+            "follow" -> "followed you"
+            "mention", "post_mention", "comment_mention" -> if (notif.data.post == null && notif.data.comment == null) "This post/comment was deleted." else "mentioned you"
+            "repost" -> if (notif.data.post == null) "This post was deleted." else "reposted your post"
+            else -> notif.type
+        }
+    }
+
+    Chip(
+        onClick = { onNotificationClick(notif) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        colors = ChipDefaults.secondaryChipColors(),
+        label = {
+            Column(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = notif.type,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colors.primary
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    // Actor avatar and name
+                    val actor = notif.data.actor
+                    if (actor != null) {
+                        AsyncImage(
+                            model = "https://wasteof-image-proxy.tnix.dev/${actor.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
+                            contentDescription = actor.name,
+                            modifier = Modifier.size(24.dp).clip(CircleShape)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = actor.name,
+                            style = MaterialTheme.typography.caption2,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    } else {
+                        Text("System", style = MaterialTheme.typography.caption2)
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                // Summary text
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.caption2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    )
 }

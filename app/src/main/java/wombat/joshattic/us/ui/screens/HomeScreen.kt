@@ -568,12 +568,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
         exit = slideOutVertically(targetOffsetY = { -it }),
         modifier = Modifier
             .align(Alignment.TopCenter)
-            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .padding(horizontal = 16.dp)
+            .padding(top = 64.dp, bottom = 16.dp)
             .zIndex(100f)
     ) {
         uiState.inAppNotification?.let { notif ->
             NotificationCard(
                 notification = notif,
+                isOverlay = true,
                 onClick = { viewModel.handleNotificationClick(notif) }
             )
             
@@ -2389,7 +2391,7 @@ private fun CommentCard(comment: Comment, isBanned: Boolean = false, onReply: (C
 }
 
 @Composable
-private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
+private fun NotificationCard(notification: Notification, isOverlay: Boolean = false, onClick: () -> Unit) {
     val type = notification.type.lowercase()
     val actorName = notification.data.actor?.name ?: if (type == "admin_notification") "Admin" else "Unknown user"
     Card(
@@ -2406,7 +2408,7 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (notification.read) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            containerColor = if (notification.read) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer
         )
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2421,11 +2423,13 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Text(
-                    formatTime(notification.time),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (!isOverlay) {
+                    Text(
+                        formatTime(notification.time),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             val content = remember(notification.id) {

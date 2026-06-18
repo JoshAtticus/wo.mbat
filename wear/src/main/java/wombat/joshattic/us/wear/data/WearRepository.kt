@@ -55,7 +55,7 @@ class WearRepository(
         val readDeferred = async(Dispatchers.IO) { api.getReadNotifications(session.token).read.orEmpty() }
         val unread = unreadDeferred.await()
         val read = readDeferred.await()
-        (unread + read).sortedByDescending { it.time }
+        (unread + read).sortedWith(compareBy({ it.read }, { -it.time }))
     }
 
     suspend fun markNotificationsRead(session: AuthSession, ids: List<String>) {

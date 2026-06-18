@@ -70,6 +70,7 @@ class WearViewModel(
             repository.sessionFlow.collect { session ->
                 _uiState.update { it.copy(session = session, isSessionLoaded = true) }
                 loadFeed(refresh = true)
+                loadNotifications()
             }
         }
     }

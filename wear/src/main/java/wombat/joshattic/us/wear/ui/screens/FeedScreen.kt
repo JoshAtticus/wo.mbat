@@ -1,5 +1,6 @@
 package wombat.joshattic.us.wear.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -76,15 +77,29 @@ fun FeedScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Notifications chip
+                    val unreadCount = uiState.notifications.count { !it.read }
                     Chip(
                         onClick = onNotificationsClick,
-                        label = {},
-                        icon = {
-                            Icon(
-                                Icons.Filled.Notifications,
-                                contentDescription = "Notifications",
-                                modifier = Modifier.size(18.dp)
-                            )
+                        label = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.Notifications,
+                                    contentDescription = "Notifications",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                if (unreadCount > 0) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = unreadCount.toString(),
+                                        style = MaterialTheme.typography.body2,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         },
                         colors = ChipDefaults.secondaryChipColors(),
                         modifier = Modifier.weight(1f)
@@ -93,13 +108,18 @@ fun FeedScreen(
                     // Compose chip
                     Chip(
                         onClick = onComposeClick,
-                        label = {},
-                        icon = {
-                            Icon(
-                                Icons.Filled.Add,
-                                contentDescription = "New post",
-                                modifier = Modifier.size(18.dp)
-                            )
+                        label = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.Add,
+                                    contentDescription = "New post",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         },
                         colors = ChipDefaults.primaryChipColors(),
                         modifier = Modifier.weight(1f)
