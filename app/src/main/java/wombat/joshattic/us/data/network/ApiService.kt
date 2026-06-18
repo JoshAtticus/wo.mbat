@@ -143,12 +143,14 @@ interface ApiService {
     @GET("users/{username}/followers")
     suspend fun getFollowers(
         @Path("username") username: String,
-        @Header("authorization") token: String? = null
+        @Header("authorization") token: String? = null,
+        @Query("page") page: Int = 1
     ): FollowersResponse
 
     @GET("users/{username}/following")
     suspend fun getFollowing(
         @Path("username") username: String,
-        @Header("authorization") token: String? = null
+        @Header("authorization") token: String? = null,
+        @Query("page") page: Int = 1
     ): FollowingResponse
 }

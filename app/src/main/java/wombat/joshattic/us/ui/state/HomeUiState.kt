@@ -70,7 +70,12 @@ data class HomeUiState(
     val reportLoading: Boolean = false,
     val userListToShow: List<User>? = null,
     val userListTitle: String = "",
-    val userListLoading: Boolean = false
+    val userListUsername: String? = null,
+    val userListType: String? = null,
+    val userListLoading: Boolean = false,
+    val userListPage: Int = 1,
+    val userListIsLastPage: Boolean = true,
+    val userListLoadingMore: Boolean = false
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size

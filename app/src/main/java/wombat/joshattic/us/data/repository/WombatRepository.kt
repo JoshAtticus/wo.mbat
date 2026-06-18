@@ -14,6 +14,8 @@ import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
 import wombat.joshattic.us.data.model.CreatePostRequest
 import wombat.joshattic.us.data.model.FeedResponse
+import wombat.joshattic.us.data.model.FollowersResponse
+import wombat.joshattic.us.data.model.FollowingResponse
 import wombat.joshattic.us.data.model.LoginRequest
 import wombat.joshattic.us.data.model.LoveToggleResponse
 import wombat.joshattic.us.data.model.Notification
@@ -144,12 +146,12 @@ class WombatRepository(
     suspend fun toggleFollow(session: AuthSession, username: String) =
         apiService.toggleFollow(username, session.token)
 
-    suspend fun getFollowers(session: AuthSession?, username: String): List<User> {
-        return apiService.getFollowers(username, session?.token).followers
+    suspend fun getFollowers(session: AuthSession?, username: String, page: Int = 1): FollowersResponse {
+        return apiService.getFollowers(username, session?.token, page)
     }
 
-    suspend fun getFollowing(session: AuthSession?, username: String): List<User> {
-        return apiService.getFollowing(username, session?.token).following
+    suspend fun getFollowing(session: AuthSession?, username: String, page: Int = 1): FollowingResponse {
+        return apiService.getFollowing(username, session?.token, page)
     }
 
     suspend fun blockUser(username: String) {

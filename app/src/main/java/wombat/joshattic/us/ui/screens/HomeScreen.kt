@@ -9,6 +9,9 @@ import android.os.Environment
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import android.widget.Toast
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -595,11 +598,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
             title = uiState.userListTitle,
             users = uiState.userListToShow,
             loading = uiState.userListLoading,
+            loadingMore = uiState.userListLoadingMore,
             onDismiss = viewModel::dismissUserList,
             onUserClick = { user ->
                 viewModel.dismissUserList()
                 viewModel.openProfile(user.name)
-            }
+            },
+            onLoadNextPage = viewModel::loadNextUserListPage
         )
     }
 }
@@ -1793,7 +1798,7 @@ private fun ProfileHeader(profile: User) {
                 Column {
                     Text(profile.name, style = MaterialTheme.typography.titleLarge)
                     Text(
-                        text = if (profile.online) "Online now" else "Offline",
+                        text = if (profile.online) "Online" else "Offline",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1983,7 +1988,7 @@ private fun ProfileScreen(
                                     color = accent
                                 )
                                 Text(
-                                    text = if (profile.online) "Online now" else "Offline",
+                                    text = if (profile.online) "Online" else "Offline",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -3127,8 +3132,10 @@ private fun UserListBottomSheet(
     title: String,
     users: List<User>?,
     loading: Boolean,
+    loadingMore: Boolean = false,
     onDismiss: () -> Unit,
-    onUserClick: (User) -> Unit
+    onUserClick: (User) -> Unit,
+    onLoadNextPage: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -3152,7 +3159,22 @@ private fun UserListBottomSheet(
                     Text("No users found", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val listState = rememberLazyListState()
+                
+                LaunchedEffect(listState) {
+                    snapshotFlow { listState.layoutInfo.visibleItemsInfo }
+                        .map { visibleItems ->
+                            if (visibleItems.isEmpty()) false else {
+                                val lastVisibleItem = visibleItems.last()
+                                lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 3
+                            }
+                        }
+                        .distinctUntilChanged()
+                        .filter { it }
+                        .collect { onLoadNextPage() }
+                }
+
+                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(users, key = { it.id }) { user ->
                         val accent = getUserColorSchemeColors(user.color).first
                         Card(
@@ -3190,6 +3212,13 @@ private fun UserListBottomSheet(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                    if (loadingMore) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
                             }
                         }
                     }

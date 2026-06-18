@@ -127,9 +127,11 @@ data class ReportRequest(
 )
 
 data class FollowersResponse(
-    val followers: List<User>
+    val followers: List<User>,
+    val last: Boolean
 )
 
 data class FollowingResponse(
-    val following: List<User>
+    val following: List<User>,
+    val last: Boolean
 )

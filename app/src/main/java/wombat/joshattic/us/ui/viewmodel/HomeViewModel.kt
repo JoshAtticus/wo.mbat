@@ -632,15 +632,21 @@ class HomeViewModel(
     fun showFollowers(username: String) {
         _uiState.value = _uiState.value.copy(
             userListTitle = "Followers",
+            userListUsername = username,
+            userListType = "followers",
             userListToShow = emptyList(),
-            userListLoading = true
+            userListLoading = true,
+            userListPage = 1,
+            userListIsLastPage = false,
+            userListLoadingMore = false
         )
         viewModelScope.launch {
             runCatching {
-                repository.getFollowers(_uiState.value.session, username)
-            }.onSuccess { followers ->
+                repository.getFollowers(_uiState.value.session, username, 1)
+            }.onSuccess { response ->
                 _uiState.value = _uiState.value.copy(
-                    userListToShow = followers,
+                    userListToShow = response.followers,
+                    userListIsLastPage = response.last,
                     userListLoading = false
                 )
             }.onFailure { throwable ->
@@ -656,15 +662,21 @@ class HomeViewModel(
     fun showFollowing(username: String) {
         _uiState.value = _uiState.value.copy(
             userListTitle = "Following",
+            userListUsername = username,
+            userListType = "following",
             userListToShow = emptyList(),
-            userListLoading = true
+            userListLoading = true,
+            userListPage = 1,
+            userListIsLastPage = false,
+            userListLoadingMore = false
         )
         viewModelScope.launch {
             runCatching {
-                repository.getFollowing(_uiState.value.session, username)
-            }.onSuccess { following ->
+                repository.getFollowing(_uiState.value.session, username, 1)
+            }.onSuccess { response ->
                 _uiState.value = _uiState.value.copy(
-                    userListToShow = following,
+                    userListToShow = response.following,
+                    userListIsLastPage = response.last,
                     userListLoading = false
                 )
             }.onFailure { throwable ->
@@ -677,11 +689,55 @@ class HomeViewModel(
         }
     }
 
+    fun loadNextUserListPage() {
+        val currentState = _uiState.value
+        val username = currentState.userListUsername ?: return
+        val type = currentState.userListType ?: return
+        
+        if (currentState.userListLoadingMore || currentState.userListIsLastPage) return
+
+        _uiState.value = currentState.copy(userListLoadingMore = true)
+        val nextPage = currentState.userListPage + 1
+
+        viewModelScope.launch {
+            if (type == "followers") {
+                runCatching { repository.getFollowers(currentState.session, username, nextPage) }
+                    .onSuccess { response ->
+                        _uiState.value = _uiState.value.copy(
+                            userListToShow = (_uiState.value.userListToShow ?: emptyList()) + response.followers,
+                            userListPage = nextPage,
+                            userListIsLastPage = response.last,
+                            userListLoadingMore = false
+                        )
+                    }.onFailure {
+                        _uiState.value = _uiState.value.copy(userListLoadingMore = false)
+                    }
+            } else if (type == "following") {
+                runCatching { repository.getFollowing(currentState.session, username, nextPage) }
+                    .onSuccess { response ->
+                        _uiState.value = _uiState.value.copy(
+                            userListToShow = (_uiState.value.userListToShow ?: emptyList()) + response.following,
+                            userListPage = nextPage,
+                            userListIsLastPage = response.last,
+                            userListLoadingMore = false
+                        )
+                    }.onFailure {
+                        _uiState.value = _uiState.value.copy(userListLoadingMore = false)
+                    }
+            }
+        }
+    }
+
     fun dismissUserList() {
         _uiState.value = _uiState.value.copy(
             userListToShow = null,
             userListTitle = "",
-            userListLoading = false
+            userListUsername = null,
+            userListType = null,
+            userListLoading = false,
+            userListPage = 1,
+            userListIsLastPage = true,
+            userListLoadingMore = false
         )
     }
 
