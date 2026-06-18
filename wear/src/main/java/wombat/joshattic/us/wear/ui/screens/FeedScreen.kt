@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Repeat
 import coil.compose.AsyncImage
 import wombat.joshattic.us.wear.WearUiState
 import wombat.joshattic.us.wear.data.model.Post
@@ -149,6 +150,40 @@ fun WearPostCard(
     onClick: () -> Unit,
     onLoveClick: () -> Unit
 ) {
+    val isPureRepost = androidx.compose.runtime.remember(post) {
+        post.repost != null &&
+        (post.content?.replace(Regex("<.*?>"), "")?.trim()?.isBlank() ?: true) &&
+        !(post.content?.contains("<img", ignoreCase = true) ?: false)
+    }
+
+    if (isPureRepost) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.Repeat,
+                    contentDescription = "Repost",
+                    modifier = Modifier.size(12.dp),
+                    tint = androidx.wear.compose.material.MaterialTheme.colors.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    "@${post.poster.name} reposted this",
+                    style = androidx.wear.compose.material.MaterialTheme.typography.caption3,
+                    color = androidx.wear.compose.material.MaterialTheme.colors.onSurfaceVariant
+                )
+            }
+            WearPostCard(
+                post = post.repost!!,
+                onClick = onClick,
+                onLoveClick = onLoveClick
+            )
+        }
+        return
+    }
+
     val plainTextContent = androidx.compose.runtime.remember(post.content) {
         post.content?.stripHtml() ?: ""
     }
