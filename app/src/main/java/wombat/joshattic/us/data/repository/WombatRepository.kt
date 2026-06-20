@@ -14,6 +14,7 @@ import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
 import wombat.joshattic.us.data.model.CreatePostRequest
+import wombat.joshattic.us.data.model.CreateWallCommentResponse
 import wombat.joshattic.us.data.model.FeedResponse
 import wombat.joshattic.us.data.model.FollowersResponse
 import wombat.joshattic.us.data.model.FollowingResponse
@@ -131,6 +132,18 @@ class WombatRepository(
             postId = postId,
             token = session.token,
             request = CreateCommentRequest(content = content, parent = parent)
+        )
+    }
+
+    suspend fun loadWallComments(session: AuthSession?, username: String, page: Int = 1): CommentResponse {
+        return apiService.getWallComments(username = username, page = page, token = session?.token)
+    }
+
+    suspend fun createWallComment(session: AuthSession, username: String, content: String, parentId: String?): CreateWallCommentResponse {
+        return apiService.makeWallComment(
+            username = username,
+            token = session.token,
+            request = CreateCommentRequest(content = content, parent = parentId)
         )
     }
 

@@ -71,7 +71,7 @@ data class CommentResponse(val comments: List<Comment>, val last: Boolean)
 @Immutable
 data class Comment(
     @SerializedName("_id") val id: String,
-    val post: String,
+    val post: String? = null,
     val poster: Poster,
     val parent: String?,
     val content: String,
@@ -96,6 +96,8 @@ data class EditPostRequest(val post: String)
 data class MarkReadRequest(val messages: List<String>)
 
 data class CreateCommentRequest(val content: String, val parent: String? = null)
+
+data class CreateWallCommentResponse(val ok: String, val id: String)
 
 data class AuthSession(
     val token: String,

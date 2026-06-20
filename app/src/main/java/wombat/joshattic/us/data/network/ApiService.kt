@@ -26,6 +26,7 @@ import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.model.FollowersResponse
 import wombat.joshattic.us.data.model.FollowingResponse
+import wombat.joshattic.us.data.model.CreateWallCommentResponse
 
 interface ApiService {
     @POST("session")
@@ -162,4 +163,18 @@ interface ApiService {
         @Header("authorization") token: String? = null,
         @Query("page") page: Int = 1
     ): FollowingResponse
+
+    @GET("users/{username}/wall")
+    suspend fun getWallComments(
+        @Path("username") username: String,
+        @Query("page") page: Int = 1,
+        @Header("authorization") token: String? = null
+    ): CommentResponse
+
+    @POST("users/{username}/wall")
+    suspend fun makeWallComment(
+        @Path("username") username: String,
+        @Header("authorization") token: String,
+        @Body request: CreateCommentRequest
+    ): CreateWallCommentResponse
 }

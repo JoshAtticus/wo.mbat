@@ -29,9 +29,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -100,7 +103,8 @@ fun AccountTab(
     onDeletePost: ((Post) -> Unit)? = null,
     onShowFollowers: (String) -> Unit = {},
     onShowFollowing: (String) -> Unit = {},
-    onEditPost: ((Post) -> Unit)? = null
+    onEditPost: ((Post) -> Unit)? = null,
+    onWallClick: (String) -> Unit = {}
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -271,10 +275,35 @@ fun AccountTab(
                                 Spacer(modifier = Modifier.height(14.dp))
                                 HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")), maxLines = 4)
                                 Spacer(modifier = Modifier.height(14.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent, onClick = { onShowFollowers(profile.name) })
                                     ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent, onClick = { onShowFollowing(profile.name) })
                                     ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
+                                    Surface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.clickable { onWallClick(profile.name) }
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Forum,
+                                                contentDescription = "Wall",
+                                                tint = accent,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Text(
+                                                text = "Wall",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

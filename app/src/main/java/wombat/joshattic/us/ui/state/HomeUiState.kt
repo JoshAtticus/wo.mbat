@@ -79,7 +79,14 @@ data class HomeUiState(
     val userListIsLastPage: Boolean = true,
     val userListLoadingMore: Boolean = false,
     val scrollToTop: Boolean = false,
-    val newPostsUsernames: List<String> = emptyList()
+    val newPostsUsernames: List<String> = emptyList(),
+    val viewingWallUsername: String? = null,
+    val wallComments: List<Comment> = emptyList(),
+    val wallCommentsLoading: Boolean = false,
+    val wallCommentsPage: Int = 1,
+    val wallCommentsLast: Boolean = false,
+    val wallCommentDraft: String = "",
+    val wallCommentReplyParent: Comment? = null
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size

@@ -507,7 +507,8 @@ class HomeViewModel(
                 notification.data.actor?.name?.let { openProfile(it) }
             }
             "wall_comment", "wall_comment_reply" -> {
-                _uiState.value = _uiState.value.copy(toastMessage = "Wall support hasn't been added yet")
+                val wallUsername = notification.data.wall?.name ?: notification.to.name
+                openWall(wallUsername)
             }
             "love" -> {
                 notification.data.post?.let { post ->
@@ -593,6 +594,96 @@ class HomeViewModel(
                 }
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(errorMessage = throwable.message ?: "Unable to post comment")
+                }
+        }
+    }
+
+    fun openWall(username: String) {
+        _uiState.value = _uiState.value.copy(
+            viewingWallUsername = username,
+            wallComments = emptyList(),
+            wallCommentsLoading = true,
+            wallCommentsPage = 1,
+            wallCommentsLast = false,
+            wallCommentDraft = "",
+            wallCommentReplyParent = null
+        )
+        loadWallCommentsPage(username, 1)
+    }
+
+    fun closeWall() {
+        _uiState.value = _uiState.value.copy(
+            viewingWallUsername = null,
+            wallComments = emptyList(),
+            wallCommentsLoading = false,
+            wallCommentsPage = 1,
+            wallCommentsLast = false,
+            wallCommentDraft = "",
+            wallCommentReplyParent = null
+        )
+    }
+
+    fun setWallCommentDraft(comment: String) {
+        _uiState.value = _uiState.value.copy(wallCommentDraft = comment, errorMessage = null)
+    }
+
+    fun setWallCommentReplyParent(comment: Comment?) {
+        _uiState.value = _uiState.value.copy(wallCommentReplyParent = comment)
+    }
+
+    private fun loadWallCommentsPage(username: String, page: Int) {
+        val session = _uiState.value.session
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(wallCommentsLoading = true)
+            runCatching {
+                val response = repository.loadWallComments(session, username, page)
+                val topLevel = response.comments.map { it.copy(replies = it.replies ?: emptyList()) }
+                val fullComments = topLevel.map { loadRepliesRecursively(it, session) }
+                fullComments to response.last
+            }.onSuccess { (fullComments, isLast) ->
+                _uiState.value = _uiState.value.copy(
+                    wallComments = if (page == 1) fullComments else _uiState.value.wallComments + fullComments,
+                    wallCommentsLoading = false,
+                    wallCommentsPage = page,
+                    wallCommentsLast = isLast
+                )
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    wallCommentsLoading = false,
+                    errorMessage = throwable.message ?: "Unable to load wall comments"
+                )
+            }
+        }
+    }
+
+    fun loadNextWallCommentsPage() {
+        val current = _uiState.value
+        val username = current.viewingWallUsername ?: return
+        if (current.wallCommentsLoading || current.wallCommentsLast) return
+        loadWallCommentsPage(username, current.wallCommentsPage + 1)
+    }
+
+    fun submitWallComment() {
+        viewModelScope.launch {
+            val session = _uiState.value.session ?: return@launch
+            val username = _uiState.value.viewingWallUsername ?: return@launch
+            val draft = _uiState.value.wallCommentDraft.trim()
+            if (draft.isBlank()) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Write a wall comment before sending it.")
+                return@launch
+            }
+
+            val parent = _uiState.value.wallCommentReplyParent?.id
+            runCatching { repository.createWallComment(session, username, draft, parent) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        wallCommentDraft = "",
+                        wallCommentReplyParent = null
+                    )
+                    loadWallCommentsPage(username, 1)
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(errorMessage = throwable.message ?: "Unable to post wall comment")
                 }
         }
     }

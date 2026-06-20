@@ -223,7 +223,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onDeletePost = { viewModel.deletePost(it.id) },
                         onShowFollowers = viewModel::showFollowers,
                         onShowFollowing = viewModel::showFollowing,
-                        onEditPost = viewModel::openEditComposer
+                        onEditPost = viewModel::openEditComposer,
+                        onWallClick = viewModel::openWall
                     )
                 } else {
                     val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
@@ -356,7 +357,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onDeletePost = { viewModel.deletePost(it.id) },
                                 onShowFollowers = viewModel::showFollowers,
                                 onShowFollowing = viewModel::showFollowing,
-                                onEditPost = viewModel::openEditComposer
+                                onEditPost = viewModel::openEditComposer,
+                                onWallClick = viewModel::openWall
                             )
                         }
                     }
@@ -418,6 +420,24 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     currentUsername = uiState.session?.username,
                     onDeletePost = { viewModel.deletePost(it.id) },
                     onEditPost = viewModel::openEditComposer
+                )
+            }
+
+            uiState.viewingWallUsername?.let { username ->
+                WallDetailsSheet(
+                    username = username,
+                    comments = uiState.wallComments,
+                    loading = uiState.wallCommentsLoading,
+                    draft = uiState.wallCommentDraft,
+                    isBanned = uiState.isBanned,
+                    onDraftChange = viewModel::setWallCommentDraft,
+                    onSubmit = viewModel::submitWallComment,
+                    onDismiss = viewModel::closeWall,
+                    onLoadNextPage = viewModel::loadNextWallCommentsPage,
+                    replyingTo = uiState.wallCommentReplyParent,
+                    onCancelReply = { viewModel.setWallCommentReplyParent(null) },
+                    onReplyToComment = viewModel::setWallCommentReplyParent,
+                    onProfileClick = viewModel::openProfile
                 )
             }
         }
