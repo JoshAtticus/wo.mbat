@@ -11,9 +11,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.firstOrNull
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
@@ -31,6 +34,18 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        val initialSession = runBlocking {
+            repository.sessionFlow.firstOrNull()
+        }
+        val initialSessions = runBlocking {
+            repository.sessionsFlow.firstOrNull()
+        } ?: emptyList()
+
+        _uiState.value = _uiState.value.copy(
+            session = initialSession,
+            savedAccounts = initialSessions
+        )
+
         observeSessionAndRefresh()
         observeBlockedUsers()
         observeSessions()
@@ -1077,9 +1092,17 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
                 }
                 .collectLatest { session ->
+                    if (session == null) {
+                        delay(300)
+                    }
+                    val oldSession = _uiState.value.session
                     _uiState.value = _uiState.value.copy(session = session)
+                    val sessionChanged = oldSession?.username != session?.username
+                    if (sessionChanged) {
+                        _uiState.value = _uiState.value.copy(feed = emptyList())
+                    }
                     coroutineScope {
-                        launch { loadFeedForCurrentSession(session) }
+                        launch { loadFeedForCurrentSession(session, forceClear = sessionChanged) }
                         launch { loadNotifications(session) }
                         launch { loadAccountProfile(session) }
                     }
@@ -1139,7 +1162,10 @@ class HomeViewModel(
         }
     }
 
-    private suspend fun loadFeedForCurrentSession(session: AuthSession?) {
+    private suspend fun loadFeedForCurrentSession(session: AuthSession?, forceClear: Boolean = false) {
+        if (forceClear) {
+            _uiState.value = _uiState.value.copy(feed = emptyList())
+        }
         _uiState.value = _uiState.value.copy(feedLoading = true, errorMessage = null)
         runCatching {
             val response = repository.loadFeed(session, 1)
@@ -1417,6 +1443,22 @@ class HomeViewModel(
     fun unblockUser(username: String) {
         viewModelScope.launch {
             repository.unblockUser(username)
+        }
+    }
+
+    private var lastBackgroundTime = 0L
+
+    fun onAppBackgrounded() {
+        lastBackgroundTime = System.currentTimeMillis()
+    }
+
+    fun onAppResumed(onRefreshTriggered: () -> Unit = {}) {
+        val currentTime = System.currentTimeMillis()
+        // Auto refresh if we've been in the background for more than 5 minutes
+        if (lastBackgroundTime > 0 && currentTime - lastBackgroundTime > 5 * 60 * 1000) {
+            refreshFeed()
+            loadExploreTrending()
+            onRefreshTriggered()
         }
     }
 

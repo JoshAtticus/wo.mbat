@@ -70,16 +70,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
     var confirmAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    var lastBackgroundTime by remember { mutableLongStateOf(0L) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                lastBackgroundTime = System.currentTimeMillis()
+                viewModel.onAppBackgrounded()
             } else if (event == Lifecycle.Event.ON_RESUME) {
-                if (lastBackgroundTime > 0 && System.currentTimeMillis() - lastBackgroundTime > 15 * 60 * 1000) {
-                    viewModel.refreshFeed()
-                    viewModel.loadExploreTrending()
+                viewModel.onAppResumed {
                     coroutineScope.launch {
                         feedListState.animateScrollToItem(0)
                         exploreListState.animateScrollToItem(0)
