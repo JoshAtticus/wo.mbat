@@ -147,7 +147,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
+        if (!uiState.isOnline) {
+            OfflineScreen(onRetry = { viewModel.refreshFeedAndExplore() })
+        } else {
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -550,6 +553,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onWearFeedTypeChange = viewModel::setWearFeedType,
             onUnblockUser = viewModel::unblockUser
         )
+    }
     }
     }
 }

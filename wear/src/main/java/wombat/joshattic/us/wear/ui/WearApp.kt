@@ -21,6 +21,7 @@ import wombat.joshattic.us.wear.ui.screens.ComposeScreen
 import wombat.joshattic.us.wear.ui.screens.FeedScreen
 import wombat.joshattic.us.wear.ui.screens.NotificationsScreen
 import wombat.joshattic.us.wear.ui.screens.PostDetailScreen
+import wombat.joshattic.us.wear.ui.screens.WearOfflineScreen
 import wombat.joshattic.us.wear.data.model.Post
 
 object WearRoutes {
@@ -35,7 +36,9 @@ fun WearApp(viewModel: WearViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val navController = rememberSwipeDismissableNavController()
 
-    if (!uiState.isSessionLoaded) {
+    if (!uiState.isOnline) {
+        WearOfflineScreen(onRetry = { viewModel.loadFeed(refresh = true) })
+    } else if (!uiState.isSessionLoaded) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }

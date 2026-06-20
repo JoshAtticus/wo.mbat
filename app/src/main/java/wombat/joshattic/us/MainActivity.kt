@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
         )
         enableEdgeToEdge()
         setContent {
-            val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository))
+            val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository, applicationContext))
             val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
 
             // Push auth session to the watch based on settings whenever it changes

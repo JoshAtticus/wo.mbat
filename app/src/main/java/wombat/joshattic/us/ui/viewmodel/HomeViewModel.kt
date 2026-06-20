@@ -1,8 +1,10 @@
 package wombat.joshattic.us.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import wombat.joshattic.us.ui.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +30,8 @@ import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.state.HomeUiState
 
 class HomeViewModel(
-    private val repository: WombatRepository
+    private val repository: WombatRepository,
+    private val connectivityObserver: NetworkConnectivityObserver
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -51,6 +54,18 @@ class HomeViewModel(
         observeSessions()
         observeUnreadSocketCount()
         observeSettings()
+        observeConnectivity()
+    }
+
+    private fun observeConnectivity() {
+        viewModelScope.launch {
+            connectivityObserver.isConnected.collect { isConnected ->
+                _uiState.value = _uiState.value.copy(isOnline = isConnected)
+                if (isConnected) {
+                    refreshFeedAndExplore()
+                }
+            }
+        }
     }
 
     private fun observeSessions() {
@@ -1466,11 +1481,11 @@ class HomeViewModel(
         private const val DEFAULT_GUEST_USER = "jeffalo"
         const val MAX_CHAR_COUNT = 1500
 
-        fun factory(repository: WombatRepository): ViewModelProvider.Factory {
+        fun factory(repository: WombatRepository, context: Context): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return HomeViewModel(repository) as T
+                    return HomeViewModel(repository, NetworkConnectivityObserver(context)) as T
                 }
             }
         }

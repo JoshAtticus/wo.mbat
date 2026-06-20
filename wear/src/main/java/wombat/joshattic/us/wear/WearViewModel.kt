@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import wombat.joshattic.us.wear.ui.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +40,8 @@ data class WearUiState(
     val composeQuotePostId: String? = null,
     val showImages: Boolean = false,
     val showPfp: Boolean = true,
-    val feedType: String = "Home"
+    val feedType: String = "Home",
+    val isOnline: Boolean = true
 )
 
 class WearViewModel(
@@ -50,6 +52,7 @@ class WearViewModel(
     private val _uiState = MutableStateFlow(WearUiState())
     val uiState: StateFlow<WearUiState> = _uiState.asStateFlow()
     private val settingsPreferences = wombat.joshattic.us.wear.data.WearSettingsPreferences(context)
+    private val connectivityObserver = NetworkConnectivityObserver(context)
 
     init {
         // Query existing data on startup in case it was pushed before the app was running
@@ -94,6 +97,16 @@ class WearViewModel(
                 val prevFeedType = _uiState.value.feedType
                 _uiState.update { it.copy(feedType = value) }
                 if (prevFeedType != value) {
+                    loadFeed(refresh = true)
+                }
+            }
+        }
+
+        // Observe connectivity changes
+        viewModelScope.launch {
+            connectivityObserver.isConnected.collect { isConnected ->
+                _uiState.update { state -> state.copy(isOnline = isConnected) }
+                if (isConnected) {
                     loadFeed(refresh = true)
                 }
             }

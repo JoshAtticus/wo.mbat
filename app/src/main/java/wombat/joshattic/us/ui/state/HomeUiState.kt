@@ -99,7 +99,8 @@ data class HomeUiState(
     val wearAccount: String = "Last used on phone",
     val wearShowImages: Boolean = false,
     val wearShowProfilePictures: Boolean = true,
-    val wearFeedType: String = "Home"
+    val wearFeedType: String = "Home",
+    val isOnline: Boolean = true
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size
