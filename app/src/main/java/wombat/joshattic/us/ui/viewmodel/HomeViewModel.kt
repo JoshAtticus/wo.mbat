@@ -429,12 +429,12 @@ class HomeViewModel(
         clearInAppNotification()
 
         when (notification.type.lowercase()) {
-            "comment" -> {
+            "comment", "comment_reply", "comment_mention" -> {
                 notification.data.post?.let { post ->
                     openPost(post, scrollToCommentId = notification.data.comment?.id)
                 }
             }
-            "post_mention", "repost" -> {
+            "post_mention", "mention", "repost" -> {
                 notification.data.post?.let { post ->
                     openPost(post)
                 }

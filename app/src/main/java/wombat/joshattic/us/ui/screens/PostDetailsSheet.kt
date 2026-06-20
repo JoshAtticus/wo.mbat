@@ -90,10 +90,24 @@ fun PostDetailsSheet(
         currentOnExpand()
     }
 
+    LaunchedEffect(scrollToCommentId) {
+        if (scrollToCommentId != null) {
+            sheetState.expand()
+        }
+    }
+
     LaunchedEffect(scrollToCommentId, loading, comments) {
         if (scrollToCommentId != null && !loading && comments.isNotEmpty()) {
-            val index = comments.indexOfFirst { it.id == scrollToCommentId }
+            fun hasCommentId(c: Comment, id: String): Boolean {
+                if (c.id == id) return true
+                c.replies?.forEach { r ->
+                    if (hasCommentId(r, id)) return true
+                }
+                return false
+            }
+            val index = comments.indexOfFirst { hasCommentId(it, scrollToCommentId) }
             if (index != -1) {
+                sheetState.expand()
                 listState.animateScrollToItem(index + 1) // +1 for post header
                 onScrollToCommentComplete()
             }
