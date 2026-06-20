@@ -79,7 +79,8 @@ fun PostDetailsSheet(
     onRepostClick: (Post) -> Unit = {},
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
-    onDeletePost: ((Post) -> Unit)? = null
+    onDeletePost: ((Post) -> Unit)? = null,
+    onEditPost: ((Post) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val listState = rememberLazyListState()
@@ -154,7 +155,8 @@ fun PostDetailsSheet(
                         onRepostClick = onRepostClick,
                         onQuoteClick = onQuoteClick,
                         currentUsername = currentUsername,
-                        onDeletePost = onDeletePost
+                        onDeletePost = onDeletePost,
+                        onEditPost = onEditPost
                     )
                 }
 

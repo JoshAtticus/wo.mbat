@@ -47,6 +47,8 @@ data class HomeUiState(
     val showComposer: Boolean = false,
     val composerDrafts: List<String> = emptyList(),
     val composeRepostId: String? = null,
+    val composeEditPostId: String? = null,
+    val composeOriginalContent: String? = null,
     val commentReplyParent: Comment? = null,
     val scrollToCommentId: String? = null,
     val fullScreenImages: List<String>? = null,

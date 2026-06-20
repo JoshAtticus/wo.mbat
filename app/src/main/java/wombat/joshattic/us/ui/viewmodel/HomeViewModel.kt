@@ -154,7 +154,50 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(
             showComposer = nextVisible,
             selectedPost = if (nextVisible) null else _uiState.value.selectedPost,
-            composeRepostId = if (!nextVisible) null else _uiState.value.composeRepostId
+            composeRepostId = if (!nextVisible) null else _uiState.value.composeRepostId,
+            composeEditPostId = if (!nextVisible) null else _uiState.value.composeEditPostId,
+            composeOriginalContent = if (!nextVisible) null else _uiState.value.composeOriginalContent
+        )
+    }
+
+    fun openEditComposer(post: Post) {
+        _uiState.value = _uiState.value.copy(
+            showComposer = true,
+            composeDraft = post.content,
+            composeOriginalContent = post.content,
+            composeEditPostId = post.id,
+            composeRepostId = null,
+            selectedPost = null
+        )
+    }
+
+    fun clearEditPostId() {
+        _uiState.value = _uiState.value.copy(
+            composeEditPostId = null,
+            composeOriginalContent = null
+        )
+    }
+
+    private fun updatePostInState(updatedPost: Post, fallbackId: String? = null, fallbackContent: String? = null) {
+        val updatedId = updatedPost.id ?: fallbackId ?: return
+        val updatedContent = updatedPost.content ?: fallbackContent ?: ""
+        val current = _uiState.value
+        fun transform(p: Post): Post {
+            var pUpdated = if (p.id == updatedId) {
+                p.copy(content = updatedContent)
+            } else p
+            val repost = pUpdated.repost
+            if (repost != null && repost.id == updatedId) {
+                pUpdated = pUpdated.copy(repost = repost.copy(content = updatedContent))
+            }
+            return pUpdated
+        }
+        _uiState.value = current.copy(
+            feed = current.feed.map(::transform),
+            exploreTrendingPosts = current.exploreTrendingPosts.map(::transform),
+            accountPosts = current.accountPosts.map(::transform),
+            viewingProfilePosts = current.viewingProfilePosts.map(::transform),
+            selectedPost = if (current.selectedPost?.id == updatedId) transform(current.selectedPost) else current.selectedPost
         )
     }
 
@@ -167,20 +210,36 @@ class HomeViewModel(
             val session = _uiState.value.session ?: return@launch
             val draft = contentOverride?.trim() ?: _uiState.value.composeDraft.trim()
             val repostId = _uiState.value.composeRepostId
-            if (draft.isBlank() && repostId == null) {
+            val editPostId = _uiState.value.composeEditPostId
+            if (draft.isBlank() && repostId == null && editPostId == null) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Write something before posting.")
                 return@launch
             }
 
-            runCatching { repository.createPost(session, draft, repostId) }
-                .onSuccess {
-                    _uiState.value = _uiState.value.copy(showComposer = false, composeDraft = "", composeRepostId = null)
-                    refreshFeed()
-                    refreshAccount()
-                }
-                .onFailure { throwable ->
-                    _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
-                }
+            if (editPostId != null) {
+                runCatching { repository.editPost(session, editPostId, draft) }
+                    .onSuccess { updatedPost ->
+                        _uiState.value = _uiState.value.copy(
+                            showComposer = false,
+                            composeDraft = "",
+                            composeEditPostId = null
+                        )
+                        updatePostInState(updatedPost, fallbackId = editPostId, fallbackContent = draft)
+                    }
+                    .onFailure { throwable ->
+                        _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
+                    }
+            } else {
+                runCatching { repository.createPost(session, draft, repostId) }
+                    .onSuccess {
+                        _uiState.value = _uiState.value.copy(showComposer = false, composeDraft = "", composeRepostId = null)
+                        refreshFeed()
+                        refreshAccount()
+                    }
+                    .onFailure { throwable ->
+                        _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
+                    }
+            }
         }
     }
 
@@ -559,8 +618,10 @@ class HomeViewModel(
     }
 
     fun saveCurrentDraft() {
+        if (_uiState.value.composeEditPostId != null) return
         val draft = _uiState.value.composeDraft.trim()
         if (draft.isBlank()) return
+
         val currentDrafts = _uiState.value.composerDrafts
         if (!currentDrafts.contains(draft)) {
             _uiState.value = _uiState.value.copy(

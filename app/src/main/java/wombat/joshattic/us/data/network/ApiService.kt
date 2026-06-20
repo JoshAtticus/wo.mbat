@@ -7,6 +7,8 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.PUT
+import wombat.joshattic.us.data.model.EditPostRequest
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
@@ -60,6 +62,13 @@ interface ApiService {
 
     @DELETE("posts/{id}")
     suspend fun deletePost(@Header("Authorization") token: String, @Path("id") postId: String)
+
+    @PUT("posts/{id}")
+    suspend fun editPost(
+        @Header("Authorization") token: String,
+        @Path("id") postId: String,
+        @Body request: EditPostRequest
+    ): Post
 
     @POST("posts/{post_id}/report")
     suspend fun reportPost(

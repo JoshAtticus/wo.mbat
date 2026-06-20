@@ -103,7 +103,8 @@ fun ComposerSheet(
     onRestoreDraft: (String) -> Unit,
     onDeleteDraft: (String) -> Unit,
     currentUsername: String? = null,
-    onDeletePost: ((Post) -> Unit)? = null
+    onDeletePost: ((Post) -> Unit)? = null,
+    isEditing: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showAddImage by remember { mutableStateOf(false) }
@@ -138,7 +139,8 @@ fun ComposerSheet(
     }
 
     fun updateDraft(text: Spanned, images: List<String>) {
-        val textHtml = HtmlCompat.toHtml(text, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+        val cleanText = cleanSpannedForHtml(text)
+        val textHtml = HtmlCompat.toHtml(cleanText, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
         val imgTags = images.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
         val combinedHtml = if (imgTags.isBlank()) textHtml else "$textHtml\n$imgTags"
         
@@ -282,9 +284,11 @@ fun ComposerSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("New post", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = { showDraftsDialog = true }) {
-                        Text("Drafts (${drafts.size})")
+                    Text(if (isEditing) "Edit post" else "New post", style = MaterialTheme.typography.titleLarge)
+                    if (!isEditing) {
+                        TextButton(onClick = { showDraftsDialog = true }) {
+                            Text("Drafts (${drafts.size})")
+                        }
                     }
                 }
 
@@ -441,7 +445,8 @@ fun ComposerSheet(
                                         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                                             val currentText = this@apply.text ?: return
                                             charCount = currentText.length
-                                            val textHtml = HtmlCompat.toHtml(currentText as Spanned, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+                                            val cleanText = cleanSpannedForHtml(currentText as Spanned)
+                                            val textHtml = HtmlCompat.toHtml(cleanText, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
                                             val imgTags = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
                                             val combinedHtml = if (imgTags.isBlank()) textHtml else "$textHtml\n$imgTags"
                                             if (combinedHtml != lastSyncedDraft) {
@@ -471,10 +476,19 @@ fun ComposerSheet(
                                     val textHtml = stripImages(draft)
                                     val spanned = HtmlCompat.fromHtml(textHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
                                     val cleanSpanned = trimTrailingNewlines(spanned)
+                                    cleanSpanned.getSpans(0, cleanSpanned.length, android.text.style.URLSpan::class.java).forEach { urlSpan ->
+                                        val s = cleanSpanned.getSpanStart(urlSpan)
+                                        val e = cleanSpanned.getSpanEnd(urlSpan)
+                                        cleanSpanned.getSpans(s, e, UnderlineSpan::class.java).forEach { uSpan ->
+                                            cleanSpanned.removeSpan(uSpan)
+                                        }
+                                    }
                                     replaceQuoteSpans(cleanSpanned)
                                     
-                                    editText.setText(cleanSpanned)
-                                    editText.setSelection(cleanSpanned.length)
+                                    if (editText.text.toString() != cleanSpanned.toString()) {
+                                        editText.setText(cleanSpanned)
+                                        editText.setSelection(cleanSpanned.length)
+                                    }
                                     charCount = cleanSpanned.length
                                     updateFormattingStates(editText)
                                 }
@@ -548,7 +562,7 @@ fun ComposerSheet(
                 ) {
                     Icon(Icons.Filled.PostAdd, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Post")
+                    Text(if (isEditing) "Save" else "Post")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -737,4 +751,28 @@ fun replaceQuoteSpans(spannable: Spannable) {
             )
         }
     }
+}
+
+fun cleanSpannedForHtml(spanned: Spanned): Spanned {
+    val builder = android.text.SpannableStringBuilder(spanned.toString())
+    spanned.getSpans(0, spanned.length, Any::class.java).forEach { span ->
+        val start = spanned.getSpanStart(span)
+        val end = spanned.getSpanEnd(span)
+        val flags = spanned.getSpanFlags(span)
+        if ((flags and Spanned.SPAN_COMPOSING) != 0) {
+            return@forEach
+        }
+        val isSupportedSpan = when (span) {
+            is StyleSpan -> true
+            is UnderlineSpan -> true
+            is StrikethroughSpan -> true
+            is android.text.style.QuoteSpan -> true
+            is android.text.style.URLSpan -> true
+            else -> false
+        }
+        if (isSupportedSpan) {
+            builder.setSpan(span, start, end, flags)
+        }
+    }
+    return builder
 }

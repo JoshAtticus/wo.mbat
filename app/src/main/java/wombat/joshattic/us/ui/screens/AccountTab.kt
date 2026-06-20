@@ -99,7 +99,8 @@ fun AccountTab(
     currentUsername: String? = null,
     onDeletePost: ((Post) -> Unit)? = null,
     onShowFollowers: (String) -> Unit = {},
-    onShowFollowing: (String) -> Unit = {}
+    onShowFollowing: (String) -> Unit = {},
+    onEditPost: ((Post) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -299,7 +300,8 @@ fun AccountTab(
                             onImageClick = onImageClick,
                             onRepostClick = onRepostClick,
                             onQuoteClick = onQuoteClick,
-                            onDeletePost = onDeletePost
+                            onDeletePost = onDeletePost,
+                            onEditPost = onEditPost
                         )
                     }
                 }

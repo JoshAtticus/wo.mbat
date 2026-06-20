@@ -91,6 +91,8 @@ data class Permissions(val admin: Boolean, val banned: Boolean)
 
 data class CreatePostRequest(val post: String, val repost: String? = null)
 
+data class EditPostRequest(val post: String)
+
 data class MarkReadRequest(val messages: List<String>)
 
 data class CreateCommentRequest(val content: String, val parent: String? = null)

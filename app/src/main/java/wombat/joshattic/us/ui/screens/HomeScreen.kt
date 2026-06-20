@@ -222,7 +222,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                         onDeletePost = { viewModel.deletePost(it.id) },
                         onShowFollowers = viewModel::showFollowers,
-                        onShowFollowing = viewModel::showFollowing
+                        onShowFollowing = viewModel::showFollowing,
+                        onEditPost = viewModel::openEditComposer
                     )
                 } else {
                     val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
@@ -274,7 +275,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 },
                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                 currentUsername = uiState.session?.username,
-                                onDeletePost = { viewModel.deletePost(it.id) }
+                                onDeletePost = { viewModel.deletePost(it.id) },
+                                onEditPost = viewModel::openEditComposer
                             )
                             BottomTab.Explore -> ExploreTab(
                                 trendingPosts = uiState.exploreTrendingPosts,
@@ -304,7 +306,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 },
                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                 currentUsername = uiState.session?.username,
-                                onDeletePost = { viewModel.deletePost(it.id) }
+                                onDeletePost = { viewModel.deletePost(it.id) },
+                                onEditPost = viewModel::openEditComposer
                             )
                             BottomTab.Notifications -> NotificationsTab(
                                 session = uiState.session,
@@ -351,7 +354,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 currentUsername = uiState.session?.username,
                                 onDeletePost = { viewModel.deletePost(it.id) },
                                 onShowFollowers = viewModel::showFollowers,
-                                onShowFollowing = viewModel::showFollowing
+                                onShowFollowing = viewModel::showFollowing,
+                                onEditPost = viewModel::openEditComposer
                             )
                         }
                     }
@@ -366,13 +370,15 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onDismiss = {
                         viewModel.saveCurrentDraft()
                         viewModel.setComposeDraft("")
+                        viewModel.clearEditPostId()
                         viewModel.toggleComposer()
                     },
                     drafts = uiState.composerDrafts,
                     onRestoreDraft = viewModel::restoreDraft,
                     onDeleteDraft = viewModel::deleteDraft,
                     currentUsername = uiState.session?.username,
-                    onDeletePost = { viewModel.deletePost(it.id) }
+                    onDeletePost = { viewModel.deletePost(it.id) },
+                    isEditing = uiState.composeEditPostId != null
                 )
             }
 
@@ -409,7 +415,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onRepostClick = { viewModel.submitRepost(it.id) },
                     onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                     currentUsername = uiState.session?.username,
-                    onDeletePost = { viewModel.deletePost(it.id) }
+                    onDeletePost = { viewModel.deletePost(it.id) },
+                    onEditPost = viewModel::openEditComposer
                 )
             }
         }

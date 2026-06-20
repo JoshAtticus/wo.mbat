@@ -114,7 +114,8 @@ fun ProfileScreen(
     onQuoteClick: (Post) -> Unit = {},
     onDeletePost: ((Post) -> Unit)? = null,
     onShowFollowers: (String) -> Unit = {},
-    onShowFollowing: (String) -> Unit = {}
+    onShowFollowing: (String) -> Unit = {},
+    onEditPost: ((Post) -> Unit)? = null
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -357,7 +358,8 @@ fun ProfileScreen(
                         onRepostClick = onRepostClick,
                         onQuoteClick = onQuoteClick,
                         onDeletePost = onDeletePost,
-                        currentUsername = currentUsername
+                        currentUsername = currentUsername,
+                        onEditPost = onEditPost
                     )
                 }
             } else {

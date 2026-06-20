@@ -401,9 +401,16 @@ fun PostActionsMenu(
     onDismiss: () -> Unit,
     onBlock: (() -> Unit)? = null,
     onReport: (() -> Unit)? = null,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (onEdit != null) {
+            DropdownMenuItem(
+                text = { Text("Edit Post") },
+                onClick = onEdit
+            )
+        }
         if (onBlock != null) {
             DropdownMenuItem(
                 text = { Text("Block") },
@@ -442,7 +449,8 @@ fun PostCard(
     onReportPost: ((Post) -> Unit)? = null,
     onRepostClick: ((Post) -> Unit)? = null,
     onQuoteClick: ((Post) -> Unit)? = null,
-    onDeletePost: ((Post) -> Unit)? = null
+    onDeletePost: ((Post) -> Unit)? = null,
+    onEditPost: ((Post) -> Unit)? = null
 ) {
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
@@ -491,7 +499,8 @@ fun PostCard(
                 onReportPost = onReportPost,
                 onRepostClick = onRepostClick,
                 onQuoteClick = onQuoteClick,
-                onDeletePost = onDeletePost
+                onDeletePost = onDeletePost,
+                onEditPost = onEditPost
             )
         }
         return
@@ -545,7 +554,7 @@ fun PostCard(
                 }
                 
                 val isOwnPost = currentUsername == post.poster.name
-                if (onBlockUser != null || onReportPost != null || onDeletePost != null) {
+                if (onBlockUser != null || onReportPost != null || onDeletePost != null || onEditPost != null) {
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "Post options")
@@ -555,7 +564,8 @@ fun PostCard(
                             onDismiss = { menuExpanded = false },
                             onBlock = if (!isOwnPost) onBlockUser?.let { { menuExpanded = false; it(post.poster.name) } } else null,
                             onReport = if (!isOwnPost) onReportPost?.let { { menuExpanded = false; it(post) } } else null,
-                            onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null
+                            onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null,
+                            onEdit = if (isOwnPost) onEditPost?.let { { menuExpanded = false; it(post) } } else null
                         )
                     }
                 }
@@ -847,7 +857,7 @@ fun HtmlText(
                             onMentionClick.invoke(username)
                         }
                         override fun updateDrawState(ds: TextPaint) {
-                            ds.isUnderlineText = true
+                            ds.isUnderlineText = false
                             ds.isFakeBoldText = true
                             ds.color = linkColor
                         }
@@ -857,15 +867,12 @@ fun HtmlText(
             }
         }
 
-        // Ensure all links (URLSpans) are slightly bold + underlined
+        // Ensure all links (URLSpans) are slightly bold
         spannable.getSpans(0, spannable.length, URLSpan::class.java).forEach { span ->
             val s = spannable.getSpanStart(span)
             val e = spannable.getSpanEnd(span)
             if (spannable.getSpans(s, e, StyleSpan::class.java).none { it.style == Typeface.BOLD }) {
                 spannable.setSpan(StyleSpan(Typeface.BOLD), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
-            if (spannable.getSpans(s, e, UnderlineSpan::class.java).isEmpty()) {
-                spannable.setSpan(UnderlineSpan(), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
 

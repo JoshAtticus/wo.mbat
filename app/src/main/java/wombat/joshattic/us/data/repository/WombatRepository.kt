@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import wombat.joshattic.us.data.model.EditPostRequest
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
@@ -102,6 +103,14 @@ class WombatRepository(
         return apiService.makePost(
             token = session.token,
             request = CreatePostRequest(post = htmlContent, repost = repostId)
+        )
+    }
+
+    suspend fun editPost(session: AuthSession, postId: String, htmlContent: String): Post {
+        return apiService.editPost(
+            token = session.token,
+            postId = postId,
+            request = EditPostRequest(post = htmlContent)
         )
     }
 

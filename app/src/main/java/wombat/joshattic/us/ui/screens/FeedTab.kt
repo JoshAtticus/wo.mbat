@@ -36,7 +36,8 @@ fun FeedTab(
     onRepostClick: (Post) -> Unit = {},
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
-    onDeletePost: ((Post) -> Unit)? = null
+    onDeletePost: ((Post) -> Unit)? = null,
+    onEditPost: ((Post) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -81,7 +82,8 @@ fun FeedTab(
                     onReportPost = onReportPost,
                     onRepostClick = onRepostClick,
                     onQuoteClick = onQuoteClick,
-                    onDeletePost = onDeletePost
+                    onDeletePost = onDeletePost,
+                    onEditPost = onEditPost
                 )
             }
         }
