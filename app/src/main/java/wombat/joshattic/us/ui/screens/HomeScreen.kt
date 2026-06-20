@@ -4,7 +4,11 @@ package wombat.joshattic.us.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -224,7 +228,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onShowFollowers = viewModel::showFollowers,
                         onShowFollowing = viewModel::showFollowing,
                         onEditPost = viewModel::openEditComposer,
-                        onWallClick = viewModel::openWall
+                        onWallClick = viewModel::openWall,
+                        showImages = uiState.showImagesInFeed,
+                        openLinksInApp = uiState.openLinksInApp,
+                        onPostClickById = viewModel::openPostById
                     )
                 } else {
                     val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
@@ -278,7 +285,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 scrollToTop = uiState.scrollToTop,
                                 onScrollToTopComplete = viewModel::clearScrollToTop,
                                 newPostsUsernames = uiState.newPostsUsernames,
-                                onClearNewPosts = viewModel::clearNewPostsUsernames
+                                onClearNewPosts = viewModel::clearNewPostsUsernames,
+                                showImages = uiState.showImagesInFeed,
+                                showNewPosts = uiState.showNewPostsPopup,
+                                openLinksInApp = uiState.openLinksInApp,
+                                onPostClickById = viewModel::openPostById
                             )
                             BottomTab.Explore -> ExploreTab(
                                 trendingPosts = uiState.exploreTrendingPosts,
@@ -309,7 +320,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                 currentUsername = uiState.session?.username,
                                 onDeletePost = { viewModel.deletePost(it.id) },
-                                onEditPost = viewModel::openEditComposer
+                                onEditPost = viewModel::openEditComposer,
+                                showImages = uiState.showImagesInFeed,
+                                openLinksInApp = uiState.openLinksInApp,
+                                onPostClickById = viewModel::openPostById
                             )
                             BottomTab.Notifications -> NotificationsTab(
                                 session = uiState.session,
@@ -318,7 +332,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 loading = uiState.notificationsLoading,
                                 onRefresh = viewModel::refreshNotifications,
                                 onMarkAllRead = viewModel::markAllNotificationsRead,
-                                onNotificationClick = viewModel::handleNotificationClick
+                                onNotificationClick = viewModel::handleNotificationClick,
+                                openLinksInApp = uiState.openLinksInApp,
+                                onMentionClick = { viewModel.openProfile(it) },
+                                onPostClickById = viewModel::openPostById
                             )
                             BottomTab.Account -> AccountTab(
                                 session = uiState.session,
@@ -357,8 +374,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onDeletePost = { viewModel.deletePost(it.id) },
                                 onShowFollowers = viewModel::showFollowers,
                                 onShowFollowing = viewModel::showFollowing,
-                                onEditPost = viewModel::openEditComposer,
-                                onWallClick = viewModel::openWall
+                                onWallClick = viewModel::openWall,
+                                onSettingsClick = viewModel::openSettings,
+                                showImages = uiState.showImagesInFeed,
+                                openLinksInApp = uiState.openLinksInApp,
+                                onPostClickById = viewModel::openPostById
                             )
                         }
                     }
@@ -419,7 +439,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                     currentUsername = uiState.session?.username,
                     onDeletePost = { viewModel.deletePost(it.id) },
-                    onEditPost = viewModel::openEditComposer
+                    onEditPost = viewModel::openEditComposer,
+                    showImages = uiState.showImagesInFeed,
+                    openLinksInApp = uiState.openLinksInApp,
+                    onPostClickById = viewModel::openPostById
                 )
             }
 
@@ -437,9 +460,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     replyingTo = uiState.wallCommentReplyParent,
                     onCancelReply = { viewModel.setWallCommentReplyParent(null) },
                     onReplyToComment = viewModel::setWallCommentReplyParent,
-                    onProfileClick = viewModel::openProfile
+                    onProfileClick = viewModel::openProfile,
+                    openLinksInApp = uiState.openLinksInApp,
+                    onPostClickById = viewModel::openPostById
                 )
             }
+
+            
         }
 
     uiState.fullScreenImages?.let { images ->
@@ -463,7 +490,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
     // In-App Notification Overlay
     AnimatedVisibility(
-        visible = uiState.inAppNotification != null,
+        visible = uiState.inAppNotifications && uiState.inAppNotification != null,
         enter = slideInVertically(initialOffsetY = { -it }),
         exit = slideOutVertically(targetOffsetY = { -it }),
         modifier = Modifier
@@ -476,6 +503,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
             NotificationCard(
                 notification = notif,
                 isOverlay = true,
+                openLinksInApp = uiState.openLinksInApp,
+                onMentionClick = { viewModel.openProfile(it) },
+                onPostClick = viewModel::openPostById,
                 onClick = { viewModel.handleNotificationClick(notif) }
             )
             
@@ -498,6 +528,30 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 viewModel.openProfile(user.name)
             },
             onLoadNextPage = viewModel::loadNextUserListPage
+        )
+    }
+
+    AnimatedVisibility(
+        visible = uiState.showSettings,
+        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+        modifier = Modifier.zIndex(10f)
+    ) {
+        SettingsScreen(
+            uiState = uiState,
+            onClose = viewModel::closeSettings,
+            onCategorySelect = viewModel::selectSettingsCategory,
+            onShowImagesInFeedChange = viewModel::setShowImagesInFeed,
+            onShowNewPostsPopupChange = viewModel::setShowNewPostsPopup,
+            onInAppNotificationsChange = viewModel::setInAppNotifications,
+            onMarkReadWhenOpenedChange = viewModel::setMarkReadWhenOpened,
+            onMarkReadWhenTabOpenedChange = viewModel::setMarkReadWhenTabOpened,
+            onOpenLinksInAppChange = viewModel::setOpenLinksInApp,
+            onWearAccountChange = viewModel::setWearAccount,
+            onWearShowImagesChange = viewModel::setWearShowImages,
+            onWearShowProfilePicturesChange = viewModel::setWearShowProfilePictures,
+            onWearFeedTypeChange = viewModel::setWearFeedType,
+            onUnblockUser = viewModel::unblockUser
         )
     }
     }

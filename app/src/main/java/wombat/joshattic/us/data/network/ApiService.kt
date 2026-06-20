@@ -52,6 +52,12 @@ interface ApiService {
         @Header("authorization") token: String? = null
     ): FeedResponse
 
+    @GET("posts/{id}")
+    suspend fun getPost(
+        @Path("id") postId: String,
+        @Header("authorization") token: String? = null
+    ): Post
+
     @POST("posts")
     suspend fun makePost(
         @Header("authorization") token: String,

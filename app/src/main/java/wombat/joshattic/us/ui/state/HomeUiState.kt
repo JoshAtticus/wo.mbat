@@ -86,7 +86,20 @@ data class HomeUiState(
     val wallCommentsPage: Int = 1,
     val wallCommentsLast: Boolean = false,
     val wallCommentDraft: String = "",
-    val wallCommentReplyParent: Comment? = null
+    val wallCommentReplyParent: Comment? = null,
+    
+    val showSettings: Boolean = false,
+    val settingsCategory: SettingsCategory? = null,
+    val showImagesInFeed: Boolean = true,
+    val showNewPostsPopup: Boolean = true,
+    val inAppNotifications: Boolean = true,
+    val markReadWhenOpened: Boolean = true,
+    val markReadWhenTabOpened: Boolean = false,
+    val openLinksInApp: Boolean = true,
+    val wearAccount: String = "Last used on phone",
+    val wearShowImages: Boolean = false,
+    val wearShowProfilePictures: Boolean = true,
+    val wearFeedType: String = "Home"
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size
@@ -97,4 +110,8 @@ enum class BottomTab {
     Explore,
     Notifications,
     Account
+}
+
+enum class SettingsCategory {
+    FEED, NOTIFICATIONS, LINKS, BLOCKED_USERS, WEAR_OS
 }

@@ -36,7 +36,10 @@ data class WearUiState(
     val commentsLoading: Boolean = false,
     val errorMessage: String? = null,
     val postSuccess: Boolean = false,
-    val composeQuotePostId: String? = null
+    val composeQuotePostId: String? = null,
+    val showImages: Boolean = false,
+    val showPfp: Boolean = true,
+    val feedType: String = "Home"
 )
 
 class WearViewModel(
@@ -46,6 +49,7 @@ class WearViewModel(
 
     private val _uiState = MutableStateFlow(WearUiState())
     val uiState: StateFlow<WearUiState> = _uiState.asStateFlow()
+    private val settingsPreferences = wombat.joshattic.us.wear.data.WearSettingsPreferences(context)
 
     init {
         // Query existing data on startup in case it was pushed before the app was running
@@ -73,14 +77,40 @@ class WearViewModel(
                 loadNotifications()
             }
         }
+
+        // Observe settings changes
+        viewModelScope.launch {
+            settingsPreferences.showImages.collect { value ->
+                _uiState.update { it.copy(showImages = value) }
+            }
+        }
+        viewModelScope.launch {
+            settingsPreferences.showPfp.collect { value ->
+                _uiState.update { it.copy(showPfp = value) }
+            }
+        }
+        viewModelScope.launch {
+            settingsPreferences.feedType.collect { value ->
+                val prevFeedType = _uiState.value.feedType
+                _uiState.update { it.copy(feedType = value) }
+                if (prevFeedType != value) {
+                    loadFeed(refresh = true)
+                }
+            }
+        }
     }
 
     fun loadFeed(refresh: Boolean = false) {
         viewModelScope.launch {
+            val isExplore = _uiState.value.feedType == "Explore"
             val page = if (refresh) 1 else _uiState.value.feedPage
             _uiState.update { it.copy(feedLoading = true) }
             runCatching {
-                val posts = repository.loadFeed(_uiState.value.session, page)
+                val posts = if (isExplore) {
+                    repository.loadTrendingFeed(_uiState.value.session)
+                } else {
+                    repository.loadFeed(_uiState.value.session, page)
+                }
                 val session = _uiState.value.session
                 if (session != null) augmentLoveStatuses(posts, session) else posts
             }.onSuccess { posts ->
@@ -89,8 +119,8 @@ class WearViewModel(
                     state.copy(
                         feed = newFeed,
                         feedLoading = false,
-                        feedPage = page + 1,
-                        feedHasMore = posts.isNotEmpty()
+                        feedPage = if (isExplore) 1 else page + 1,
+                        feedHasMore = if (isExplore) false else posts.isNotEmpty()
                     )
                 }
             }.onFailure { e ->

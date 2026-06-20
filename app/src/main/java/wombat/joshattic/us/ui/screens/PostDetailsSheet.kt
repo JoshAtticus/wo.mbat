@@ -80,10 +80,26 @@ fun PostDetailsSheet(
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
     onDeletePost: ((Post) -> Unit)? = null,
-    onEditPost: ((Post) -> Unit)? = null
+    onEditPost: ((Post) -> Unit)? = null,
+    showImages: Boolean = true,
+    openLinksInApp: Boolean = true,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val listState = rememberLazyListState()
+
+    val handleProfileClick = remember(onProfileClick, onDismiss) {
+        { username: String ->
+            onDismiss()
+            onProfileClick(username)
+        }
+    }
+    val handleMentionClick = remember(onMentionClick, onDismiss) {
+        { username: String ->
+            onDismiss()
+            onMentionClick(username)
+        }
+    }
 
     val currentOnExpand by rememberUpdatedState(onExpandComments)
 
@@ -145,8 +161,8 @@ fun PostDetailsSheet(
                         onClick = {},
                         clickable = false,
                         truncated = false,
-                        onMentionClick = onMentionClick,
-                        onProfileClick = onProfileClick,
+                        onMentionClick = handleMentionClick,
+                        onProfileClick = handleProfileClick,
                         onLoveClick = onLoveClick,
                         onPostClick = onPostClick,
                         onImageClick = onImageClick,
@@ -156,7 +172,10 @@ fun PostDetailsSheet(
                         onQuoteClick = onQuoteClick,
                         currentUsername = currentUsername,
                         onDeletePost = onDeletePost,
-                        onEditPost = onEditPost
+                        onEditPost = onEditPost,
+                        showImages = showImages,
+                        openLinksInApp = openLinksInApp,
+                        onPostClickById = onPostClickById
                     )
                 }
 
@@ -184,7 +203,10 @@ fun PostDetailsSheet(
                             comment = comment,
                             isBanned = isBanned,
                             onReply = onReplyToComment,
-                            onProfileClick = onProfileClick
+                            onProfileClick = handleProfileClick,
+                            onMentionClick = handleMentionClick,
+                            onPostClick = onPostClickById,
+                            openLinksInApp = openLinksInApp
                         )
                     }
                 }

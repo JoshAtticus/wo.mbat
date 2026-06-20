@@ -27,11 +27,13 @@ import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.network.ApiService
 import wombat.joshattic.us.data.storage.AuthPreferences
 import wombat.joshattic.us.data.storage.BlockedUsersDatabase
+import wombat.joshattic.us.data.storage.SettingsPreferences
 
 class WombatRepository(
     private val apiService: ApiService,
     private val authPreferences: AuthPreferences,
-    private val blockedUsersDatabase: BlockedUsersDatabase
+    private val blockedUsersDatabase: BlockedUsersDatabase,
+    val settingsPreferences: SettingsPreferences
 ) {
     private val socketManager = wombat.joshattic.us.data.network.WasteofSocketManager()
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
@@ -70,6 +72,10 @@ class WombatRepository(
 
     suspend fun loadUserPosts(session: AuthSession?, username: String, page: Int = 1): FeedResponse {
         return apiService.getUserPosts(username = username, page = page, token = session?.token)
+    }
+
+    suspend fun loadPost(session: AuthSession?, postId: String): Post {
+        return apiService.getPost(postId = postId, token = session?.token)
     }
 
     suspend fun loadComments(session: AuthSession?, postId: String) =

@@ -68,10 +68,25 @@ fun WallDetailsSheet(
     replyingTo: Comment? = null,
     onCancelReply: () -> Unit = {},
     onReplyToComment: (Comment) -> Unit = {},
-    onProfileClick: (String) -> Unit = {}
+    onProfileClick: (String) -> Unit = {},
+    openLinksInApp: Boolean = true,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val listState = rememberLazyListState()
+
+    val handleProfileClick = remember(onProfileClick, onDismiss) {
+        { username: String ->
+            onDismiss()
+            onProfileClick(username)
+        }
+    }
+    val handleMentionClick = remember(onProfileClick, onDismiss) {
+        { username: String ->
+            onDismiss()
+            onProfileClick(username)
+        }
+    }
 
     val currentOnLoadNextPage by rememberUpdatedState(onLoadNextPage)
 
@@ -162,7 +177,10 @@ fun WallDetailsSheet(
                         comment = comment,
                         isBanned = isBanned,
                         onReply = onReplyToComment,
-                        onProfileClick = onProfileClick
+                        onProfileClick = handleProfileClick,
+                        onMentionClick = handleMentionClick,
+                        onPostClick = onPostClickById,
+                        openLinksInApp = openLinksInApp
                     )
                 }
 

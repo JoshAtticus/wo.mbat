@@ -146,6 +146,8 @@ fun FeedScreen(
             items(uiState.feed, key = { it.id }) { post ->
                 WearPostCard(
                     post = post,
+                    showImages = uiState.showImages,
+                    showPfp = uiState.showPfp,
                     onClick = { onPostClick(post) },
                     onLoveClick = { onLoveClick(post) }
                 )
@@ -167,6 +169,8 @@ fun FeedScreen(
 @Composable
 fun WearPostCard(
     post: Post,
+    showImages: Boolean = false,
+    showPfp: Boolean = true,
     onClick: () -> Unit,
     onLoveClick: () -> Unit
 ) {
@@ -197,6 +201,8 @@ fun WearPostCard(
             }
             WearPostCard(
                 post = post.repost!!,
+                showImages = showImages,
+                showPfp = showPfp,
                 onClick = onClick,
                 onLoveClick = onLoveClick
             )
@@ -218,14 +224,16 @@ fun WearPostCard(
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Author row with avatar
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = "https://wasteof-image-proxy.tnix.dev/${post.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
-                        contentDescription = post.poster.name,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    if (showPfp) {
+                        AsyncImage(
+                            model = "https://wasteof-image-proxy.tnix.dev/${post.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
+                            contentDescription = post.poster.name,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
                     Text(
                         text = post.poster.name,
                         style = MaterialTheme.typography.caption1,
@@ -233,7 +241,7 @@ fun WearPostCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 // Post content (HTML stripped to plain text)
                 Text(
@@ -256,12 +264,14 @@ fun WearPostCard(
                     ) {
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                AsyncImage(
-                                    model = "https://wasteof-image-proxy.tnix.dev/${post.repost.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp).clip(CircleShape)
-                                )
-                                Spacer(Modifier.width(4.dp))
+                                if (showPfp) {
+                                    AsyncImage(
+                                        model = "https://wasteof-image-proxy.tnix.dev/${post.repost.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp).clip(CircleShape)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                }
                                 Text(post.repost.poster.name, style = MaterialTheme.typography.caption3, fontWeight = FontWeight.Bold)
                             }
                             Spacer(Modifier.height(2.dp))
@@ -269,12 +279,26 @@ fun WearPostCard(
                         }
                     }
                 } else if (post.content?.contains("<img", ignoreCase = true) == true) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Tap post to view images",
-                        style = MaterialTheme.typography.caption3.copy(fontStyle = FontStyle.Italic),
-                        color = MaterialTheme.colors.primary
-                    )
+                    val imageUrls = androidx.compose.runtime.remember(post.content) { extractImages(post.content) }
+                    if (showImages && imageUrls.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        AsyncImage(
+                            model = imageUrls.first(),
+                            contentDescription = "Post image",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(60.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Tap post to view images",
+                            style = MaterialTheme.typography.caption3.copy(fontStyle = FontStyle.Italic),
+                            color = MaterialTheme.colors.primary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -327,3 +351,11 @@ fun String.stripHtml(): String = replace(Regex("<br\\s*/?>", RegexOption.IGNORE_
     .replace("&gt;", ">")
     .replace("&quot;", "\"")
     .trim()
+
+fun extractImages(html: String): List<String> {
+    val imgRegex = """<img[^>]*src=["']([^"']+)["'][^>]*>""".toRegex(RegexOption.IGNORE_CASE)
+    return imgRegex.findAll(html)
+        .mapNotNull { it.groupValues.getOrNull(1) }
+        .distinct()
+        .toList()
+}

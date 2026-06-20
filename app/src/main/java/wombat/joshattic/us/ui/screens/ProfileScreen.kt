@@ -118,7 +118,10 @@ fun ProfileScreen(
     onShowFollowers: (String) -> Unit = {},
     onShowFollowing: (String) -> Unit = {},
     onEditPost: ((Post) -> Unit)? = null,
-    onWallClick: (String) -> Unit = {}
+    onWallClick: (String) -> Unit = {},
+    showImages: Boolean = true,
+    openLinksInApp: Boolean = true,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -289,8 +292,11 @@ fun ProfileScreen(
                         }
                         Spacer(modifier = Modifier.height(14.dp))
                         HtmlText(
-                            autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")),
-                            maxLines = 4
+                            html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")),
+                            maxLines = 4,
+                            onMentionClick = onMentionClick,
+                            onPostClick = onPostClickById,
+                            openLinksInApp = openLinksInApp
                         )
                         Spacer(modifier = Modifier.height(14.dp))
                         Row(
@@ -387,7 +393,10 @@ fun ProfileScreen(
                         onQuoteClick = onQuoteClick,
                         onDeletePost = onDeletePost,
                         currentUsername = currentUsername,
-                        onEditPost = onEditPost
+                        onEditPost = onEditPost,
+                        showImages = showImages,
+                        openLinksInApp = openLinksInApp,
+                        onPostClickById = onPostClickById
                     )
                 }
             } else {

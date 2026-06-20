@@ -35,6 +35,7 @@ class HomeViewModel(
         observeBlockedUsers()
         observeSessions()
         observeUnreadSocketCount()
+        observeSettings()
     }
 
     private fun observeSessions() {
@@ -101,7 +102,11 @@ class HomeViewModel(
             viewingProfilePage = 1,
             viewingProfileLast = false
         )
-        refreshForSelectedTab(tab)
+        if (tab == BottomTab.Notifications && _uiState.value.markReadWhenTabOpened) {
+            markAllNotificationsRead()
+        } else {
+            refreshForSelectedTab(tab)
+        }
     }
 
     fun setLoginUsername(username: String) {
@@ -469,6 +474,22 @@ class HomeViewModel(
         }
     }
 
+    fun openPostById(postId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(commentsLoading = true)
+            runCatching {
+                repository.loadPost(_uiState.value.session, postId)
+            }.onSuccess { post ->
+                openPost(post)
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    commentsLoading = false,
+                    errorMessage = throwable.message ?: "Unable to load post"
+                )
+            }
+        }
+    }
+
     fun clearScrollToComment() {
         _uiState.value = _uiState.value.copy(scrollToCommentId = null)
     }
@@ -479,7 +500,7 @@ class HomeViewModel(
 
     fun handleNotificationClick(notification: Notification) {
         // Mark as read immediately
-        if (!notification.read) {
+        if (!notification.read && _uiState.value.markReadWhenOpened) {
             viewModelScope.launch {
                 val session = _uiState.value.session ?: return@launch
                 runCatching {
@@ -1284,6 +1305,118 @@ class HomeViewModel(
             BottomTab.Explore -> loadExploreTrending()
             BottomTab.Notifications -> refreshNotifications()
             BottomTab.Account -> refreshAccount()
+        }
+    }
+
+    private fun observeSettings() {
+        val prefs = repository.settingsPreferences
+        viewModelScope.launch {
+            prefs.showImagesInFeed.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(showImagesInFeed = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.showNewPostsPopup.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(showNewPostsPopup = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.inAppNotifications.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(inAppNotifications = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.markReadWhenOpened.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(markReadWhenOpened = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.markReadWhenTabOpened.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(markReadWhenTabOpened = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.openLinksInApp.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(openLinksInApp = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.wearAccount.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(wearAccount = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.wearShowImages.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(wearShowImages = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.wearShowProfilePictures.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(wearShowProfilePictures = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.wearFeedType.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(wearFeedType = value)
+            }
+        }
+    }
+
+    fun openSettings() {
+        _uiState.value = _uiState.value.copy(showSettings = true, settingsCategory = null)
+    }
+
+    fun closeSettings() {
+        _uiState.value = _uiState.value.copy(showSettings = false, settingsCategory = null)
+    }
+
+    fun selectSettingsCategory(category: wombat.joshattic.us.ui.state.SettingsCategory?) {
+        _uiState.value = _uiState.value.copy(settingsCategory = category)
+    }
+
+    fun setShowImagesInFeed(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setShowImagesInFeed(value) }
+    }
+
+    fun setShowNewPostsPopup(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setShowNewPostsPopup(value) }
+    }
+
+    fun setInAppNotifications(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setInAppNotifications(value) }
+    }
+
+    fun setMarkReadWhenOpened(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setMarkReadWhenOpened(value) }
+    }
+
+    fun setMarkReadWhenTabOpened(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setMarkReadWhenTabOpened(value) }
+    }
+
+    fun setOpenLinksInApp(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setOpenLinksInApp(value) }
+    }
+
+    fun setWearAccount(value: String) {
+        viewModelScope.launch { repository.settingsPreferences.setWearAccount(value) }
+    }
+
+    fun setWearShowImages(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setWearShowImages(value) }
+    }
+
+    fun setWearShowProfilePictures(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setWearShowProfilePictures(value) }
+    }
+
+    fun setWearFeedType(value: String) {
+        viewModelScope.launch { repository.settingsPreferences.setWearFeedType(value) }
+    }
+
+    fun unblockUser(username: String) {
+        viewModelScope.launch {
+            repository.unblockUser(username)
         }
     }
 

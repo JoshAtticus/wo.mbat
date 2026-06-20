@@ -21,6 +21,10 @@ class WearRepository(
         }
     }
 
+    suspend fun loadTrendingFeed(session: AuthSession?): List<Post> {
+        return api.getTrendingPosts(token = session?.token).posts
+    }
+
     suspend fun loadComments(session: AuthSession?, postId: String): List<Comment> =
         api.getComments(postId = postId, token = session?.token).comments
 

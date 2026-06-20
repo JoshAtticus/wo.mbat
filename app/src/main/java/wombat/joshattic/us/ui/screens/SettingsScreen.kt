@@ -1,0 +1,589 @@
+package wombat.joshattic.us.ui.screens
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Feed
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Watch
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import wombat.joshattic.us.data.model.AuthSession
+import wombat.joshattic.us.ui.state.HomeUiState
+import wombat.joshattic.us.ui.state.SettingsCategory
+
+@Composable
+fun SettingsScreen(
+    uiState: HomeUiState,
+    onClose: () -> Unit,
+    onCategorySelect: (SettingsCategory?) -> Unit,
+    onShowImagesInFeedChange: (Boolean) -> Unit,
+    onShowNewPostsPopupChange: (Boolean) -> Unit,
+    onInAppNotificationsChange: (Boolean) -> Unit,
+    onMarkReadWhenOpenedChange: (Boolean) -> Unit,
+    onMarkReadWhenTabOpenedChange: (Boolean) -> Unit,
+    onOpenLinksInAppChange: (Boolean) -> Unit,
+    onWearAccountChange: (String) -> Unit,
+    onWearShowImagesChange: (Boolean) -> Unit,
+    onWearShowProfilePicturesChange: (Boolean) -> Unit,
+    onWearFeedTypeChange: (String) -> Unit,
+    onUnblockUser: (String) -> Unit
+) {
+    BackHandler(enabled = uiState.showSettings) {
+        if (uiState.settingsCategory != null) {
+            onCategorySelect(null)
+        } else {
+            onClose()
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+        ) {
+            // Header bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (uiState.settingsCategory != null) {
+                    IconButton(onClick = { onCategorySelect(null) }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to settings menu"
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = when (uiState.settingsCategory) {
+                        SettingsCategory.FEED -> "Feed"
+                        SettingsCategory.NOTIFICATIONS -> "Notifications"
+                        SettingsCategory.LINKS -> "Links"
+                        SettingsCategory.BLOCKED_USERS -> "Blocked Users"
+                        SettingsCategory.WEAR_OS -> "Wear OS"
+                        null -> "Settings"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close Settings")
+                }
+            }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Animated transition between main menu and subcategories
+            AnimatedContent(
+                targetState = uiState.settingsCategory,
+                transitionSpec = {
+                    fadeIn().togetherWith(fadeOut())
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                label = "SettingsScreenContent"
+            ) { category ->
+                when (category) {
+                    null -> SettingsMenu(onCategorySelect = onCategorySelect)
+                    SettingsCategory.FEED -> FeedSettings(
+                        showImages = uiState.showImagesInFeed,
+                        showNewPosts = uiState.showNewPostsPopup,
+                        onShowImagesChange = onShowImagesInFeedChange,
+                        onShowNewPostsChange = onShowNewPostsPopupChange
+                    )
+                    SettingsCategory.NOTIFICATIONS -> NotificationSettings(
+                        inApp = uiState.inAppNotifications,
+                        readOnOpened = uiState.markReadWhenOpened,
+                        readOnTabOpened = uiState.markReadWhenTabOpened,
+                        onInAppChange = onInAppNotificationsChange,
+                        onReadOnOpenedChange = onMarkReadWhenOpenedChange,
+                        onReadOnTabOpenedChange = onMarkReadWhenTabOpenedChange
+                    )
+                    SettingsCategory.LINKS -> LinkSettings(
+                        openInApp = uiState.openLinksInApp,
+                        onOpenInAppChange = onOpenLinksInAppChange
+                    )
+                    SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
+                        blockedUsers = uiState.blockedUsernames.toList().sorted(),
+                        onUnblockUser = onUnblockUser
+                    )
+                    SettingsCategory.WEAR_OS -> WearSettings(
+                        currentAccount = uiState.wearAccount,
+                        savedAccounts = uiState.savedAccounts,
+                        showImages = uiState.wearShowImages,
+                        showPfp = uiState.wearShowProfilePictures,
+                        feedType = uiState.wearFeedType,
+                        onAccountChange = onWearAccountChange,
+                        onShowImagesChange = onWearShowImagesChange,
+                        onShowPfpChange = onWearShowProfilePicturesChange,
+                        onFeedTypeChange = onWearFeedTypeChange
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            CategoryMenuItem(
+                title = "Feed",
+                subtitle = "Configure post layouts and feed popup behaviors",
+                icon = Icons.Filled.Feed,
+                onClick = { onCategorySelect(SettingsCategory.FEED) }
+            )
+        }
+        item {
+            CategoryMenuItem(
+                title = "Notifications",
+                subtitle = "Manage notification sounds, badges, and read status rules",
+                icon = Icons.Filled.Notifications,
+                onClick = { onCategorySelect(SettingsCategory.NOTIFICATIONS) }
+            )
+        }
+        item {
+            CategoryMenuItem(
+                title = "Links",
+                subtitle = "Set default browser behavior for links clicked in posts",
+                icon = Icons.Filled.Link,
+                onClick = { onCategorySelect(SettingsCategory.LINKS) }
+            )
+        }
+        item {
+            CategoryMenuItem(
+                title = "Blocked Users",
+                subtitle = "View and manage people you have blocked",
+                icon = Icons.Filled.Block,
+                onClick = { onCategorySelect(SettingsCategory.BLOCKED_USERS) }
+            )
+        }
+        item {
+            CategoryMenuItem(
+                title = "Wear OS",
+                subtitle = "Sync and configure feed and account settings on your watch",
+                icon = Icons.Filled.Watch,
+                onClick = { onCategorySelect(SettingsCategory.WEAR_OS) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryMenuItem(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeedSettings(
+    showImages: Boolean,
+    showNewPosts: Boolean,
+    onShowImagesChange: (Boolean) -> Unit,
+    onShowNewPostsChange: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        SettingToggleCard(
+            title = "Show images in feed",
+            subtitle = "Enable loading media grid files and attachments directly inside posts on the main feed",
+            checked = showImages,
+            onCheckedChange = onShowImagesChange
+        )
+        SettingToggleCard(
+            title = "Show New Posts popup",
+            subtitle = "Show the floating pill button at the top of your feed when new posts are loaded",
+            checked = showNewPosts,
+            onCheckedChange = onShowNewPostsChange
+        )
+    }
+}
+
+@Composable
+private fun NotificationSettings(
+    inApp: Boolean,
+    readOnOpened: Boolean,
+    readOnTabOpened: Boolean,
+    onInAppChange: (Boolean) -> Unit,
+    onReadOnOpenedChange: (Boolean) -> Unit,
+    onReadOnTabOpenedChange: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        SettingToggleCard(
+            title = "In-app Notifications",
+            subtitle = "Show in-app notification banners when replies or loves arrive while you're browsing",
+            checked = inApp,
+            onCheckedChange = onInAppChange
+        )
+        SettingToggleCard(
+            title = "Mark notifications as read when opened",
+            subtitle = "Automatically clear/read a notification when you tap on it from the notification card or banner",
+            checked = readOnOpened,
+            onCheckedChange = onReadOnOpenedChange
+        )
+        SettingToggleCard(
+            title = "Mark all as read when tab opened",
+            subtitle = "Immediately mark all unread notifications as read when entering the Notifications tab",
+            checked = readOnTabOpened,
+            onCheckedChange = onReadOnTabOpenedChange
+        )
+    }
+}
+
+@Composable
+private fun LinkSettings(
+    openInApp: Boolean,
+    onOpenInAppChange: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Links opened in wo.mbat should open in...", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 4.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenInAppChange(true) }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = openInApp, onClick = { onOpenInAppChange(true) })
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("wo.mbat (in-app browser)", style = MaterialTheme.typography.bodyLarge)
+                        Text("Opens external links inside a premium Custom Tab wrapper", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenInAppChange(false) }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = !openInApp, onClick = { onOpenInAppChange(false) })
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Default web browser", style = MaterialTheme.typography.bodyLarge)
+                        Text("Launches links in Chrome, Firefox, or your default system browser", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BlockedUsersSettings(
+    blockedUsers: List<String>,
+    onUnblockUser: (String) -> Unit
+) {
+    if (blockedUsers.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Filled.Block, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("No blocked users yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(blockedUsers, key = { it }) { username ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "@$username",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(
+                            onClick = { onUnblockUser(username) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Unblock", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WearSettings(
+    currentAccount: String,
+    savedAccounts: List<AuthSession>,
+    showImages: Boolean,
+    showPfp: Boolean,
+    feedType: String,
+    onAccountChange: (String) -> Unit,
+    onShowImagesChange: (Boolean) -> Unit,
+    onShowPfpChange: (Boolean) -> Unit,
+    onFeedTypeChange: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text("Watch Feed Account", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(4.dp)) {
+                    val accounts = listOf("Last used on phone") + savedAccounts.map { it.username }
+                    accounts.forEach { acc ->
+                        val isSelected = acc == currentAccount
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onAccountChange(acc) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = isSelected, onClick = { onAccountChange(acc) })
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(acc, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            SettingToggleCard(
+                title = "Show Images on Feed",
+                subtitle = "Load and render post images directly inside post cards on the Wear OS home/explore feed list",
+                checked = showImages,
+                onCheckedChange = onShowImagesChange
+            )
+        }
+
+        item {
+            SettingToggleCard(
+                title = "Show Profile Pictures on Feed",
+                subtitle = "Display user profile pictures next to authors' names on Wear OS posts list",
+                checked = showPfp,
+                onCheckedChange = onShowPfpChange
+            )
+        }
+
+        item {
+            Text("Watch Feed Source", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(4.dp)) {
+                    val feeds = listOf("Home", "Explore")
+                    feeds.forEach { f ->
+                        val isSelected = f == feedType
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onFeedTypeChange(f) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = isSelected, onClick = { onFeedTypeChange(f) })
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(f, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingToggleCard(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+@Composable
+private fun HorizontalDivider(
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(1.dp)
+            .background(color)
+    )
+}
+
+@Composable
+private fun PaddingValues(
+    horizontal: androidx.compose.ui.unit.Dp = 0.dp,
+    vertical: androidx.compose.ui.unit.Dp = 0.dp
+): androidx.compose.foundation.layout.PaddingValues {
+    return androidx.compose.foundation.layout.PaddingValues(
+        start = horizontal,
+        top = vertical,
+        end = horizontal,
+        bottom = vertical
+    )
+}

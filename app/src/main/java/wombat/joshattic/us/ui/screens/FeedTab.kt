@@ -74,7 +74,11 @@ fun FeedTab(
     scrollToTop: Boolean = false,
     onScrollToTopComplete: () -> Unit = {},
     newPostsUsernames: List<String> = emptyList(),
-    onClearNewPosts: () -> Unit = {}
+    onClearNewPosts: () -> Unit = {},
+    showImages: Boolean = true,
+    showNewPosts: Boolean = true,
+    openLinksInApp: Boolean = true,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val refreshState = rememberPullToRefreshState()
@@ -155,13 +159,16 @@ fun FeedTab(
                     onRepostClick = onRepostClick,
                     onQuoteClick = onQuoteClick,
                     onDeletePost = onDeletePost,
-                    onEditPost = onEditPost
+                    onEditPost = onEditPost,
+                    showImages = showImages,
+                    openLinksInApp = openLinksInApp,
+                    onPostClickById = onPostClickById
                 )
             }
         }
 
         AnimatedVisibility(
-            visible = newPostsUsernames.isNotEmpty() && !wasAtTopBeforeUpdate,
+            visible = showNewPosts && newPostsUsernames.isNotEmpty() && !wasAtTopBeforeUpdate,
             enter = slideInVertically(initialOffsetY = { -it }),
             exit = slideOutVertically(targetOffsetY = { -it }),
             modifier = Modifier

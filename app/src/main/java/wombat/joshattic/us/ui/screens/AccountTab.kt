@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +42,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -104,7 +106,11 @@ fun AccountTab(
     onShowFollowers: (String) -> Unit = {},
     onShowFollowing: (String) -> Unit = {},
     onEditPost: ((Post) -> Unit)? = null,
-    onWallClick: (String) -> Unit = {}
+    onWallClick: (String) -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    showImages: Boolean = true,
+    openLinksInApp: Boolean = true,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -271,9 +277,25 @@ fun AccountTab(
                                             color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                    IconButton(
+                                        onClick = onSettingsClick,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Settings,
+                                            contentDescription = "Settings",
+                                            tint = accent
+                                        )
+                                    }
                                 }
                                 Spacer(modifier = Modifier.height(14.dp))
-                                HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")), maxLines = 4)
+                                 HtmlText(
+                                     html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")),
+                                     maxLines = 4,
+                                     onMentionClick = onMentionClick,
+                                     onPostClick = onPostClickById,
+                                     openLinksInApp = openLinksInApp
+                                 )
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -330,7 +352,10 @@ fun AccountTab(
                             onRepostClick = onRepostClick,
                             onQuoteClick = onQuoteClick,
                             onDeletePost = onDeletePost,
-                            onEditPost = onEditPost
+                            onEditPost = onEditPost,
+                            showImages = showImages,
+                            openLinksInApp = openLinksInApp,
+                            onPostClickById = onPostClickById
                         )
                     }
                 }

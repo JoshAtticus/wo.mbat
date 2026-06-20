@@ -40,7 +40,10 @@ fun NotificationsTab(
     loading: Boolean,
     onRefresh: () -> Unit,
     onMarkAllRead: () -> Unit,
-    onNotificationClick: (Notification) -> Unit
+    onNotificationClick: (Notification) -> Unit,
+    openLinksInApp: Boolean = true,
+    onMentionClick: ((String) -> Unit)? = null,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -93,7 +96,13 @@ fun NotificationsTab(
             }
 
             items(unreadNotifications, key = { it.id }, contentType = { "notification" }) { notification ->
-                NotificationCard(notification, onClick = { onNotificationClick(notification) })
+                NotificationCard(
+                    notification = notification,
+                    openLinksInApp = openLinksInApp,
+                    onMentionClick = onMentionClick,
+                    onPostClick = onPostClickById,
+                    onClick = { onNotificationClick(notification) }
+                )
             }
 
             if (readNotifications.isNotEmpty()) {
@@ -122,7 +131,13 @@ fun NotificationsTab(
                 }
 
                 items(readNotifications, key = { it.id }, contentType = { "notification" }) { notification ->
-                    NotificationCard(notification, onClick = { onNotificationClick(notification) })
+                    NotificationCard(
+                        notification = notification,
+                        openLinksInApp = openLinksInApp,
+                        onMentionClick = onMentionClick,
+                        onPostClick = onPostClickById,
+                        onClick = { onNotificationClick(notification) }
+                    )
                 }
             }
         }

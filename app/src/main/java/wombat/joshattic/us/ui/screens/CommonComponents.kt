@@ -450,7 +450,10 @@ fun PostCard(
     onRepostClick: ((Post) -> Unit)? = null,
     onQuoteClick: ((Post) -> Unit)? = null,
     onDeletePost: ((Post) -> Unit)? = null,
-    onEditPost: ((Post) -> Unit)? = null
+    onEditPost: ((Post) -> Unit)? = null,
+    showImages: Boolean = true,
+    openLinksInApp: Boolean = true,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
@@ -500,7 +503,10 @@ fun PostCard(
                 onRepostClick = onRepostClick,
                 onQuoteClick = onQuoteClick,
                 onDeletePost = onDeletePost,
-                onEditPost = onEditPost
+                onEditPost = onEditPost,
+                showImages = showImages,
+                openLinksInApp = openLinksInApp,
+                onPostClickById = onPostClickById
             )
         }
         return
@@ -572,11 +578,13 @@ fun PostCard(
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 HtmlText(
-                    displayContent,
+                    html = displayContent,
                     modifier = Modifier.padding(horizontal = 16.dp),
                     maxLines = if (truncated) 6 else Int.MAX_VALUE,
                     onMentionClick = onMentionClick,
-                    onClick = onClick
+                    onPostClick = onPostClickById,
+                    onClick = onClick,
+                    openLinksInApp = openLinksInApp
                 )
                 post.repost?.let { repostPost ->
                     val repostDisplay = remember(repostPost.content) { autoLinkAndMentions(stripImages(repostPost.content)) }
@@ -603,12 +611,19 @@ fun PostCard(
                                     Text(repostPost.poster.name, style = MaterialTheme.typography.titleSmall)
                                 }
                             }
-                            HtmlText(repostDisplay, maxLines = 4, onClick = { onPostClick?.invoke(repostPost) })
+                            HtmlText(
+                                html = repostDisplay,
+                                maxLines = 4,
+                                onMentionClick = onMentionClick,
+                                onPostClick = onPostClickById,
+                                onClick = { onPostClick?.invoke(repostPost) },
+                                openLinksInApp = openLinksInApp
+                            )
                         }
                     }
                 }
             }
-            if (imageUrls.isNotEmpty()) {
+            if (showImages && imageUrls.isNotEmpty()) {
                 PostImageCarousel(
                     images = imageUrls,
                     onImageClick = { images, index -> onImageClick(images, index, post.poster.name) },
@@ -663,7 +678,15 @@ fun PostCard(
 }
 
 @Composable
-fun CommentCard(comment: Comment, isBanned: Boolean = false, onReply: (Comment) -> Unit = {}, onProfileClick: (String) -> Unit = {}) {
+fun CommentCard(
+    comment: Comment,
+    isBanned: Boolean = false,
+    onReply: (Comment) -> Unit = {},
+    onProfileClick: (String) -> Unit = {},
+    onMentionClick: ((String) -> Unit)? = null,
+    onPostClick: ((String) -> Unit)? = null,
+    openLinksInApp: Boolean = true
+) {
     val isReply = comment.parent != null
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(animationSpec = tween(300)),
@@ -689,13 +712,26 @@ fun CommentCard(comment: Comment, isBanned: Boolean = false, onReply: (Comment) 
                 }
             }
             val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
-            HtmlText(displayContent)
+            HtmlText(
+                html = displayContent,
+                onMentionClick = onMentionClick,
+                onPostClick = onPostClick,
+                openLinksInApp = openLinksInApp
+            )
 
             val safeReplies = comment.replies ?: emptyList()
             if (safeReplies.isNotEmpty()) {
                 Column(modifier = Modifier.padding(start = 16.dp)) {
                     safeReplies.forEach { reply ->
-                        CommentCard(comment = reply, isBanned = isBanned, onReply = onReply, onProfileClick = onProfileClick)
+                        CommentCard(
+                            comment = reply,
+                            isBanned = isBanned,
+                            onReply = onReply,
+                            onProfileClick = onProfileClick,
+                            onMentionClick = onMentionClick,
+                            onPostClick = onPostClick,
+                            openLinksInApp = openLinksInApp
+                        )
                     }
                 }
             }
@@ -704,7 +740,14 @@ fun CommentCard(comment: Comment, isBanned: Boolean = false, onReply: (Comment) 
 }
 
 @Composable
-fun NotificationCard(notification: Notification, isOverlay: Boolean = false, onClick: () -> Unit) {
+fun NotificationCard(
+    notification: Notification,
+    isOverlay: Boolean = false,
+    openLinksInApp: Boolean = true,
+    onMentionClick: ((String) -> Unit)? = null,
+    onPostClick: ((String) -> Unit)? = null,
+    onClick: () -> Unit
+) {
     val type = notification.type.lowercase()
     val actorName = notification.data.actor?.name ?: if (type == "admin_notification") "Admin" else "Unknown user"
     Card(
@@ -759,7 +802,10 @@ fun NotificationCard(notification: Notification, isOverlay: Boolean = false, onC
                     html = content,
                     modifier = Modifier.padding(top = 4.dp),
                     maxLines = 3,
-                    onClick = onClick
+                    onMentionClick = onMentionClick,
+                    onPostClick = onPostClick,
+                    onClick = onClick,
+                    openLinksInApp = openLinksInApp
                 )
             } else if (notification.data.post != null && notification.data.post.content != null) {
                 val postContent = remember(notification.id) { notification.data.post.content }
@@ -767,7 +813,10 @@ fun NotificationCard(notification: Notification, isOverlay: Boolean = false, onC
                     html = postContent,
                     modifier = Modifier.padding(top = 4.dp),
                     maxLines = 2,
-                    onClick = onClick
+                    onMentionClick = onMentionClick,
+                    onPostClick = onPostClick,
+                    onClick = onClick,
+                    openLinksInApp = openLinksInApp
                 )
             } else if (type in listOf("repost", "comment", "comment_reply", "mention", "post_mention", "comment_mention", "wall_comment", "wall_comment_reply")) {
                 Text(
@@ -824,18 +873,43 @@ fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderCo
     }
 }
 
+sealed class WasteofUrl {
+    data class Profile(val username: String) : WasteofUrl()
+    data class Post(val postId: String) : WasteofUrl()
+}
+
+fun parseWasteofUrl(url: String): WasteofUrl? {
+    val uri = try { android.net.Uri.parse(url) } catch (e: Exception) { return null }
+    val host = uri.host?.lowercase() ?: ""
+    if (host == "wasteof.money" || host == "www.wasteof.money" || host == "beta.wasteof.money") {
+        val pathSegments = uri.pathSegments
+        if (pathSegments.size == 2) {
+            val type = pathSegments[0].lowercase()
+            val value = pathSegments[1]
+            if (type == "users") {
+                return WasteofUrl.Profile(value)
+            } else if (type == "posts") {
+                return WasteofUrl.Post(value)
+            }
+        }
+    }
+    return null
+}
+
 @Composable
 fun HtmlText(
     html: String,
     modifier: Modifier = Modifier,
     maxLines: Int = Int.MAX_VALUE,
     onMentionClick: ((String) -> Unit)? = null,
-    onClick: (() -> Unit)? = null
+    onPostClick: ((String) -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+    openLinksInApp: Boolean = true
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val linkColor = MaterialTheme.colorScheme.onBackground.toArgb()
 
-    val spannedText = remember(html, textColor, linkColor, onMentionClick) {
+    val spannedText = remember(html, textColor, linkColor, onMentionClick, onPostClick, openLinksInApp) {
         val processedHtml = html.trim()
             .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
             .replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "</p>\n\n<p")
@@ -843,13 +917,13 @@ fun HtmlText(
         val spanned = HtmlCompat.fromHtml(processedHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
         val spannable = SpannableStringBuilder(spanned)
 
-        if (onMentionClick != null) {
-            val urlSpans = spannable.getSpans(0, spannable.length, URLSpan::class.java)
-            for (span in urlSpans) {
-                val url = span.url
-                val start = spannable.getSpanStart(span)
-                val end = spannable.getSpanEnd(span)
-                if (url.startsWith("wombat://user/")) {
+        val urlSpans = spannable.getSpans(0, spannable.length, URLSpan::class.java)
+        for (span in urlSpans) {
+            val url = span.url
+            val start = spannable.getSpanStart(span)
+            val end = spannable.getSpanEnd(span)
+            if (url.startsWith("wombat://user/")) {
+                if (onMentionClick != null) {
                     spannable.removeSpan(span)
                     val username = url.substringAfter("wombat://user/")
                     val clickable = object : ClickableSpan() {
@@ -864,11 +938,48 @@ fun HtmlText(
                     }
                     spannable.setSpan(clickable, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
+            } else {
+                // Non-wombat link: intercept click according to openLinksInApp setting
+                spannable.removeSpan(span)
+                val clickable = object : ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        try {
+                            val parsed = parseWasteofUrl(url)
+                            if (openLinksInApp && parsed != null) {
+                                when (parsed) {
+                                    is WasteofUrl.Profile -> {
+                                        onMentionClick?.invoke(parsed.username)
+                                    }
+                                    is WasteofUrl.Post -> {
+                                        onPostClick?.invoke(parsed.postId)
+                                    }
+                                }
+                            } else {
+                                val uri = android.net.Uri.parse(url)
+                                val context = widget.context
+                                if (openLinksInApp) {
+                                    val customTabsIntent = androidx.browser.customtabs.CustomTabsIntent.Builder().build()
+                                    customTabsIntent.launchUrl(context, uri)
+                                } else {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                                    context.startActivity(intent)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    override fun updateDrawState(ds: TextPaint) {
+                        ds.isUnderlineText = false
+                        ds.color = linkColor
+                    }
+                }
+                spannable.setSpan(clickable, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
 
-        // Ensure all links (URLSpans) are slightly bold
-        spannable.getSpans(0, spannable.length, URLSpan::class.java).forEach { span ->
+        // Ensure all links (ClickableSpans) are slightly bold
+        spannable.getSpans(0, spannable.length, ClickableSpan::class.java).forEach { span ->
             val s = spannable.getSpanStart(span)
             val e = spannable.getSpanEnd(span)
             if (spannable.getSpans(s, e, StyleSpan::class.java).none { it.style == Typeface.BOLD }) {

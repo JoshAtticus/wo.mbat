@@ -34,7 +34,10 @@ fun ExploreTab(
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
     onDeletePost: ((Post) -> Unit)? = null,
-    onEditPost: ((Post) -> Unit)? = null
+    onEditPost: ((Post) -> Unit)? = null,
+    showImages: Boolean = true,
+    openLinksInApp: Boolean = true,
+    onPostClickById: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -71,7 +74,10 @@ fun ExploreTab(
                     onRepostClick = onRepostClick,
                     onQuoteClick = onQuoteClick,
                     onDeletePost = onDeletePost,
-                    onEditPost = onEditPost
+                    onEditPost = onEditPost,
+                    showImages = showImages,
+                    openLinksInApp = openLinksInApp,
+                    onPostClickById = onPostClickById
                 )
             }
         }

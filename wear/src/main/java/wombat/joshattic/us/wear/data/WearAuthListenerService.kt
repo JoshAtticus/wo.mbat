@@ -35,6 +35,14 @@ class WearAuthListenerService : WearableListenerService() {
                 scope.launch {
                     WearAuthPreferences(applicationContext).saveSession(token, username)
                 }
+            } else if (event.dataItem.uri.path == PATH_SETTINGS) {
+                val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
+                val showImages = dataMap.getBoolean(KEY_SHOW_IMAGES, false)
+                val showPfp = dataMap.getBoolean(KEY_SHOW_PFP, true)
+                val feedType = dataMap.getString(KEY_FEED_TYPE, "Home")
+                scope.launch {
+                    WearSettingsPreferences(applicationContext).saveSettings(showImages, showPfp, feedType)
+                }
             }
         }
     }
@@ -48,6 +56,11 @@ class WearAuthListenerService : WearableListenerService() {
         const val PATH_AUTH = "/wombat/auth"
         const val KEY_TOKEN = "token"
         const val KEY_USERNAME = "username"
+
+        const val PATH_SETTINGS = "/wombat/settings"
+        const val KEY_SHOW_IMAGES = "show_images"
+        const val KEY_SHOW_PFP = "show_pfp"
+        const val KEY_FEED_TYPE = "feed_type"
     }
 }
 
