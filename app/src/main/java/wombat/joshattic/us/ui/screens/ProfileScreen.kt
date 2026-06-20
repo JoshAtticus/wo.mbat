@@ -2,6 +2,7 @@
 
 package wombat.joshattic.us.ui.screens
 
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -191,6 +192,7 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp)
+                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 0.dp))
                         .background(accent.copy(alpha = 0.18f))
                 ) {
                     SubcomposeAsyncImage(
@@ -231,16 +233,15 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-24).dp)
-                        .padding(horizontal = 4.dp)
                         .background(
                             Brush.verticalGradient(
                                 0.0f to Color.Transparent,
                                 0.1f to accent.copy(alpha = 0.08f),
                                 1.0f to accent.copy(alpha = 0.08f)
                             ),
-                            RoundedCornerShape(20.dp)
+                            RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
                         ),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
