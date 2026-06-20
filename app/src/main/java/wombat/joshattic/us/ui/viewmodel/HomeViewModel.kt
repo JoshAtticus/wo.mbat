@@ -302,14 +302,26 @@ class HomeViewModel(
         viewModelScope.launch {
             val currentSession = _uiState.value.session
             runCatching {
-                val profile = repository.loadUserProfile(normalizedUsername)
-                val response = repository.loadUserPosts(currentSession, normalizedUsername, 1)
-                val allPosts = (response.pinned ?: emptyList()) + response.posts
-                val posts = if (currentSession != null) augmentLoveStatuses(allPosts, currentSession) else allPosts
-                val isFollowing = currentSession
-                    ?.takeUnless { it.username.equals(normalizedUsername, ignoreCase = true) }
-                    ?.let { repository.getFollowStatus(it, normalizedUsername, it.username) }
-                Triple(profile, posts, isFollowing to response.last)
+                coroutineScope {
+                    val profileDeferred = async { repository.loadUserProfile(normalizedUsername) }
+                    val postsDeferred = async {
+                        val response = repository.loadUserPosts(currentSession, normalizedUsername, 1)
+                        val allPosts = (response.pinned ?: emptyList()) + response.posts
+                        val posts = if (currentSession != null) augmentLoveStatuses(allPosts, currentSession) else allPosts
+                        posts to response.last
+                    }
+                    val followDeferred = async {
+                        currentSession
+                            ?.takeUnless { it.username.equals(normalizedUsername, ignoreCase = true) }
+                            ?.let { repository.getFollowStatus(it, normalizedUsername, it.username) }
+                    }
+
+                    val profile = profileDeferred.await()
+                    val (posts, isLast) = postsDeferred.await()
+                    val isFollowing = followDeferred.await()
+
+                    Triple(profile, posts, isFollowing to isLast)
+                }
             }.onSuccess { (profile, posts, followAndLast) ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfile = profile,
@@ -880,9 +892,11 @@ class HomeViewModel(
                 }
                 .collectLatest { session ->
                     _uiState.value = _uiState.value.copy(session = session)
-                    loadFeedForCurrentSession(session)
-                    loadNotifications(session)
-                    loadAccountProfile(session)
+                    coroutineScope {
+                        launch { loadFeedForCurrentSession(session) }
+                        launch { loadNotifications(session) }
+                        launch { loadAccountProfile(session) }
+                    }
                     if (session != null) {
                         checkBanStatus(session)
                     } else {
@@ -1000,21 +1014,27 @@ class HomeViewModel(
         }
 
         _uiState.value = _uiState.value.copy(accountLoading = true)
-        runCatching { repository.loadUserProfile(session.username) }
-            .onSuccess { profile ->
+        coroutineScope {
+            val profileDeferred = async { runCatching { repository.loadUserProfile(session.username) } }
+            val postsDeferred = async {
+                runCatching {
+                    val response = repository.loadUserPosts(session, session.username, 1)
+                    val allPosts = (response.pinned ?: emptyList()) + response.posts
+                    val posts = filterBlockedPosts(augmentLoveStatuses(allPosts, session))
+                    posts to response.last
+                }
+            }
+
+            profileDeferred.await().onSuccess { profile ->
                 _uiState.value = _uiState.value.copy(accountProfile = profile)
             }
-        runCatching {
-            val response = repository.loadUserPosts(session, session.username, 1)
-            val allPosts = (response.pinned ?: emptyList()) + response.posts
-            val posts = filterBlockedPosts(augmentLoveStatuses(allPosts, session))
-            posts to response.last
-        }.onSuccess { (posts, isLast) ->
-            _uiState.value = _uiState.value.copy(
-                accountPosts = posts,
-                accountLast = isLast,
-                accountPage = 1
-            )
+            postsDeferred.await().onSuccess { (posts, isLast) ->
+                _uiState.value = _uiState.value.copy(
+                    accountPosts = posts,
+                    accountLast = isLast,
+                    accountPage = 1
+                )
+            }
         }
         _uiState.value = _uiState.value.copy(accountLoading = false)
     }
