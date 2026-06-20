@@ -343,7 +343,8 @@ fun ProfileScreen(
                                     onBlockReport = {
                                         profileMenuExpanded = false
                                         onBlockReportClick(profile.name)
-                                    }
+                                    },
+                                    username = profile.name
                                 )
                             }
                         }

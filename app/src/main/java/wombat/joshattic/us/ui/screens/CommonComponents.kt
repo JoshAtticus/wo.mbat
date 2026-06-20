@@ -381,9 +381,24 @@ fun UserActionsMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     onBlock: () -> Unit,
-    onBlockReport: () -> Unit
+    onBlockReport: () -> Unit,
+    username: String
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Share Profile") },
+            onClick = {
+                onDismiss()
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, "https://wasteof.money/users/$username")
+                    type = "text/plain"
+                }
+                val shareIntent = android.content.Intent.createChooser(sendIntent, null)
+                context.startActivity(shareIntent)
+            }
+        )
         DropdownMenuItem(
             text = { Text("Block") },
             onClick = onBlock
@@ -399,12 +414,27 @@ fun UserActionsMenu(
 fun PostActionsMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
+    postId: String,
     onBlock: (() -> Unit)? = null,
     onReport: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Share Post") },
+            onClick = {
+                onDismiss()
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, "https://wasteof.money/posts/$postId")
+                    type = "text/plain"
+                }
+                val shareIntent = android.content.Intent.createChooser(sendIntent, null)
+                context.startActivity(shareIntent)
+            }
+        )
         if (onEdit != null) {
             DropdownMenuItem(
                 text = { Text("Edit Post") },
@@ -568,6 +598,7 @@ fun PostCard(
                         PostActionsMenu(
                             expanded = menuExpanded,
                             onDismiss = { menuExpanded = false },
+                            postId = post.id,
                             onBlock = if (!isOwnPost) onBlockUser?.let { { menuExpanded = false; it(post.poster.name) } } else null,
                             onReport = if (!isOwnPost) onReportPost?.let { { menuExpanded = false; it(post) } } else null,
                             onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null,
