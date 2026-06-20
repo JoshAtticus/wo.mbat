@@ -20,3 +20,4 @@ app/release/output-metadata.json
 *.apk
 *.aab
 /wear/build/*
+.idea/deploymentTargetSelector.xml

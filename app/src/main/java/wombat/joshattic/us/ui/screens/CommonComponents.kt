@@ -98,6 +98,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -294,6 +295,12 @@ fun WombatBottomNavigationBar(
     profilePictureUrl: String?,
     onTabSelected: (BottomTab) -> Unit
 ) {
+    val navBarItemColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.primary,
+        selectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface
     ) {
@@ -301,13 +308,15 @@ fun WombatBottomNavigationBar(
             selected = selectedTab == BottomTab.Home,
             onClick = { onTabSelected(BottomTab.Home) },
             icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
-            label = { Text("Home") }
+            label = { Text("Home") },
+            colors = navBarItemColors
         )
         NavigationBarItem(
             selected = selectedTab == BottomTab.Explore,
             onClick = { onTabSelected(BottomTab.Explore) },
             icon = { Icon(Icons.Filled.Tag, contentDescription = "Explore") },
-            label = { Text("Explore") }
+            label = { Text("Explore") },
+            colors = navBarItemColors
         )
         NavigationBarItem(
             selected = selectedTab == BottomTab.Notifications,
@@ -323,7 +332,8 @@ fun WombatBottomNavigationBar(
                     Icon(Icons.Filled.Notifications, contentDescription = "Notifications")
                 }
             },
-            label = { Text("Notifications") }
+            label = { Text("Notifications") },
+            colors = navBarItemColors
         )
         NavigationBarItem(
             selected = selectedTab == BottomTab.Account,
@@ -342,7 +352,8 @@ fun WombatBottomNavigationBar(
                     Icon(Icons.Filled.AccountCircle, contentDescription = "Account")
                 }
             },
-            label = { Text(accountLabel, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
+            label = { Text(accountLabel, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+            colors = navBarItemColors
         )
     }
 }
