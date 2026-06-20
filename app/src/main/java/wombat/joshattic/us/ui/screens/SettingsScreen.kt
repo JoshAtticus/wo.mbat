@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -188,42 +190,50 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
+            Spacer(modifier = Modifier.height(12.dp)) // padding above the first menu
+        }
+        item {
             CategoryMenuItem(
                 title = "Feed",
-                subtitle = "Configure post layouts and feed popup behaviors",
                 icon = Icons.Filled.Feed,
+                iconContainerColor = Color(0xFF6366F1), // wasteof colour
+                iconColor = Color.White,
                 onClick = { onCategorySelect(SettingsCategory.FEED) }
             )
         }
         item {
             CategoryMenuItem(
                 title = "Notifications",
-                subtitle = "Manage notification sounds, badges, and read status rules",
                 icon = Icons.Filled.Notifications,
+                iconContainerColor = Color(0xFFEF5350), // red
+                iconColor = Color.White,
                 onClick = { onCategorySelect(SettingsCategory.NOTIFICATIONS) }
             )
         }
         item {
             CategoryMenuItem(
                 title = "Links",
-                subtitle = "Set default browser behavior for links clicked in posts",
                 icon = Icons.Filled.Link,
+                iconContainerColor = Color(0xFF008AFF), // blue
+                iconColor = Color.White,
                 onClick = { onCategorySelect(SettingsCategory.LINKS) }
             )
         }
         item {
             CategoryMenuItem(
                 title = "Blocked Users",
-                subtitle = "View and manage people you have blocked",
                 icon = Icons.Filled.Block,
+                iconContainerColor = Color(0xFFFFEB3B), // yellow
+                iconColor = Color.Black,
                 onClick = { onCategorySelect(SettingsCategory.BLOCKED_USERS) }
             )
         }
         item {
             CategoryMenuItem(
                 title = "Wear OS",
-                subtitle = "Sync and configure feed and account settings on your watch",
                 icon = Icons.Filled.Watch,
+                iconContainerColor = Color(0xFFC6FF00), // pixel watch lime
+                iconColor = Color.Black,
                 onClick = { onCategorySelect(SettingsCategory.WEAR_OS) }
             )
         }
@@ -233,8 +243,9 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
 @Composable
 private fun CategoryMenuItem(
     title: String,
-    subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconContainerColor: Color,
+    iconColor: Color,
     onClick: () -> Unit
 ) {
     Card(
@@ -245,24 +256,28 @@ private fun CategoryMenuItem(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(color = iconContainerColor, shape = CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp)
                 )
             }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
@@ -403,7 +418,7 @@ private fun BlockedUsersSettings(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(16.dp, 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(blockedUsers, key = { it }) { username ->
@@ -454,7 +469,7 @@ private fun WearSettings(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(16.dp, 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
