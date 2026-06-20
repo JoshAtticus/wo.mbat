@@ -232,7 +232,12 @@ class HomeViewModel(
             } else {
                 runCatching { repository.createPost(session, draft, repostId) }
                     .onSuccess {
-                        _uiState.value = _uiState.value.copy(showComposer = false, composeDraft = "", composeRepostId = null)
+                        _uiState.value = _uiState.value.copy(
+                            showComposer = false,
+                            composeDraft = "",
+                            composeRepostId = null,
+                            scrollToTop = true
+                        )
                         refreshFeed()
                         refreshAccount()
                     }
@@ -615,6 +620,14 @@ class HomeViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun clearScrollToTop() {
+        _uiState.value = _uiState.value.copy(scrollToTop = false)
+    }
+
+    fun clearNewPostsUsernames() {
+        _uiState.value = _uiState.value.copy(newPostsUsernames = emptyList())
     }
 
     fun saveCurrentDraft() {
@@ -1021,11 +1034,20 @@ class HomeViewModel(
             val posts = if (session != null) augmentLoveStatuses(response.posts, session) else response.posts
             filterBlockedPosts(posts) to response.last
         }.onSuccess { (posts, isLast) ->
+            val oldFeedIds = _uiState.value.feed.map { it.id }.toSet()
+            val newPosts = if (oldFeedIds.isNotEmpty() && !_uiState.value.scrollToTop) {
+                posts.filter { it.id !in oldFeedIds }
+            } else {
+                emptyList()
+            }
+            val newPostsUsernames = newPosts.map { it.poster.name }.distinct().take(3)
+
             _uiState.value = _uiState.value.copy(
                 feed = posts,
                 feedLoading = false,
                 feedLast = isLast,
-                feedPage = 1
+                feedPage = 1,
+                newPostsUsernames = newPostsUsernames
             )
         }.onFailure { throwable ->
             _uiState.value = _uiState.value.copy(

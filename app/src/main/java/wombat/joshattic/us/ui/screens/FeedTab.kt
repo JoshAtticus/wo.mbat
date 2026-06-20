@@ -2,21 +2,54 @@
 
 package wombat.joshattic.us.ui.screens
 
+import kotlinx.coroutines.launch
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import wombat.joshattic.us.data.model.Post
 
 @Composable
@@ -37,9 +70,48 @@ fun FeedTab(
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
     onDeletePost: ((Post) -> Unit)? = null,
-    onEditPost: ((Post) -> Unit)? = null
+    onEditPost: ((Post) -> Unit)? = null,
+    scrollToTop: Boolean = false,
+    onScrollToTopComplete: () -> Unit = {},
+    newPostsUsernames: List<String> = emptyList(),
+    onClearNewPosts: () -> Unit = {}
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val refreshState = rememberPullToRefreshState()
+
+    var wasAtTopBeforeUpdate by remember { mutableStateOf(true) }
+    var previousTopPostId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 10 }
+            .collect { wasAtTopBeforeUpdate = it }
+    }
+
+    LaunchedEffect(posts) {
+        if (posts.isNotEmpty()) {
+            val currentTopId = posts.firstOrNull()?.id
+            if (previousTopPostId != null && currentTopId != previousTopPostId) {
+                if (wasAtTopBeforeUpdate) {
+                    listState.animateScrollToItem(0)
+                }
+            }
+            previousTopPostId = currentTopId
+        }
+    }
+
+    LaunchedEffect(wasAtTopBeforeUpdate) {
+        if (wasAtTopBeforeUpdate && newPostsUsernames.isNotEmpty()) {
+            onClearNewPosts()
+        }
+    }
+
+    LaunchedEffect(scrollToTop, loading) {
+        if (scrollToTop && !loading) {
+            listState.animateScrollToItem(0)
+            onScrollToTopComplete()
+        }
+    }
+
     PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),
         state = refreshState,
@@ -86,6 +158,85 @@ fun FeedTab(
                     onEditPost = onEditPost
                 )
             }
+        }
+
+        AnimatedVisibility(
+            visible = newPostsUsernames.isNotEmpty() && !wasAtTopBeforeUpdate,
+            enter = slideInVertically(initialOffsetY = { -it }),
+            exit = slideOutVertically(targetOffsetY = { -it }),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+                .zIndex(10f)
+        ) {
+            NewPostsButton(
+                usernames = newPostsUsernames,
+                onClick = {
+                    coroutineScope.launch {
+                        listState.animateScrollToItem(0)
+                    }
+                    onClearNewPosts()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun NewPostsButton(
+    usernames: List<String>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(50),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowDownward,
+                contentDescription = null,
+                modifier = Modifier
+                    .graphicsLayer(rotationZ = 180f)
+                    .size(16.dp),
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
+            
+            Box(
+                modifier = Modifier
+                    .height(24.dp)
+                    .width(
+                        if (usernames.isEmpty()) 0.dp 
+                        else (24 + (usernames.size - 1) * 16).dp
+                    )
+            ) {
+                usernames.forEachIndexed { index, username ->
+                    Box(
+                        modifier = Modifier
+                            .offset(x = (index * 16).dp)
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    ) {
+                        ProfilePicture(username = username, size = 24.dp)
+                    }
+                }
+            }
+
+            Text(
+                text = "New Posts",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

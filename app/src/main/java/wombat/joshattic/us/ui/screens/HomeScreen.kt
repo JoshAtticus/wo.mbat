@@ -250,10 +250,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 posts = uiState.feed,
                                 loading = uiState.feedLoading,
                                 listState = feedListState,
-                                onRefresh = {
-                                    viewModel.refreshFeed()
-                                    coroutineScope.launch { feedListState.animateScrollToItem(0) }
-                                },
+                                onRefresh = viewModel::refreshFeed,
                                 onPostClick = viewModel::openPost,
                                 onMentionClick = { username ->
                                     viewModel.openProfile(username)
@@ -276,7 +273,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                 currentUsername = uiState.session?.username,
                                 onDeletePost = { viewModel.deletePost(it.id) },
-                                onEditPost = viewModel::openEditComposer
+                                onEditPost = viewModel::openEditComposer,
+                                scrollToTop = uiState.scrollToTop,
+                                onScrollToTopComplete = viewModel::clearScrollToTop,
+                                newPostsUsernames = uiState.newPostsUsernames,
+                                onClearNewPosts = viewModel::clearNewPostsUsernames
                             )
                             BottomTab.Explore -> ExploreTab(
                                 trendingPosts = uiState.exploreTrendingPosts,
