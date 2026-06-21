@@ -214,7 +214,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             selectedTab = uiState.selectedTab,
                             unreadCount = uiState.unreadNotificationCount,
                             accountLabel = uiState.accountLabel,
-                            profilePictureUrl = uiState.session?.username?.let { "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" },
+                            profilePictureUrl = uiState.session?.username?.let {
+                                "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" +
+                                if (uiState.profileCacheBuster > 0) "&cb=${uiState.profileCacheBuster}" else ""
+                            },
                             onTabSelected = viewModel::selectTab
                         )
                     }
@@ -232,7 +235,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 selectedTab = uiState.selectedTab,
                                 unreadCount = uiState.unreadNotificationCount,
                                 accountLabel = uiState.accountLabel,
-                                profilePictureUrl = uiState.session?.username?.let { "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" },
+                                profilePictureUrl = uiState.session?.username?.let {
+                                    "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" +
+                                    if (uiState.profileCacheBuster > 0) "&cb=${uiState.profileCacheBuster}" else ""
+                                },
                                 onTabSelected = viewModel::selectTab
                             )
 
@@ -389,6 +395,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 onShowFollowing = viewModel::showFollowing,
                                                 onWallClick = viewModel::openWall,
                                                 onSettingsClick = viewModel::openSettings,
+                                                onEditProfileClick = viewModel::openEditProfile,
+                                                profileCacheBuster = uiState.profileCacheBuster,
                                                 showImages = uiState.showImagesInFeed,
                                                 openLinksInApp = uiState.openLinksInApp,
                                                 onPostClickById = viewModel::openPostById
@@ -740,6 +748,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         onShowFollowing = viewModel::showFollowing,
                                         onWallClick = viewModel::openWall,
                                         onSettingsClick = viewModel::openSettings,
+                                        onEditProfileClick = viewModel::openEditProfile,
+                                        profileCacheBuster = uiState.profileCacheBuster,
                                         showImages = uiState.showImagesInFeed,
                                         openLinksInApp = uiState.openLinksInApp,
                                         onPostClickById = viewModel::openPostById
@@ -840,6 +850,23 @@ fun HomeScreen(viewModel: HomeViewModel) {
         }
     }
 }
+
+    if (uiState.showEditProfile && uiState.accountProfile != null) {
+        EditProfileSheet(
+            profile = uiState.accountProfile!!,
+            bioDraft = uiState.editProfileBio,
+            loading = uiState.editProfileLoading,
+            error = uiState.editProfileError,
+            cacheBuster = uiState.profileCacheBuster,
+            onBioChange = viewModel::setEditProfileBio,
+            onSaveBio = viewModel::updateProfileBio,
+            onUploadPfp = viewModel::uploadProfilePicture,
+            onDeletePfp = viewModel::deleteProfilePicture,
+            onUploadBanner = viewModel::uploadBanner,
+            onDeleteBanner = viewModel::deleteBanner,
+            onDismiss = viewModel::closeEditProfile
+        )
+    }
 
     uiState.fullScreenImages?.let { images ->
         FullScreenImageViewer(

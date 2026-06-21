@@ -841,6 +841,138 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(newPostsUsernames = emptyList())
     }
 
+    fun openEditProfile() {
+        val currentProfile = _uiState.value.accountProfile ?: return
+        _uiState.value = _uiState.value.copy(
+            showEditProfile = true,
+            editProfileBio = currentProfile.bio ?: "",
+            editProfileError = null
+        )
+    }
+
+    fun closeEditProfile() {
+        _uiState.value = _uiState.value.copy(
+            showEditProfile = false,
+            editProfileBio = "",
+            editProfileError = null
+        )
+    }
+
+    fun setEditProfileBio(bio: String) {
+        _uiState.value = _uiState.value.copy(editProfileBio = bio)
+    }
+
+    fun updateProfileBio() {
+        val session = _uiState.value.session ?: return
+        val bio = _uiState.value.editProfileBio
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(editProfileLoading = true, editProfileError = null)
+            runCatching { repository.updateBio(session, bio) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        showEditProfile = false,
+                        toastMessage = "Bio updated!"
+                    )
+                    refreshAccount()
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        editProfileError = throwable.message ?: "Failed to update bio"
+                    )
+                }
+        }
+    }
+
+    fun deleteProfilePicture() {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(editProfileLoading = true, editProfileError = null)
+            runCatching { repository.deleteProfilePicture(session) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        profileCacheBuster = System.currentTimeMillis(),
+                        toastMessage = "Profile picture deleted!"
+                    )
+                    refreshAccount()
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        editProfileError = throwable.message ?: "Failed to delete profile picture"
+                    )
+                }
+        }
+    }
+
+    fun uploadProfilePicture(bytes: ByteArray) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(editProfileLoading = true, editProfileError = null)
+            runCatching { repository.uploadProfilePicture(session, bytes) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        profileCacheBuster = System.currentTimeMillis(),
+                        toastMessage = "Profile picture updated!"
+                    )
+                    refreshAccount()
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        editProfileError = throwable.message ?: "Failed to upload profile picture"
+                    )
+                }
+        }
+    }
+
+    fun deleteBanner() {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(editProfileLoading = true, editProfileError = null)
+            runCatching { repository.deleteBanner(session) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        profileCacheBuster = System.currentTimeMillis(),
+                        toastMessage = "Banner deleted!"
+                    )
+                    refreshAccount()
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        editProfileError = throwable.message ?: "Failed to delete banner"
+                    )
+                }
+        }
+    }
+
+    fun uploadBanner(bytes: ByteArray) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(editProfileLoading = true, editProfileError = null)
+            runCatching { repository.uploadBanner(session, bytes) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        profileCacheBuster = System.currentTimeMillis(),
+                        toastMessage = "Banner updated!"
+                    )
+                    refreshAccount()
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        editProfileLoading = false,
+                        editProfileError = throwable.message ?: "Failed to upload banner"
+                    )
+                }
+        }
+    }
+
     fun saveCurrentDraft() {
         if (_uiState.value.composeEditPostId != null) return
         val draft = _uiState.value.composeDraft.trim()

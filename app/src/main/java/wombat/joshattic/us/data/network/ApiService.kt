@@ -8,6 +8,10 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.PUT
+import retrofit2.http.Multipart
+import retrofit2.http.Part
+import okhttp3.MultipartBody
+import wombat.joshattic.us.data.model.UpdateBioRequest
 import wombat.joshattic.us.data.model.EditPostRequest
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
@@ -183,4 +187,39 @@ interface ApiService {
         @Header("authorization") token: String,
         @Body request: CreateCommentRequest
     ): CreateWallCommentResponse
+
+    @PUT("users/{username}/bio")
+    suspend fun updateBio(
+        @Path("username") username: String,
+        @Header("authorization") token: String,
+        @Body request: UpdateBioRequest
+    )
+
+    @Multipart
+    @PUT("users/{username}/picture")
+    suspend fun uploadProfilePicture(
+        @Path("username") username: String,
+        @Header("authorization") token: String,
+        @Part picture: MultipartBody.Part
+    )
+
+    @DELETE("users/{username}/picture")
+    suspend fun deleteProfilePicture(
+        @Path("username") username: String,
+        @Header("authorization") token: String
+    )
+
+    @Multipart
+    @PUT("users/{username}/banner")
+    suspend fun uploadBanner(
+        @Path("username") username: String,
+        @Header("authorization") token: String,
+        @Part banner: MultipartBody.Part
+    )
+
+    @DELETE("users/{username}/banner")
+    suspend fun deleteBanner(
+        @Path("username") username: String,
+        @Header("authorization") token: String
+    )
 }

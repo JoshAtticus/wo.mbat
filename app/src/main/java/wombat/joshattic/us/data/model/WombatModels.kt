@@ -139,3 +139,5 @@ data class FollowingResponse(
     val following: List<User>,
     val last: Boolean
 )
+
+data class UpdateBioRequest(val bio: String)

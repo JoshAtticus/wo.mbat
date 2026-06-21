@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Settings
@@ -108,6 +109,8 @@ fun AccountTab(
     onEditPost: ((Post) -> Unit)? = null,
     onWallClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onEditProfileClick: () -> Unit = {},
+    profileCacheBuster: Long = 0L,
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
     onPostClickById: ((String) -> Unit)? = null
@@ -143,7 +146,8 @@ fun AccountTab(
                 if (profile != null) {
                     val accent = getUserColorSchemeColors(profile.color).first
                     item {
-                        val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner"
+                        val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner" +
+                            if (profileCacheBuster > 0) "?cb=$profileCacheBuster" else ""
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -202,7 +206,12 @@ fun AccountTab(
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box {
-                                        ProfilePicture(username = profile.name, size = 72.dp, borderColor = accent)
+                                        ProfilePicture(
+                                            username = profile.name,
+                                            size = 72.dp,
+                                            borderColor = accent,
+                                            cacheBuster = if (profileCacheBuster > 0) profileCacheBuster.toString() else null
+                                        )
                                         if (profile.online) {
                                             Box(
                                                 modifier = Modifier
@@ -275,6 +284,16 @@ fun AccountTab(
                                             text = if (profile.online) "Online" else "Offline",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = onEditProfileClick,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Edit,
+                                            contentDescription = "Edit Profile",
+                                            tint = accent
                                         )
                                     }
                                     IconButton(

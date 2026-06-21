@@ -1016,11 +1016,13 @@ fun NotificationCard(
 }
 
 @Composable
-fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderColor: Color? = null) {
+fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderColor: Color? = null, cacheBuster: String? = null) {
     val context = LocalContext.current
-    val imageRequest = remember(username) {
+    val imageRequest = remember(username, cacheBuster) {
+        val url = "https://wasteof-image-proxy.tnix.dev/$username?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" +
+            if (cacheBuster != null) "&cb=$cacheBuster" else ""
         ImageRequest.Builder(context)
-            .data("https://wasteof-image-proxy.tnix.dev/$username?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3")
+            .data(url)
             .crossfade(true)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)

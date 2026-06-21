@@ -8,8 +8,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import wombat.joshattic.us.data.model.EditPostRequest
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import wombat.joshattic.us.data.model.AuthSession
+import wombat.joshattic.us.data.model.EditPostRequest
+import wombat.joshattic.us.data.model.UpdateBioRequest
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
@@ -213,6 +217,30 @@ class WombatRepository(
 
     suspend fun getSession(token: String): wombat.joshattic.us.data.model.SessionResponse {
         return apiService.getSession(token)
+    }
+
+    suspend fun updateBio(session: AuthSession, bio: String) {
+        apiService.updateBio(session.username, session.token, UpdateBioRequest(bio))
+    }
+
+    suspend fun uploadProfilePicture(session: AuthSession, bytes: ByteArray) {
+        val requestBody = bytes.toRequestBody("image/*".toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("picture", "picture.jpg", requestBody)
+        apiService.uploadProfilePicture(session.username, session.token, part)
+    }
+
+    suspend fun deleteProfilePicture(session: AuthSession) {
+        apiService.deleteProfilePicture(session.username, session.token)
+    }
+
+    suspend fun uploadBanner(session: AuthSession, bytes: ByteArray) {
+        val requestBody = bytes.toRequestBody("image/*".toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("banner", "banner.jpg", requestBody)
+        apiService.uploadBanner(session.username, session.token, part)
+    }
+
+    suspend fun deleteBanner(session: AuthSession) {
+        apiService.deleteBanner(session.username, session.token)
     }
 
     companion object {
