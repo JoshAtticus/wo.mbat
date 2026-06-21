@@ -103,14 +103,14 @@ fun FeedTab(
         }
     }
 
-    LaunchedEffect(wasAtTopBeforeUpdate) {
+    LaunchedEffect(wasAtTopBeforeUpdate, newPostsUsernames) {
         if (wasAtTopBeforeUpdate && newPostsUsernames.isNotEmpty()) {
             onClearNewPosts()
         }
     }
 
-    LaunchedEffect(scrollToTop, loading) {
-        if (scrollToTop && !loading) {
+    LaunchedEffect(scrollToTop) {
+        if (scrollToTop) {
             listState.animateScrollToItem(0)
             onScrollToTopComplete()
         }

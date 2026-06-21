@@ -112,6 +112,7 @@ class HomeViewModel(
     }
 
     fun selectTab(tab: BottomTab) {
+        val isSameTab = _uiState.value.selectedTab == tab
         _uiState.value = _uiState.value.copy(
             selectedTab = tab,
             viewingProfileUsername = null,
@@ -130,7 +131,8 @@ class HomeViewModel(
             accountPage = 1,
             accountLast = false,
             viewingProfilePage = 1,
-            viewingProfileLast = false
+            viewingProfileLast = false,
+            scrollToTop = if (isSameTab && tab == BottomTab.Home) true else _uiState.value.scrollToTop
         )
         if (tab == BottomTab.Notifications && _uiState.value.markReadWhenTabOpened) {
             markAllNotificationsRead()
@@ -1250,7 +1252,7 @@ class HomeViewModel(
             filterBlockedPosts(posts) to response.last
         }.onSuccess { (posts, isLast) ->
             val oldFeedIds = _uiState.value.feed.map { it.id }.toSet()
-            val newPosts = if (oldFeedIds.isNotEmpty() && !_uiState.value.scrollToTop) {
+            val newPosts = if (oldFeedIds.isNotEmpty()) {
                 posts.filter { it.id !in oldFeedIds }
             } else {
                 emptyList()
