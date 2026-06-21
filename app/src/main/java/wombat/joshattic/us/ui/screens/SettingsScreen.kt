@@ -807,13 +807,5 @@ private fun AboutSettings(onFollowJosh: () -> Unit) {
                 onClick = onFollowJosh
             )
         }
-
-        item {
-            Text(
-                text = "This is an alpha build, expect bugs and please don't share!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
