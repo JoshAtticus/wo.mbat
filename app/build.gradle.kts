@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.coil.svg)
     implementation(libs.socketio.client)
     implementation(libs.play.services.wearable)
+    implementation(libs.androidx.compose.foundation.layout)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -21,6 +21,7 @@ wearCompose = "1.4.1"
 wearable = "18.2.0"
 wearInput = "1.2.0"
 androidLibrary = "9.1.1"
+foundationLayout = "1.11.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +55,7 @@ wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-fou
 wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearCompose" }
 play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "wearable" }
 wear-input = { group = "androidx.wear", name = "wear-input", version.ref = "wearInput" }
+androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

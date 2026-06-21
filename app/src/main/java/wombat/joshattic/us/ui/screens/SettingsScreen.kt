@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -51,6 +52,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.runtime.Composable
@@ -84,8 +86,11 @@ fun SettingsScreen(
     onUnblockUser: (String) -> Unit,
     onFollowJosh: () -> Unit
 ) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600
+
     BackHandler(enabled = uiState.showSettings) {
-        if (uiState.settingsCategory != null) {
+        if (!isTablet && uiState.settingsCategory != null) {
             onCategorySelect(null)
         } else {
             onClose()
@@ -108,7 +113,7 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (uiState.settingsCategory != null) {
+                if (!isTablet && uiState.settingsCategory != null) {
                     IconButton(onClick = { onCategorySelect(null) }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -118,7 +123,7 @@ fun SettingsScreen(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = when (uiState.settingsCategory) {
+                    text = if (isTablet) "Settings" else when (uiState.settingsCategory) {
                         SettingsCategory.FEED -> "Feed"
                         SettingsCategory.NOTIFICATIONS -> "Notifications"
                         SettingsCategory.LINKS -> "Links"
@@ -140,53 +145,150 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Animated transition between main menu and subcategories
-            AnimatedContent(
-                targetState = uiState.settingsCategory,
-                transitionSpec = {
-                    fadeIn().togetherWith(fadeOut())
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                label = "SettingsScreenContent"
-            ) { category ->
-                when (category) {
-                    null -> SettingsMenu(onCategorySelect = onCategorySelect)
-                    SettingsCategory.FEED -> FeedSettings(
-                        showImages = uiState.showImagesInFeed,
-                        showNewPosts = uiState.showNewPostsPopup,
-                        onShowImagesChange = onShowImagesInFeedChange,
-                        onShowNewPostsChange = onShowNewPostsPopupChange
+            if (isTablet) {
+                Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    // Left Pane: Categories list
+                    Box(
+                        modifier = Modifier
+                            .width(320.dp)
+                            .fillMaxHeight()
+                    ) {
+                        val selectedCategory = uiState.settingsCategory ?: SettingsCategory.FEED
+                        SettingsMenu(
+                            onCategorySelect = onCategorySelect,
+                            selectedCategory = selectedCategory
+                        )
+                    }
+
+                    // Vertical Divider
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     )
-                    SettingsCategory.NOTIFICATIONS -> NotificationSettings(
-                        inApp = uiState.inAppNotifications,
-                        readOnOpened = uiState.markReadWhenOpened,
-                        readOnTabOpened = uiState.markReadWhenTabOpened,
-                        onInAppChange = onInAppNotificationsChange,
-                        onReadOnOpenedChange = onMarkReadWhenOpenedChange,
-                        onReadOnTabOpenedChange = onMarkReadWhenTabOpenedChange
-                    )
-                    SettingsCategory.LINKS -> LinkSettings(
-                        openInApp = uiState.openLinksInApp,
-                        onOpenInAppChange = onOpenLinksInAppChange
-                    )
-                    SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
-                        blockedUsers = uiState.blockedUsernames.toList().sorted(),
-                        onUnblockUser = onUnblockUser
-                    )
-                    SettingsCategory.WEAR_OS -> WearSettings(
-                        currentAccount = uiState.wearAccount,
-                        savedAccounts = uiState.savedAccounts,
-                        showImages = uiState.wearShowImages,
-                        showPfp = uiState.wearShowProfilePictures,
-                        feedType = uiState.wearFeedType,
-                        onAccountChange = onWearAccountChange,
-                        onShowImagesChange = onWearShowImagesChange,
-                        onShowPfpChange = onWearShowProfilePicturesChange,
-                        onFeedTypeChange = onWearFeedTypeChange
-                    )
-                    SettingsCategory.ABOUT -> AboutSettings(onFollowJosh = onFollowJosh)
+
+                    // Right Pane: Active Category Details
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        val category = uiState.settingsCategory ?: SettingsCategory.FEED
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = when (category) {
+                                        SettingsCategory.FEED -> "Feed Settings"
+                                        SettingsCategory.NOTIFICATIONS -> "Notification Settings"
+                                        SettingsCategory.LINKS -> "Link Settings"
+                                        SettingsCategory.BLOCKED_USERS -> "Blocked Users"
+                                        SettingsCategory.WEAR_OS -> "Wear OS Settings"
+                                        SettingsCategory.ABOUT -> "About wo.mbat"
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Box(modifier = Modifier.weight(1f)) {
+                                when (category) {
+                                    SettingsCategory.FEED -> FeedSettings(
+                                        showImages = uiState.showImagesInFeed,
+                                        showNewPosts = uiState.showNewPostsPopup,
+                                        onShowImagesChange = onShowImagesInFeedChange,
+                                        onShowNewPostsChange = onShowNewPostsPopupChange
+                                    )
+                                    SettingsCategory.NOTIFICATIONS -> NotificationSettings(
+                                        inApp = uiState.inAppNotifications,
+                                        readOnOpened = uiState.markReadWhenOpened,
+                                        readOnTabOpened = uiState.markReadWhenTabOpened,
+                                        onInAppChange = onInAppNotificationsChange,
+                                        onReadOnOpenedChange = onMarkReadWhenOpenedChange,
+                                        onReadOnTabOpenedChange = onMarkReadWhenTabOpenedChange
+                                    )
+                                    SettingsCategory.LINKS -> LinkSettings(
+                                        openInApp = uiState.openLinksInApp,
+                                        onOpenInAppChange = onOpenLinksInAppChange
+                                    )
+                                    SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
+                                        blockedUsers = uiState.blockedUsernames.toList().sorted(),
+                                        onUnblockUser = onUnblockUser
+                                    )
+                                    SettingsCategory.WEAR_OS -> WearSettings(
+                                        currentAccount = uiState.wearAccount,
+                                        savedAccounts = uiState.savedAccounts,
+                                        showImages = uiState.wearShowImages,
+                                        showPfp = uiState.wearShowProfilePictures,
+                                        feedType = uiState.wearFeedType,
+                                        onAccountChange = onWearAccountChange,
+                                        onShowImagesChange = onWearShowImagesChange,
+                                        onShowPfpChange = onWearShowProfilePicturesChange,
+                                        onFeedTypeChange = onWearFeedTypeChange
+                                    )
+                                    SettingsCategory.ABOUT -> AboutSettings(onFollowJosh = onFollowJosh)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Animated transition between main menu and subcategories (for mobile)
+                AnimatedContent(
+                    targetState = uiState.settingsCategory,
+                    transitionSpec = {
+                        fadeIn().togetherWith(fadeOut())
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    label = "SettingsScreenContent"
+                ) { category ->
+                    when (category) {
+                        null -> SettingsMenu(onCategorySelect = onCategorySelect)
+                        SettingsCategory.FEED -> FeedSettings(
+                            showImages = uiState.showImagesInFeed,
+                            showNewPosts = uiState.showNewPostsPopup,
+                            onShowImagesChange = onShowImagesInFeedChange,
+                            onShowNewPostsChange = onShowNewPostsPopupChange
+                        )
+                        SettingsCategory.NOTIFICATIONS -> NotificationSettings(
+                            inApp = uiState.inAppNotifications,
+                            readOnOpened = uiState.markReadWhenOpened,
+                            readOnTabOpened = uiState.markReadWhenTabOpened,
+                            onInAppChange = onInAppNotificationsChange,
+                            onReadOnOpenedChange = onMarkReadWhenOpenedChange,
+                            onReadOnTabOpenedChange = onMarkReadWhenTabOpenedChange
+                        )
+                        SettingsCategory.LINKS -> LinkSettings(
+                            openInApp = uiState.openLinksInApp,
+                            onOpenInAppChange = onOpenLinksInAppChange
+                        )
+                        SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
+                            blockedUsers = uiState.blockedUsernames.toList().sorted(),
+                            onUnblockUser = onUnblockUser
+                        )
+                        SettingsCategory.WEAR_OS -> WearSettings(
+                            currentAccount = uiState.wearAccount,
+                            savedAccounts = uiState.savedAccounts,
+                            showImages = uiState.wearShowImages,
+                            showPfp = uiState.wearShowProfilePictures,
+                            feedType = uiState.wearFeedType,
+                            onAccountChange = onWearAccountChange,
+                            onShowImagesChange = onWearShowImagesChange,
+                            onShowPfpChange = onWearShowProfilePicturesChange,
+                            onFeedTypeChange = onWearFeedTypeChange
+                        )
+                        SettingsCategory.ABOUT -> AboutSettings(onFollowJosh = onFollowJosh)
+                    }
                 }
             }
         }
@@ -194,7 +296,10 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
+private fun SettingsMenu(
+    onCategorySelect: (SettingsCategory) -> Unit,
+    selectedCategory: SettingsCategory? = null
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -209,6 +314,7 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
                 icon = Icons.Filled.Feed,
                 iconContainerColor = Color(0xFF6366F1), // wasteof colour
                 iconColor = Color.White,
+                selected = selectedCategory == SettingsCategory.FEED,
                 onClick = { onCategorySelect(SettingsCategory.FEED) }
             )
         }
@@ -218,6 +324,7 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
                 icon = Icons.Filled.Notifications,
                 iconContainerColor = Color(0xFFEF5350), // red
                 iconColor = Color.White,
+                selected = selectedCategory == SettingsCategory.NOTIFICATIONS,
                 onClick = { onCategorySelect(SettingsCategory.NOTIFICATIONS) }
             )
         }
@@ -227,6 +334,7 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
                 icon = Icons.Filled.Link,
                 iconContainerColor = Color(0xFF008AFF), // blue
                 iconColor = Color.White,
+                selected = selectedCategory == SettingsCategory.LINKS,
                 onClick = { onCategorySelect(SettingsCategory.LINKS) }
             )
         }
@@ -236,6 +344,7 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
                 icon = Icons.Filled.Block,
                 iconContainerColor = Color(0xFFFFEB3B), // yellow
                 iconColor = Color.Black,
+                selected = selectedCategory == SettingsCategory.BLOCKED_USERS,
                 onClick = { onCategorySelect(SettingsCategory.BLOCKED_USERS) }
             )
         }
@@ -245,6 +354,7 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
                 icon = Icons.Filled.Watch,
                 iconContainerColor = Color(0xFFC6FF00), // pixel watch lime
                 iconColor = Color.Black,
+                selected = selectedCategory == SettingsCategory.WEAR_OS,
                 onClick = { onCategorySelect(SettingsCategory.WEAR_OS) }
             )
         }
@@ -254,6 +364,7 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
                 icon = Icons.Filled.Info,
                 iconContainerColor = Color.White,
                 iconColor = Color.Black,
+                selected = selectedCategory == SettingsCategory.ABOUT,
                 onClick = { onCategorySelect(SettingsCategory.ABOUT) }
             )
         }
@@ -266,14 +377,20 @@ private fun CategoryMenuItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconContainerColor: Color,
     iconColor: Color,
+    selected: Boolean = false,
     onClick: () -> Unit
 ) {
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
