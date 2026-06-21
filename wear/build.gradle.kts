@@ -5,14 +5,17 @@ plugins {
 
 android {
     namespace = "wombat.joshattic.us.wear"
-    compileSdk = 37
+    //noinspection GradleDependency
+    compileSdk = 36
 
     defaultConfig {
+        val phoneVersionCode = project(":app").android.defaultConfig.versionCode ?: 1
+        versionCode = phoneVersionCode * 1000
+
         applicationId = "wombat.joshattic.us"
         minSdk = 30          // Wear OS 3+ required for Compose for Wear OS
-        targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 36
+        versionName = project(":app").android.defaultConfig.versionName ?: "1.0"
     }
 
     buildTypes {

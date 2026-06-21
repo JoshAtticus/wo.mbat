@@ -15,8 +15,8 @@ android {
         applicationId = "wombat.joshattic.us"
         minSdk = 23
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
