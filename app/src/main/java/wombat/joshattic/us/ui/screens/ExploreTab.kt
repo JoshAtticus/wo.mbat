@@ -37,7 +37,10 @@ fun ExploreTab(
     onEditPost: ((Post) -> Unit)? = null,
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
-    onPostClickById: ((String) -> Unit)? = null
+    onPostClickById: ((String) -> Unit)? = null,
+    followedUsernames: Set<String> = emptySet(),
+    followLoadingUsernames: Set<String> = emptySet(),
+    onFollowClick: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -59,6 +62,8 @@ fun ExploreTab(
             }
 
             items(trendingPosts, key = { it.id }, contentType = { "post" }) { post ->
+                val isFollowing = followedUsernames.contains(post.poster.name.lowercase())
+                val followLoading = followLoadingUsernames.contains(post.poster.name.lowercase())
                 PostCard(
                     post = post,
                     onClick = { onOpenPost(post) },
@@ -77,7 +82,10 @@ fun ExploreTab(
                     onEditPost = onEditPost,
                     showImages = showImages,
                     openLinksInApp = openLinksInApp,
-                    onPostClickById = onPostClickById
+                    onPostClickById = onPostClickById,
+                    isFollowing = isFollowing,
+                    followLoading = followLoading,
+                    onFollowClick = onFollowClick?.let { { it(post.poster.name) } }
                 )
             }
         }

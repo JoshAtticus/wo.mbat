@@ -100,7 +100,9 @@ data class HomeUiState(
     val wearShowImages: Boolean = false,
     val wearShowProfilePictures: Boolean = true,
     val wearFeedType: String = "Home",
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val followedUsernames: Set<String> = emptySet(),
+    val followLoadingUsernames: Set<String> = emptySet()
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = unreadNotifications.size

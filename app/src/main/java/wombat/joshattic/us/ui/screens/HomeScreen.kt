@@ -323,7 +323,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onEditPost = viewModel::openEditComposer,
                                 showImages = uiState.showImagesInFeed,
                                 openLinksInApp = uiState.openLinksInApp,
-                                onPostClickById = viewModel::openPostById
+                                onPostClickById = viewModel::openPostById,
+                                followedUsernames = uiState.followedUsernames,
+                                followLoadingUsernames = uiState.followLoadingUsernames,
+                                onFollowClick = viewModel::toggleFollowUser
                             )
                             BottomTab.Notifications -> NotificationsTab(
                                 session = uiState.session,

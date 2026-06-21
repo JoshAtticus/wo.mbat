@@ -483,7 +483,10 @@ fun PostCard(
     onEditPost: ((Post) -> Unit)? = null,
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
-    onPostClickById: ((String) -> Unit)? = null
+    onPostClickById: ((String) -> Unit)? = null,
+    isFollowing: Boolean? = null,
+    followLoading: Boolean = false,
+    onFollowClick: (() -> Unit)? = null
 ) {
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
@@ -536,7 +539,10 @@ fun PostCard(
                 onEditPost = onEditPost,
                 showImages = showImages,
                 openLinksInApp = openLinksInApp,
-                onPostClickById = onPostClickById
+                onPostClickById = onPostClickById,
+                isFollowing = isFollowing,
+                followLoading = followLoading,
+                onFollowClick = onFollowClick
             )
         }
         return
@@ -590,6 +596,24 @@ fun PostCard(
                 }
                 
                 val isOwnPost = currentUsername == post.poster.name
+                if (currentUsername != null && !isOwnPost && onFollowClick != null) {
+                    if (followLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(onClick = onFollowClick) {
+                            Icon(
+                                imageVector = if (isFollowing == true) Icons.Filled.Check else Icons.Filled.PersonAdd,
+                                contentDescription = if (isFollowing == true) "Unfollow" else "Follow",
+                                tint = if (isFollowing == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
                 if (onBlockUser != null || onReportPost != null || onDeletePost != null || onEditPost != null) {
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {

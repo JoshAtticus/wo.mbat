@@ -364,11 +364,43 @@ class HomeViewModel(
             runCatching {
                 val response = repository.loadTrendingPosts(currentSession)
                 val posts = if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
-                filterBlockedPosts(posts)
-            }.onSuccess { posts ->
+                val filteredPosts = filterBlockedPosts(posts)
+                
+                val followedMap = if (currentSession != null) {
+                    val uniquePosters = filteredPosts
+                        .map { it.poster.name }
+                        .distinct()
+                        .filterNot { it.equals(currentSession.username, ignoreCase = true) }
+                    
+                    coroutineScope {
+                        uniquePosters.map { username ->
+                            async(Dispatchers.IO) {
+                                username.lowercase() to runCatching {
+                                    repository.getFollowStatus(currentSession, username, currentSession.username)
+                                }.getOrDefault(false)
+                            }
+                        }.awaitAll().toMap()
+                    }
+                } else {
+                    emptyMap()
+                }
+                
+                Triple(filteredPosts, followedMap, currentSession)
+            }.onSuccess { (posts, followedMap, session) ->
+                val currentFollowed = _uiState.value.followedUsernames.toMutableSet()
+                if (session != null) {
+                    followedMap.forEach { (username, isFollowing) ->
+                        if (isFollowing) {
+                            currentFollowed.add(username)
+                        } else {
+                            currentFollowed.remove(username)
+                        }
+                    }
+                }
                 _uiState.value = _uiState.value.copy(
                     exploreTrendingPosts = posts,
-                    exploreTrendingLoading = false
+                    exploreTrendingLoading = false,
+                    followedUsernames = currentFollowed
                 )
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
@@ -422,12 +454,20 @@ class HomeViewModel(
                     Triple(profile, posts, isFollowing to isLast)
                 }
             }.onSuccess { (profile, posts, followAndLast) ->
+                val isFollowing = followAndLast.first ?: false
+                val currentFollowed = _uiState.value.followedUsernames.toMutableSet()
+                if (isFollowing) {
+                    currentFollowed.add(normalizedUsername.lowercase())
+                } else {
+                    currentFollowed.remove(normalizedUsername.lowercase())
+                }
                 _uiState.value = _uiState.value.copy(
                     viewingProfile = profile,
                     viewingProfilePosts = filterBlockedPosts(posts),
                     viewingProfileLoading = false,
                     viewingProfileIsFollowing = followAndLast.first,
-                    viewingProfileLast = followAndLast.second
+                    viewingProfileLast = followAndLast.second,
+                    followedUsernames = currentFollowed
                 )
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
@@ -969,30 +1009,52 @@ class HomeViewModel(
         )
     }
 
-    fun toggleViewedProfileFollow() {
+    fun toggleFollowUser(username: String) {
         val session = _uiState.value.session ?: return
-        val username = _uiState.value.viewingProfileUsername ?: return
         if (session.username.equals(username, ignoreCase = true)) return
+        val normalized = username.lowercase()
+        val isViewingThisProfile = _uiState.value.viewingProfileUsername?.equals(username, ignoreCase = true) == true
+        
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(viewingProfileFollowLoading = true)
+            _uiState.value = _uiState.value.copy(
+                followLoadingUsernames = _uiState.value.followLoadingUsernames + normalized,
+                viewingProfileFollowLoading = if (isViewingThisProfile) true else _uiState.value.viewingProfileFollowLoading
+            )
             runCatching { repository.toggleFollow(session, username) }
                 .onSuccess { response ->
+                    val isNowFollowing = response.new.isFollowing
+                    val currentFollowed = _uiState.value.followedUsernames.toMutableSet()
+                    if (isNowFollowing) {
+                        currentFollowed.add(normalized)
+                    } else {
+                        currentFollowed.remove(normalized)
+                    }
+                    
                     val currentProfile = _uiState.value.viewingProfile
+                    
                     _uiState.value = _uiState.value.copy(
-                        viewingProfile = currentProfile?.copy(
-                            stats = currentProfile.stats?.copy(followers = response.new.followers)
-                        ),
-                        viewingProfileIsFollowing = response.new.isFollowing,
-                        viewingProfileFollowLoading = false
+                        followedUsernames = currentFollowed,
+                        followLoadingUsernames = _uiState.value.followLoadingUsernames - normalized,
+                        viewingProfileIsFollowing = if (isViewingThisProfile) isNowFollowing else _uiState.value.viewingProfileIsFollowing,
+                        viewingProfileFollowLoading = if (isViewingThisProfile) false else _uiState.value.viewingProfileFollowLoading,
+                        viewingProfile = if (isViewingThisProfile && currentProfile != null) {
+                            currentProfile.copy(stats = currentProfile.stats?.copy(followers = response.new.followers))
+                        } else currentProfile
                     )
                 }
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
-                        viewingProfileFollowLoading = false,
+                        followLoadingUsernames = _uiState.value.followLoadingUsernames - normalized,
+                        viewingProfileFollowLoading = if (isViewingThisProfile) false else _uiState.value.viewingProfileFollowLoading,
                         errorMessage = throwable.message ?: "Unable to update follow"
                     )
                 }
         }
+    }
+
+    fun toggleViewedProfileFollow() {
+        val username = _uiState.value.viewingProfileUsername ?: return
+        toggleFollowUser(username)
     }
 
     fun clearToast() {
