@@ -80,7 +80,7 @@ fun ProfileHeader(profile: User) {
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
-            HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")))
+            HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")))
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ProfileStat("Followers", profile.stats?.followers ?: 0)
@@ -292,7 +292,7 @@ fun ProfileScreen(
                         }
                         Spacer(modifier = Modifier.height(14.dp))
                         HtmlText(
-                            html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>No bio yet.</p>")),
+                            html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")),
                             maxLines = 4,
                             onMentionClick = onMentionClick,
                             onPostClick = onPostClickById,
