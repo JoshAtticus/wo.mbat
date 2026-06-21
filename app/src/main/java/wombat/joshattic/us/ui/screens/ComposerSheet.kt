@@ -16,6 +16,7 @@ import android.view.View
 import android.widget.EditText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -141,8 +142,9 @@ fun ComposerSheet(
     fun updateDraft(text: Spanned, images: List<String>) {
         val cleanText = cleanSpannedForHtml(text)
         val textHtml = HtmlCompat.toHtml(cleanText, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+        val convertedHtml = convertStrikethroughToSTag(textHtml)
         val imgTags = images.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
-        val combinedHtml = if (imgTags.isBlank()) textHtml else "$textHtml\n$imgTags"
+        val combinedHtml = if (imgTags.isBlank()) convertedHtml else "$convertedHtml\n$imgTags"
         
         lastSyncedDraft = combinedHtml
         onDraftChange(combinedHtml)
@@ -234,12 +236,10 @@ fun ComposerSheet(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = d,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 10,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    HtmlText(
+                                        html = d,
+                                        modifier = Modifier.padding(bottom = 8.dp),
+                                        maxLines = 10
                                     )
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     Row(
@@ -412,12 +412,24 @@ fun ComposerSheet(
                     val borderWidth = if (isFocused) 2.dp else 1.dp
                     val textColor = MaterialTheme.colorScheme.onSurface
 
+                    val context = androidx.compose.ui.platform.LocalContext.current
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 220.dp)
                             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                             .border(borderWidth, borderColors, RoundedCornerShape(16.dp))
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                richEditTextRef?.let { editText ->
+                                    editText.requestFocus()
+                                    editText.setSelection(editText.text?.length ?: 0)
+                                    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                                    imm?.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                                }
+                            }
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
                         AndroidView(
@@ -447,8 +459,9 @@ fun ComposerSheet(
                                             charCount = currentText.length
                                             val cleanText = cleanSpannedForHtml(currentText as Spanned)
                                             val textHtml = HtmlCompat.toHtml(cleanText, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+                                            val convertedHtml = convertStrikethroughToSTag(textHtml)
                                             val imgTags = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
-                                            val combinedHtml = if (imgTags.isBlank()) textHtml else "$textHtml\n$imgTags"
+                                            val combinedHtml = if (imgTags.isBlank()) convertedHtml else "$convertedHtml\n$imgTags"
                                             if (combinedHtml != lastSyncedDraft) {
                                                 lastSyncedDraft = combinedHtml
                                                 onDraftChange(combinedHtml)
@@ -775,4 +788,27 @@ fun cleanSpannedForHtml(spanned: Spanned): Spanned {
         }
     }
     return builder
+}
+
+fun convertStrikethroughToSTag(html: String): String {
+    var processed = html
+    processed = processed.replace(
+        Regex("<span\\s+style=\"[^\"]*text-decoration:\\s*line-through;?[^\"]*\"\\s*>(.*?)</span>", 
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        ), 
+        "<s>$1</s>"
+    )
+    processed = processed.replace(
+        Regex("<strike\\s*>(.*?)</strike>", 
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        ), 
+        "<s>$1</s>"
+    )
+    processed = processed.replace(
+        Regex("<del\\s*>(.*?)</del>", 
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        ), 
+        "<s>$1</s>"
+    )
+    return processed
 }
