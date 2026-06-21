@@ -740,53 +740,182 @@ fun CommentCard(
     onProfileClick: (String) -> Unit = {},
     onMentionClick: ((String) -> Unit)? = null,
     onPostClick: ((String) -> Unit)? = null,
-    openLinksInApp: Boolean = true
+    openLinksInApp: Boolean = true,
+    depth: Int = 0,
+    onFocusComment: ((Comment) -> Unit)? = null
 ) {
     val isReply = comment.parent != null
-    Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize(animationSpec = tween(300)),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isReply) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+    if (!isReply) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = tween(300)),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            )
+        ) {
+            Box(modifier = Modifier.padding(12.dp)) {
+                CommentThreadContent(
+                    comment = comment,
+                    isBanned = isBanned,
+                    onReply = onReply,
+                    onProfileClick = onProfileClick,
+                    onMentionClick = onMentionClick,
+                    onPostClick = onPostClick,
+                    openLinksInApp = openLinksInApp,
+                    depth = depth,
+                    onFocusComment = onFocusComment
+                )
+            }
+        }
+    } else {
+        CommentThreadContent(
+            comment = comment,
+            isBanned = isBanned,
+            onReply = onReply,
+            onProfileClick = onProfileClick,
+            onMentionClick = onMentionClick,
+            onPostClick = onPostClick,
+            openLinksInApp = openLinksInApp,
+            depth = depth,
+            onFocusComment = onFocusComment
         )
+    }
+}
+
+@Composable
+fun CommentThreadContent(
+    comment: Comment,
+    isBanned: Boolean,
+    onReply: (Comment) -> Unit,
+    onProfileClick: (String) -> Unit,
+    onMentionClick: ((String) -> Unit)?,
+    onPostClick: ((String) -> Unit)?,
+    openLinksInApp: Boolean,
+    depth: Int,
+    onFocusComment: ((Comment) -> Unit)?
+) {
+    val isReply = comment.parent != null
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Left column: Profile picture and thread line
+        Column(
+            modifier = Modifier.fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(modifier = Modifier.clickable { onProfileClick(comment.poster.name) }) {
+                ProfilePicture(
+                    username = comment.poster.name, 
+                    size = if (isReply) 28.dp else 34.dp
+                )
+            }
+            
+            val safeReplies = comment.replies ?: emptyList()
+            if (safeReplies.isNotEmpty() && depth < 2) {
+                Box(
+                    modifier = Modifier
+                        .width(1.5.dp)
+                        .fillMaxHeight()
+                        .padding(vertical = 4.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                )
+            }
+        }
+        
+        // Right column: Content + Nested replies
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Row(
-                modifier = Modifier.clickable { onProfileClick(comment.poster.name) },
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                ProfilePicture(username = comment.poster.name, size = 32.dp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(comment.poster.name, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = comment.poster.name, 
+                    style = if (isReply) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.clickable { onProfileClick(comment.poster.name) }
+                )
+                Text(
+                    text = "•",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+                Text(
+                    text = formatTime(comment.time), 
+                    style = MaterialTheme.typography.bodySmall, 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
                 Spacer(modifier = Modifier.weight(1f))
-                Text(formatTime(comment.time), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                
                 if (!isBanned) {
-                    IconButton(onClick = { onReply(comment) }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Filled.Chat, contentDescription = "Reply", modifier = Modifier.size(16.dp))
+                    IconButton(
+                        onClick = { onReply(comment) }, 
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Chat, 
+                            contentDescription = "Reply", 
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                        )
                     }
                 }
             }
+            
+            // Content text
             val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
             HtmlText(
                 html = displayContent,
                 onMentionClick = onMentionClick,
                 onPostClick = onPostClick,
-                openLinksInApp = openLinksInApp
+                openLinksInApp = openLinksInApp,
+                modifier = Modifier.padding(bottom = 2.dp)
             )
-
+            
+            // Nested replies list
             val safeReplies = comment.replies ?: emptyList()
             if (safeReplies.isNotEmpty()) {
-                Column(modifier = Modifier.padding(start = 16.dp)) {
-                    safeReplies.forEach { reply ->
-                        CommentCard(
-                            comment = reply,
-                            isBanned = isBanned,
-                            onReply = onReply,
-                            onProfileClick = onProfileClick,
-                            onMentionClick = onMentionClick,
-                            onPostClick = onPostClick,
-                            openLinksInApp = openLinksInApp
+                val maxDepth = 2 // Cap depth at 2 inline levels
+                if (depth >= maxDepth) {
+                    androidx.compose.material3.TextButton(
+                        onClick = { onFocusComment?.invoke(comment) },
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text(
+                            text = "See replies (${safeReplies.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        safeReplies.forEach { reply ->
+                            CommentCard(
+                                comment = reply,
+                                isBanned = isBanned,
+                                onReply = onReply,
+                                onProfileClick = onProfileClick,
+                                onMentionClick = onMentionClick,
+                                onPostClick = onPostClick,
+                                openLinksInApp = openLinksInApp,
+                                depth = depth + 1,
+                                onFocusComment = onFocusComment
+                            )
+                        }
                     }
                 }
             }

@@ -126,6 +126,7 @@ class HomeViewModel(
             commentDraft = "",
             commentsLoading = false,
             commentReplyParent = null,
+            focusedComment = null,
             feedPage = 1,
             feedLast = false,
             accountPage = 1,
@@ -622,6 +623,21 @@ class HomeViewModel(
             comments = emptyList(),
             commentDraft = "",
             commentsLoading = false,
+            commentReplyParent = null,
+            focusedComment = null
+        )
+    }
+
+    fun focusComment(comment: Comment?) {
+        _uiState.value = _uiState.value.copy(
+            focusedComment = comment,
+            commentReplyParent = comment
+        )
+    }
+
+    fun clearFocusComment() {
+        _uiState.value = _uiState.value.copy(
+            focusedComment = null,
             commentReplyParent = null
         )
     }
@@ -676,8 +692,13 @@ class HomeViewModel(
                 return@launch
             }
 
+            val formattedHtml = draft.split("\n\n").joinToString("\n") { p ->
+                val lineBreaks = p.replace("\n", "<br />")
+                "<p dir=\"ltr\">$lineBreaks</p>"
+            }
+
             val parent = _uiState.value.commentReplyParent?.id
-            runCatching { repository.createComment(session, selectedPost.id, draft, parent) }
+            runCatching { repository.createComment(session, selectedPost.id, formattedHtml, parent) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         commentDraft = "",
@@ -712,7 +733,8 @@ class HomeViewModel(
             wallCommentsPage = 1,
             wallCommentsLast = false,
             wallCommentDraft = "",
-            wallCommentReplyParent = null
+            wallCommentReplyParent = null,
+            focusedComment = null
         )
     }
 
@@ -766,8 +788,13 @@ class HomeViewModel(
                 return@launch
             }
 
+            val formattedHtml = draft.split("\n\n").joinToString("\n") { p ->
+                val lineBreaks = p.replace("\n", "<br />")
+                "<p dir=\"ltr\">$lineBreaks</p>"
+            }
+
             val parent = _uiState.value.wallCommentReplyParent?.id
-            runCatching { repository.createWallComment(session, username, draft, parent) }
+            runCatching { repository.createWallComment(session, username, formattedHtml, parent) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         wallCommentDraft = "",

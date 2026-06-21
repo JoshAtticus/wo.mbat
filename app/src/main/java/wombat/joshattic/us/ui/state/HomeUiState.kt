@@ -50,6 +50,7 @@ data class HomeUiState(
     val composeEditPostId: String? = null,
     val composeOriginalContent: String? = null,
     val commentReplyParent: Comment? = null,
+    val focusedComment: Comment? = null,
     val scrollToCommentId: String? = null,
     val fullScreenImages: List<String>? = null,
     val fullScreenImageUsername: String? = null,

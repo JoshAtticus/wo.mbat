@@ -9,6 +9,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,6 +74,9 @@ fun WallDetailsContent(
     onProfileClick: (String) -> Unit = {},
     openLinksInApp: Boolean = true,
     onPostClickById: ((String) -> Unit)? = null,
+    focusedComment: Comment? = null,
+    onFocusComment: (Comment) -> Unit = {},
+    onClearFocusComment: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -106,6 +112,7 @@ fun WallDetailsContent(
                 isImeVisible || listState.layoutInfo.visibleItemsInfo.any { it.index > 0 }
             }
         }
+        val displayComments = if (focusedComment != null) listOf(focusedComment) else comments
 
         LazyColumn(
             state = listState,
@@ -150,7 +157,30 @@ fun WallDetailsContent(
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Wall Messages", style = MaterialTheme.typography.titleMedium)
+                    if (focusedComment != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onClearFocusComment() }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to wall thread",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Back to wall thread",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        Text("Wall Messages", style = MaterialTheme.typography.titleMedium)
+                    }
                     if (loading && comments.isEmpty()) {
                         Row(
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -166,7 +196,7 @@ fun WallDetailsContent(
                 }
             }
 
-            items(comments, key = { it.id }) { comment ->
+            items(displayComments, key = { it.id }) { comment ->
                 CommentCard(
                     comment = comment,
                     isBanned = isBanned,
@@ -174,7 +204,9 @@ fun WallDetailsContent(
                     onProfileClick = handleProfileClick,
                     onMentionClick = handleMentionClick,
                     onPostClick = onPostClickById,
-                    openLinksInApp = openLinksInApp
+                    openLinksInApp = openLinksInApp,
+                    depth = 0,
+                    onFocusComment = onFocusComment
                 )
             }
 
@@ -251,30 +283,27 @@ fun WallDetailsContent(
                             value = draft,
                             onValueChange = onDraftChange,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            minLines = 2,
-                            maxLines = 5,
+                            shape = RoundedCornerShape(24.dp),
+                            maxLines = 4,
                             placeholder = {
                                 Text(
-                                    if (replyingTo != null) "Write a reply" 
+                                    if (replyingTo != null) "Reply to @${replyingTo.poster.name}..."
                                     else "Write a message on @$username's wall..."
                                 )
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = onSubmit,
+                                    enabled = draft.isNotBlank()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "Send message",
+                                        tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    )
+                                }
                             }
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Button(
-                                onClick = onSubmit,
-                                enabled = draft.isNotBlank(),
-                                shape = RoundedCornerShape(20.dp)
-                            ) {
-                                Icon(Icons.Filled.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (replyingTo != null) "Reply" else "Send")
-                            }
-                        }
                     }
                 }
             }
@@ -298,7 +327,10 @@ fun WallDetailsSheet(
     onReplyToComment: (Comment) -> Unit = {},
     onProfileClick: (String) -> Unit = {},
     openLinksInApp: Boolean = true,
-    onPostClickById: ((String) -> Unit)? = null
+    onPostClickById: ((String) -> Unit)? = null,
+    focusedComment: Comment? = null,
+    onFocusComment: (Comment) -> Unit = {},
+    onClearFocusComment: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
@@ -323,7 +355,10 @@ fun WallDetailsSheet(
             onReplyToComment = onReplyToComment,
             onProfileClick = onProfileClick,
             openLinksInApp = openLinksInApp,
-            onPostClickById = onPostClickById
+            onPostClickById = onPostClickById,
+            focusedComment = focusedComment,
+            onFocusComment = onFocusComment,
+            onClearFocusComment = onClearFocusComment
         )
     }
 }

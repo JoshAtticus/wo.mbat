@@ -470,7 +470,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             showImages = uiState.showImagesInFeed,
                                             openLinksInApp = uiState.openLinksInApp,
                                             onPostClickById = viewModel::openPostById,
-                                            showCloseButton = true
+                                            showCloseButton = true,
+                                            focusedComment = uiState.focusedComment,
+                                            onFocusComment = viewModel::focusComment,
+                                            onClearFocusComment = viewModel::clearFocusComment
                                         )
                                     }
                                     uiState.viewingWallUsername != null -> {
@@ -489,7 +492,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onReplyToComment = viewModel::setWallCommentReplyParent,
                                             onProfileClick = viewModel::openProfile,
                                             openLinksInApp = uiState.openLinksInApp,
-                                            onPostClickById = viewModel::openPostById
+                                            onPostClickById = viewModel::openPostById,
+                                            focusedComment = uiState.focusedComment,
+                                            onFocusComment = viewModel::focusComment,
+                                            onClearFocusComment = viewModel::clearFocusComment
                                         )
                                     }
                                     uiState.viewingProfileUsername != null -> {
@@ -801,7 +807,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onEditPost = viewModel::openEditComposer,
                         showImages = uiState.showImagesInFeed,
                         openLinksInApp = uiState.openLinksInApp,
-                        onPostClickById = viewModel::openPostById
+                        onPostClickById = viewModel::openPostById,
+                        focusedComment = uiState.focusedComment,
+                        onFocusComment = viewModel::focusComment,
+                        onClearFocusComment = viewModel::clearFocusComment
                     )
                 }
 
@@ -821,7 +830,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onReplyToComment = viewModel::setWallCommentReplyParent,
                         onProfileClick = viewModel::openProfile,
                         openLinksInApp = uiState.openLinksInApp,
-                        onPostClickById = viewModel::openPostById
+                        onPostClickById = viewModel::openPostById,
+                        focusedComment = uiState.focusedComment,
+                        onFocusComment = viewModel::focusComment,
+                        onClearFocusComment = viewModel::clearFocusComment
                     )
                 }
             }
