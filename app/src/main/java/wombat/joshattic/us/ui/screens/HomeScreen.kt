@@ -551,7 +551,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onWearShowImagesChange = viewModel::setWearShowImages,
             onWearShowProfilePicturesChange = viewModel::setWearShowProfilePictures,
             onWearFeedTypeChange = viewModel::setWearFeedType,
-            onUnblockUser = viewModel::unblockUser
+            onUnblockUser = viewModel::unblockUser,
+            onFollowJosh = viewModel::followJoshAtticus
         )
     }
     }

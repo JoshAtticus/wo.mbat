@@ -114,5 +114,5 @@ enum class BottomTab {
 }
 
 enum class SettingsCategory {
-    FEED, NOTIFICATIONS, LINKS, BLOCKED_USERS, WEAR_OS
+    FEED, NOTIFICATIONS, LINKS, BLOCKED_USERS, WEAR_OS, ABOUT
 }

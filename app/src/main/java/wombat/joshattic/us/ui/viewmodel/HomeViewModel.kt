@@ -1461,6 +1461,29 @@ class HomeViewModel(
         }
     }
 
+    fun followJoshAtticus() {
+        val session = _uiState.value.session
+        if (session == null) {
+            _uiState.value = _uiState.value.copy(toastMessage = "You're not signed in!")
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                val isFollowing = repository.getFollowStatus(session, "joshatticus", session.username)
+                if (isFollowing) {
+                    "You're already following me, thanks :D"
+                } else {
+                    repository.toggleFollow(session, "joshatticus")
+                    "Thanks for following me :D"
+                }
+            }.onSuccess { message ->
+                _uiState.value = _uiState.value.copy(toastMessage = message)
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(toastMessage = throwable.message ?: "Oh no! Something went wrong D:")
+            }
+        }
+    }
+
     private var lastBackgroundTime = 0L
 
     fun onAppBackgrounded() {

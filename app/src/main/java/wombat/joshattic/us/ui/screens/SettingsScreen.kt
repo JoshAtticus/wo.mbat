@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,15 +23,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Feed
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Watch
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,7 +81,8 @@ fun SettingsScreen(
     onWearShowImagesChange: (Boolean) -> Unit,
     onWearShowProfilePicturesChange: (Boolean) -> Unit,
     onWearFeedTypeChange: (String) -> Unit,
-    onUnblockUser: (String) -> Unit
+    onUnblockUser: (String) -> Unit,
+    onFollowJosh: () -> Unit
 ) {
     BackHandler(enabled = uiState.showSettings) {
         if (uiState.settingsCategory != null) {
@@ -115,6 +124,7 @@ fun SettingsScreen(
                         SettingsCategory.LINKS -> "Links"
                         SettingsCategory.BLOCKED_USERS -> "Blocked Users"
                         SettingsCategory.WEAR_OS -> "Wear OS"
+                        SettingsCategory.ABOUT -> "About"
                         null -> "Settings"
                     },
                     style = MaterialTheme.typography.titleLarge,
@@ -176,6 +186,7 @@ fun SettingsScreen(
                         onShowPfpChange = onWearShowProfilePicturesChange,
                         onFeedTypeChange = onWearFeedTypeChange
                     )
+                    SettingsCategory.ABOUT -> AboutSettings(onFollowJosh = onFollowJosh)
                 }
             }
         }
@@ -235,6 +246,15 @@ private fun SettingsMenu(onCategorySelect: (SettingsCategory) -> Unit) {
                 iconContainerColor = Color(0xFFC6FF00), // pixel watch lime
                 iconColor = Color.Black,
                 onClick = { onCategorySelect(SettingsCategory.WEAR_OS) }
+            )
+        }
+        item {
+            CategoryMenuItem(
+                title = "About",
+                icon = Icons.Filled.Info,
+                iconContainerColor = Color.White,
+                iconColor = Color.Black,
+                onClick = { onCategorySelect(SettingsCategory.ABOUT) }
             )
         }
     }
@@ -601,4 +621,82 @@ private fun PaddingValues(
         end = horizontal,
         bottom = vertical
     )
+}
+
+@Composable
+private fun AboutSettings(onFollowJosh: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
+    
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp, 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(vertical = 16.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo),
+                    contentDescription = "wo.mbat Logo",
+                    modifier = Modifier.size(80.dp)
+                )
+                
+                Text(
+                    text = "wo.mbat",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                
+                Text(
+                    text = "Made with <3 by JoshAtticus",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
+        item {
+            CategoryMenuItem(
+                title = "Website",
+                icon = Icons.Filled.Link,
+                iconContainerColor = Color(0xFF6366F1),
+                iconColor = Color.White,
+                onClick = { uriHandler.openUri("https://joshattic.us") }
+            )
+        }
+        
+        item {
+            CategoryMenuItem(
+                title = "Blog",
+                icon = Icons.Filled.Feed,
+                iconContainerColor = Color(0xFF008AFF),
+                iconColor = Color.White,
+                onClick = { uriHandler.openUri("https://blog.joshattic.us") }
+            )
+        }
+        
+        item {
+            CategoryMenuItem(
+                title = "Follow @joshatticus",
+                icon = Icons.Filled.PersonAdd,
+                iconContainerColor = Color(0xFFEF5350),
+                iconColor = Color.White,
+                onClick = onFollowJosh
+            )
+        }
+
+        item {
+            Text(
+                text = "This is an alpha build, expect bugs and please don't share!",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
