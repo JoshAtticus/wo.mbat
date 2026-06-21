@@ -143,7 +143,7 @@ fun FeedTab(
                 item { EmptyStateCard(title = "Nothing here yet", message = "Pull down to refresh.") }
             }
 
-            items(posts, key = { it.id }, contentType = { "post" }) { post ->
+            items(posts.distinctBy { it.id }, key = { it.id }, contentType = { "post" }) { post ->
                 PostCard(
                     post = post,
                     onClick = { onPostClick(post) },

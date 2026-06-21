@@ -95,7 +95,7 @@ fun NotificationsTab(
                 item { EmptyStateCard("All clear", "No unread notifications right now.") }
             }
 
-            items(unreadNotifications, key = { it.id }, contentType = { "notification" }) { notification ->
+            items(unreadNotifications.distinctBy { it.id }, key = { it.id }, contentType = { "notification" }) { notification ->
                 NotificationCard(
                     notification = notification,
                     openLinksInApp = openLinksInApp,
@@ -130,7 +130,12 @@ fun NotificationsTab(
                     }
                 }
 
-                items(readNotifications, key = { it.id }, contentType = { "notification" }) { notification ->
+                // Filter out any notifications that might also be in the unread list to prevent duplicate key crash
+                val filteredRead = readNotifications.filter { read ->
+                    unreadNotifications.none { unread -> unread.id == read.id }
+                }.distinctBy { it.id }
+
+                items(filteredRead, key = { it.id }, contentType = { "notification" }) { notification ->
                     NotificationCard(
                         notification = notification,
                         openLinksInApp = openLinksInApp,

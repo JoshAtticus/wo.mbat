@@ -317,19 +317,39 @@ fun AccountTab(
                                  )
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    ProfileStat("Followers", profile.stats?.followers ?: 0, accentColor = accent, onClick = { onShowFollowers(profile.name) })
-                                    ProfileStat("Following", profile.stats?.following ?: 0, accentColor = accent, onClick = { onShowFollowing(profile.name) })
-                                    ProfileStat("Posts", profile.stats?.posts ?: 0, accentColor = accent)
+                                    ProfileStat(
+                                        label = "Followers",
+                                        value = profile.stats?.followers ?: 0,
+                                        accentColor = accent,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { onShowFollowers(profile.name) }
+                                    )
+                                    ProfileStat(
+                                        label = "Following",
+                                        value = profile.stats?.following ?: 0,
+                                        accentColor = accent,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { onShowFollowing(profile.name) }
+                                    )
+                                    ProfileStat(
+                                        label = "Posts",
+                                        value = profile.stats?.posts ?: 0,
+                                        accentColor = accent,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                     Surface(
                                         shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier.clickable { onWallClick(profile.name) }
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { onWallClick(profile.name) }
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                            modifier = Modifier.padding(vertical = 10.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Icon(
@@ -340,8 +360,9 @@ fun AccountTab(
                                             )
                                             Text(
                                                 text = "Wall",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1
                                             )
                                         }
                                     }
@@ -357,7 +378,7 @@ fun AccountTab(
                         item { EmptyStateCard(title = "No posts yet", message = "Pull down to refresh or create your first post.") }
                     }
 
-                    items(posts, key = { it.id }, contentType = { "post" }) { post ->
+                    items(posts.distinctBy { it.id }, key = { it.id }, contentType = { "post" }) { post ->
                         PostCard(
                             post = post,
                             onClick = { onPostClick(post) },

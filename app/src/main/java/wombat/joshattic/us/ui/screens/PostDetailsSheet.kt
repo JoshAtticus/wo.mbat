@@ -231,7 +231,7 @@ fun PostDetailsContent(
             }
 
             if (!loading && displayComments.isNotEmpty()) {
-                items(displayComments, key = { it.id }) { comment ->
+                items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
                     CommentCard(
                         comment = comment,
                         isBanned = isBanned,

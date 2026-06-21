@@ -359,19 +359,25 @@ fun WombatBottomNavigationBar(
 }
 
 @Composable
-fun ProfileStat(label: String, value: Int, accentColor: Color? = null, onClick: (() -> Unit)? = null) {
+fun ProfileStat(label: String, value: Int, accentColor: Color? = null, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     Surface(
         shape = RoundedCornerShape(16.dp), 
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+        modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 value.toString(),
                 style = MaterialTheme.typography.titleMedium,
-                color = accentColor ?: MaterialTheme.colorScheme.onSurface
+                color = accentColor ?: MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
             )
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                label, 
+                style = MaterialTheme.typography.bodySmall, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
         }
     }
 }
@@ -1762,7 +1768,7 @@ fun UserListBottomSheet(
                 }
 
                 LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(users, key = { it.id }) { user ->
+                    items(users.distinctBy { it.id }, key = { it.id }) { user ->
                         val accent = getUserColorSchemeColors(user.color).first
                         Card(
                             modifier = Modifier

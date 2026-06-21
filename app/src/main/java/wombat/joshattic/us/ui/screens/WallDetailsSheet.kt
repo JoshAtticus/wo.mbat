@@ -196,7 +196,7 @@ fun WallDetailsContent(
                 }
             }
 
-            items(displayComments, key = { it.id }) { comment ->
+            items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
                 CommentCard(
                     comment = comment,
                     isBanned = isBanned,

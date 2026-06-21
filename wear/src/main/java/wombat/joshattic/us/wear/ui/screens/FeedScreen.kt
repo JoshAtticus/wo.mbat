@@ -143,7 +143,7 @@ fun FeedScreen(
                 }
             }
 
-            items(uiState.feed, key = { it.id }) { post ->
+            items(uiState.feed.distinctBy { it.id }, key = { it.id }) { post ->
                 WearPostCard(
                     post = post,
                     showImages = uiState.showImages,

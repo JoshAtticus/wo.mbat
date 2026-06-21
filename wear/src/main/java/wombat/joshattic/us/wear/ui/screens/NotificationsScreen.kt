@@ -78,8 +78,8 @@ fun NotificationsScreen(
                 }
             }
 
-            val unreadNotifs = uiState.notifications.filter { !it.read }
-            val readNotifs = uiState.notifications.filter { it.read }
+            val unreadNotifs = uiState.notifications.filter { !it.read }.distinctBy { it.id }
+            val readNotifs = uiState.notifications.filter { it.read }.distinctBy { it.id }
 
             if (unreadNotifs.isNotEmpty()) {
                 items(unreadNotifs, key = { it.id }) { notif ->
@@ -98,7 +98,13 @@ fun NotificationsScreen(
                         )
                     }
                 }
-                items(readNotifs, key = { it.id }) { notif ->
+                
+                // Filter out any notifications that might also be in the unread list
+                val filteredRead = readNotifs.filter { read ->
+                    unreadNotifs.none { unread -> unread.id == read.id }
+                }
+
+                items(filteredRead, key = { it.id }) { notif ->
                     NotificationItem(notif, onNotificationClick)
                 }
             }

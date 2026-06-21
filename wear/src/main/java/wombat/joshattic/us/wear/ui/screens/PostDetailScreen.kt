@@ -297,7 +297,7 @@ fun PostDetailScreen(
                 }
             }
 
-            items(uiState.comments, key = { it.id }) { comment ->
+            items(uiState.comments.distinctBy { it.id }, key = { it.id }) { comment ->
                 val commentPlainText = androidx.compose.runtime.remember(comment.content) {
                     comment.content.stripHtml()
                 }

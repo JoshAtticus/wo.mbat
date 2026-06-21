@@ -61,7 +61,7 @@ fun ExploreTab(
                 item { EmptyStateCard("No trending posts (bug?)", "Pull to refresh to load trending posts.") }
             }
 
-            items(trendingPosts, key = { it.id }, contentType = { "post" }) { post ->
+            items(trendingPosts.distinctBy { it.id }, key = { it.id }, contentType = { "post" }) { post ->
                 val isFollowing = followedUsernames.contains(post.poster.name.lowercase())
                 val followLoading = followLoadingUsernames.contains(post.poster.name.lowercase())
                 PostCard(
