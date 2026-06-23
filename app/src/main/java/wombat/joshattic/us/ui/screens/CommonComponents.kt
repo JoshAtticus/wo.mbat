@@ -527,7 +527,9 @@ fun PostCard(
             }
             PostCard(
                 post = post.repost!!,
-                onClick = onClick,
+                // When clicking a pure repost, open the inner (actual) post so that
+                // comments and love status are loaded for the correct post ID.
+                onClick = { onPostClick?.invoke(post.repost!!) ?: onClick() },
                 modifier = Modifier,
                 clickable = clickable,
                 truncated = truncated,

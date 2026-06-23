@@ -523,8 +523,14 @@ class HomeViewModel(
     }
 
     fun openPost(post: Post, scrollToCommentId: String? = null) {
+        // If this is a pure repost wrapper (empty content + nested post), open the inner post
+        // so that comments, love counts, and repost counts are loaded for the correct post ID.
+        val isPureRepostWrapper = post.repost != null &&
+            post.content.replace(Regex("<.*?>"), "").trim().isBlank()
+        val effectivePost = if (isPureRepostWrapper) post.repost!! else post
+
         _uiState.value = _uiState.value.copy(
-            selectedPost = post,
+            selectedPost = effectivePost,
             showComposer = false,
             commentDraft = "",
             comments = emptyList(),
@@ -534,14 +540,14 @@ class HomeViewModel(
         )
         // Comments are loaded lazily when user swipes up in the details sheet to expand
 
-        // Verify/augment love status for this post if we have a session
+        // Verify/augment love status for the effective post if we have a session
         val session = _uiState.value.session
         if (session != null) {
             viewModelScope.launch {
                 runCatching {
-                    repository.getPostLoveStatus(session, post.id, session.username)
+                    repository.getPostLoveStatus(session, effectivePost.id, session.username)
                 }.onSuccess { loved ->
-                    updatePostsWithLove(post.id, post.loves, loved)
+                    updatePostsWithLove(effectivePost.id, effectivePost.loves, loved)
                 }
             }
         }
@@ -1288,7 +1294,10 @@ class HomeViewModel(
             exploreTrendingPosts = current.exploreTrendingPosts.map(::transform),
             accountPosts = current.accountPosts.map(::transform),
             viewingProfilePosts = current.viewingProfilePosts.map(::transform),
-            selectedPost = if (current.selectedPost?.id == postId) transform(current.selectedPost) else current.selectedPost
+            // Always apply transform to selectedPost so that liking an embedded repost
+            // (where selectedPost.id != postId but selectedPost.repost.id == postId) also
+            // updates the love state shown in the details sheet.
+            selectedPost = current.selectedPost?.let { transform(it) }
         )
     }
 
