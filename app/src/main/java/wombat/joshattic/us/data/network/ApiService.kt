@@ -90,7 +90,8 @@ interface ApiService {
 
     @GET("messages/unread")
     suspend fun getUnreadNotifications(
-        @Header("authorization") token: String
+        @Header("authorization") token: String,
+        @Query("page") page: Int = 1
     ): NotificationResponse
 
     @GET("messages/admin")
@@ -100,7 +101,8 @@ interface ApiService {
 
     @GET("messages/read")
     suspend fun getReadNotifications(
-        @Header("authorization") token: String
+        @Header("authorization") token: String,
+        @Query("page") page: Int = 1
     ): NotificationResponse
 
     @POST("messages/mark/read")

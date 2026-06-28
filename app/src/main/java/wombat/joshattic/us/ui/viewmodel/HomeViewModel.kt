@@ -93,6 +93,9 @@ class HomeViewModel(
     private fun observeUnreadSocketCount() {
         viewModelScope.launch {
             repository.unreadSocketCount.collectLatest { count ->
+                // Always update the badge count from socket directly
+                _uiState.value = _uiState.value.copy(socketUnreadCount = count)
+                // Only trigger a refresh if the count changed meaningfully
                 val currentSize = _uiState.value.unreadNotifications.size
                 if (count > currentSize || (count == 0 && currentSize > 0)) {
                     refreshNotifications()
@@ -825,7 +828,47 @@ class HomeViewModel(
             val session = _uiState.value.session ?: return@launch
             val notificationIds = _uiState.value.unreadNotifications.map { it.id }
             repository.markNotificationsRead(session, notificationIds)
+            // Reset pagination and reload from page 1
+            _uiState.value = _uiState.value.copy(
+                unreadNotificationsPage = 1,
+                unreadNotificationsLast = false,
+                readNotificationsPage = 1,
+                readNotificationsLast = false,
+                socketUnreadCount = 0
+            )
             loadNotifications(session)
+        }
+    }
+
+    fun loadNextNotificationsPage() {
+        val current = _uiState.value
+        if (current.notificationsLoadingMore) return
+        // Load more unread first, then read
+        val session = current.session ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(notificationsLoadingMore = true)
+            if (!current.unreadNotificationsLast) {
+                val nextPage = current.unreadNotificationsPage + 1
+                val response = runCatching { repository.loadUnreadNotifications(session, nextPage) }.getOrNull()
+                if (response != null) {
+                    _uiState.value = _uiState.value.copy(
+                        unreadNotifications = _uiState.value.unreadNotifications + response.unread.orEmpty(),
+                        unreadNotificationsPage = nextPage,
+                        unreadNotificationsLast = response.last
+                    )
+                }
+            } else if (!current.readNotificationsLast) {
+                val nextPage = current.readNotificationsPage + 1
+                val response = runCatching { repository.loadReadNotifications(session, nextPage) }.getOrNull()
+                if (response != null) {
+                    _uiState.value = _uiState.value.copy(
+                        readNotifications = _uiState.value.readNotifications + response.read.orEmpty(),
+                        readNotificationsPage = nextPage,
+                        readNotificationsLast = response.last
+                    )
+                }
+            }
+            _uiState.value = _uiState.value.copy(notificationsLoadingMore = false)
         }
     }
 
@@ -1444,16 +1487,29 @@ class HomeViewModel(
 
     private suspend fun loadNotifications(session: AuthSession?) {
         if (session == null) {
-            _uiState.value = _uiState.value.copy(unreadNotifications = emptyList(), readNotifications = emptyList(), notificationsLoading = false)
+            _uiState.value = _uiState.value.copy(
+                unreadNotifications = emptyList(),
+                readNotifications = emptyList(),
+                notificationsLoading = false,
+                unreadNotificationsPage = 1,
+                unreadNotificationsLast = false,
+                readNotificationsPage = 1,
+                readNotificationsLast = false
+            )
             return
         }
 
         _uiState.value = _uiState.value.copy(notificationsLoading = true)
-        val unread = runCatching { repository.loadUnreadNotifications(session) }.getOrDefault(emptyList())
-        val read = runCatching { repository.loadReadNotifications(session) }.getOrDefault(emptyList())
+        val unreadResponse = runCatching { repository.loadUnreadNotifications(session, 1) }
+            .getOrDefault(wombat.joshattic.us.data.model.NotificationResponse(emptyList(), null, true))
+        val readResponse = runCatching { repository.loadReadNotifications(session, 1) }
+            .getOrDefault(wombat.joshattic.us.data.model.NotificationResponse(null, emptyList(), true))
+
+        val unread = unreadResponse.unread.orEmpty()
+        val read = readResponse.read.orEmpty()
         val oldUnreadIds = _uiState.value.unreadNotifications.map { it.id }.toSet()
         val isInitialLoad = !_uiState.value.hasInitialNotificationsLoaded
-        
+
         val newNotification = if (!isInitialLoad) {
             unread.firstOrNull { it.id !in oldUnreadIds }
         } else {
@@ -1465,9 +1521,14 @@ class HomeViewModel(
             readNotifications = read,
             notificationsLoading = false,
             hasInitialNotificationsLoaded = true,
+            unreadNotificationsPage = 1,
+            unreadNotificationsLast = unreadResponse.last,
+            readNotificationsPage = 1,
+            readNotificationsLast = readResponse.last,
             inAppNotification = newNotification ?: _uiState.value.inAppNotification
         )
     }
+
 
     private suspend fun loadAccountProfile(session: AuthSession?) {
         if (session == null) {

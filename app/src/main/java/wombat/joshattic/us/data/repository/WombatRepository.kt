@@ -25,6 +25,7 @@ import wombat.joshattic.us.data.model.FollowingResponse
 import wombat.joshattic.us.data.model.LoginRequest
 import wombat.joshattic.us.data.model.LoveToggleResponse
 import wombat.joshattic.us.data.model.Notification
+import wombat.joshattic.us.data.model.NotificationResponse
 import wombat.joshattic.us.data.model.Permissions
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
@@ -92,22 +93,22 @@ class WombatRepository(
         return apiService.getTrendingPosts(session?.token)
     }
 
-    suspend fun loadUnreadNotifications(session: AuthSession?): List<Notification> {
-        val token = session?.token ?: return emptyList()
-        return apiService.getUnreadNotifications(token).unread.orEmpty()
+    suspend fun loadUnreadNotifications(session: AuthSession?, page: Int = 1): NotificationResponse {
+        val token = session?.token ?: return NotificationResponse(unread = emptyList(), read = null, last = true)
+        return apiService.getUnreadNotifications(token, page)
     }
 
     suspend fun getUnreadCount(token: String): Int {
         return try {
-            apiService.getUnreadNotifications(token).unread.orEmpty().size
+            apiService.getUnreadNotifications(token, 1).unread.orEmpty().size
         } catch (e: Exception) {
             0
         }
     }
 
-    suspend fun loadReadNotifications(session: AuthSession?): List<Notification> {
-        val token = session?.token ?: return emptyList()
-        return apiService.getReadNotifications(token).read.orEmpty()
+    suspend fun loadReadNotifications(session: AuthSession?, page: Int = 1): NotificationResponse {
+        val token = session?.token ?: return NotificationResponse(unread = null, read = emptyList(), last = true)
+        return apiService.getReadNotifications(token, page)
     }
 
     suspend fun createPost(session: AuthSession, htmlContent: String, repostId: String? = null): Post {

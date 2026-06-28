@@ -3,6 +3,7 @@
 package wombat.joshattic.us.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,12 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,9 +30,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import wombat.joshattic.us.data.model.Notification
 
 @Composable
@@ -38,14 +46,34 @@ fun NotificationsTab(
     unreadNotifications: List<Notification>,
     readNotifications: List<Notification>,
     loading: Boolean,
+    loadingMore: Boolean = false,
+    isLastPage: Boolean = false,
     onRefresh: () -> Unit,
     onMarkAllRead: () -> Unit,
     onNotificationClick: (Notification) -> Unit,
+    onLoadNextPage: () -> Unit = {},
     openLinksInApp: Boolean = true,
     onMentionClick: ((String) -> Unit)? = null,
     onPostClickById: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
+    val listState = rememberLazyListState()
+
+    // Trigger load-more when near end of list
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo }
+            .map { visibleItems ->
+                if (visibleItems.isEmpty()) false
+                else {
+                    val lastVisible = visibleItems.last()
+                    lastVisible.index >= listState.layoutInfo.totalItemsCount - 3
+                }
+            }
+            .distinctUntilChanged()
+            .filter { it }
+            .collect { onLoadNextPage() }
+    }
+
     PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),
         state = refreshState,
@@ -53,7 +81,9 @@ fun NotificationsTab(
         onRefresh = onRefresh
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize()
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -130,7 +160,7 @@ fun NotificationsTab(
                     }
                 }
 
-                // Filter out any notifications that might also be in the unread list to prevent duplicate key crash
+                // Filter out any notifications that might also be in the unread list
                 val filteredRead = readNotifications.filter { read ->
                     unreadNotifications.none { unread -> unread.id == read.id }
                 }.distinctBy { it.id }
@@ -143,6 +173,20 @@ fun NotificationsTab(
                         onPostClick = onPostClickById,
                         onClick = { onNotificationClick(notification) }
                     )
+                }
+            }
+
+            // Load more indicator
+            if (loadingMore) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
             }
         }

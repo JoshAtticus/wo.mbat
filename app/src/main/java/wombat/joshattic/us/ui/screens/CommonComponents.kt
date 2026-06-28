@@ -57,6 +57,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
@@ -956,7 +957,13 @@ fun NotificationCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (notification.read) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer
+            containerColor = if (notification.read) MaterialTheme.colorScheme.surface
+            else MaterialTheme.colorScheme.surface.copy(alpha = 0f).let {
+                // Subtle tinted overlay — 10% primary on top of surface
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                    .compositeOver(MaterialTheme.colorScheme.surface)
+            },
+            contentColor = MaterialTheme.colorScheme.onSurface
         )
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -964,11 +971,15 @@ fun NotificationCard(
                 ProfilePicture(username = actorName, size = 36.dp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(actorName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        actorName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Text(
                         text = notificationLabel(notification.type),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
                 if (!isOverlay) {

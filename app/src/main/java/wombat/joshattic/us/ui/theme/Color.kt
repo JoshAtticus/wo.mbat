@@ -1,6 +1,8 @@
 package wombat.joshattic.us.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.ColorUtils
 
 val AppBackground = Color(0xFF111827)
 val CardBackground = Color(0xFF1F2937)
@@ -20,7 +22,7 @@ val SurfaceWhite = Color(0xFFFFFFFF)
 val SurfaceTint = Color(0xFFE7E1D8)
 
 fun getUserColorSchemeColors(userColor: String?): Triple<Color, Color, Color> {
-    val base = when (userColor?.lowercase()) {
+    val baseColor = when (userColor?.lowercase()) {
         "red" -> Color(0xFFDC2626)
         "orange" -> Color(0xFFEA580C)
         "yellow" -> Color(0xFFCA8A04)
@@ -33,18 +35,23 @@ fun getUserColorSchemeColors(userColor: String?): Triple<Color, Color, Color> {
         "purple" -> Color(0xFF9333EA)
         "fuchsia" -> Color(0xFFC026FF)
         "pink" -> Color(0xFFDB2777)
-        "gray" -> Color(0xFF1F2937)
-        else -> Color(0xFF6366F1) // default indigo
+        "gray" -> Color(0xFF6B7280)
+        else -> Color(0xFF6366F1)
     }
-    val variant = base.copy(
-        red = (base.red * 0.8f).coerceIn(0f, 1f),
-        green = (base.green * 0.8f).coerceIn(0f, 1f),
-        blue = (base.blue * 0.8f).coerceIn(0f, 1f)
-    )
-    val light = base.copy(
-        red = ((base.red + 1f) / 2).coerceIn(0f, 1f),
-        green = ((base.green + 1f) / 2).coerceIn(0f, 1f),
-        blue = ((base.blue + 1f) / 2).coerceIn(0f, 1f)
-    )
-    return Triple(base, variant, light)
+
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(baseColor.toArgb(), hsl)
+
+    // Variant: Darker (lower lightness)
+    val variantHsl = hsl.copyOf()
+    variantHsl[2] = (hsl[2] - 0.15f).coerceIn(0f, 1f)
+    val variant = Color(ColorUtils.HSLToColor(variantHsl))
+
+    // Light: Lighter (higher lightness, lower saturation)
+    val lightHsl = hsl.copyOf()
+    lightHsl[1] = (hsl[1] * 0.5f).coerceIn(0f, 1f)
+    lightHsl[2] = (hsl[2] + 0.35f).coerceIn(0f, 1f)
+    val light = Color(ColorUtils.HSLToColor(lightHsl))
+
+    return Triple(baseColor, variant, light)
 }

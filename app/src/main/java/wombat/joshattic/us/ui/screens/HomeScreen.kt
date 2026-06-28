@@ -94,10 +94,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
     }
 
     LaunchedEffect(uiState.selectedTab) {
-        if (pagerState.currentPage != uiState.selectedTab.ordinal) {
-            pagerState.animateScrollToPage(uiState.selectedTab.ordinal)
+        val targetPage = uiState.selectedTab.ordinal
+        // Use scrollToPage (instant) to avoid fighting with an in-progress animation
+        if (pagerState.currentPage != targetPage || pagerState.isScrollInProgress) {
+            pagerState.scrollToPage(targetPage)
         }
     }
+
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -349,9 +352,12 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 unreadNotifications = uiState.unreadNotifications,
                                                 readNotifications = uiState.readNotifications,
                                                 loading = uiState.notificationsLoading,
+                                                loadingMore = uiState.notificationsLoadingMore,
+                                                isLastPage = uiState.unreadNotificationsLast && uiState.readNotificationsLast,
                                                 onRefresh = viewModel::refreshNotifications,
                                                 onMarkAllRead = viewModel::markAllNotificationsRead,
                                                 onNotificationClick = viewModel::handleNotificationClick,
+                                                onLoadNextPage = viewModel::loadNextNotificationsPage,
                                                 openLinksInApp = uiState.openLinksInApp,
                                                 onMentionClick = { viewModel.openProfile(it) },
                                                 onPostClickById = viewModel::openPostById
@@ -702,9 +708,12 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         unreadNotifications = uiState.unreadNotifications,
                                         readNotifications = uiState.readNotifications,
                                         loading = uiState.notificationsLoading,
+                                        loadingMore = uiState.notificationsLoadingMore,
+                                        isLastPage = uiState.unreadNotificationsLast && uiState.readNotificationsLast,
                                         onRefresh = viewModel::refreshNotifications,
                                         onMarkAllRead = viewModel::markAllNotificationsRead,
                                         onNotificationClick = viewModel::handleNotificationClick,
+                                        onLoadNextPage = viewModel::loadNextNotificationsPage,
                                         openLinksInApp = uiState.openLinksInApp,
                                         onMentionClick = { viewModel.openProfile(it) },
                                         onPostClickById = viewModel::openPostById

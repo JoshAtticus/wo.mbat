@@ -12,9 +12,17 @@ data class HomeUiState(
     val session: AuthSession? = null,
     val feed: List<Post> = emptyList(),
     val unreadNotifications: List<Notification> = emptyList(),
+    val readNotifications: List<Notification> = emptyList(),
     val inAppNotification: Notification? = null,
     val hasInitialNotificationsLoaded: Boolean = false,
-    val readNotifications: List<Notification> = emptyList(),
+    // Pagination for notifications
+    val unreadNotificationsPage: Int = 1,
+    val unreadNotificationsLast: Boolean = false,
+    val readNotificationsPage: Int = 1,
+    val readNotificationsLast: Boolean = false,
+    val notificationsLoadingMore: Boolean = false,
+    // Total unread count from socket (may exceed loaded page size)
+    val socketUnreadCount: Int = 0,
     val accountProfile: User? = null,
     val exploreProfile: User? = null,
     val explorePosts: List<Post> = emptyList(),
@@ -111,7 +119,7 @@ data class HomeUiState(
     val followLoadingUsernames: Set<String> = emptySet()
 ) {
     val accountLabel: String = session?.username ?: "Account"
-    val unreadNotificationCount: Int = unreadNotifications.size
+    val unreadNotificationCount: Int = maxOf(unreadNotifications.size, socketUnreadCount)
 }
 
 enum class BottomTab {
