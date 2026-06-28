@@ -856,6 +856,17 @@ class HomeViewModel(
                         unreadNotificationsPage = nextPage,
                         unreadNotificationsLast = response.last
                     )
+                    // If we reached the end of unread notifications, fetch page 1 of read notifications
+                    if (response.last) {
+                        val readResp = runCatching { repository.loadReadNotifications(session, 1) }.getOrNull()
+                        if (readResp != null) {
+                            _uiState.value = _uiState.value.copy(
+                                readNotifications = readResp.read.orEmpty(),
+                                readNotificationsPage = 1,
+                                readNotificationsLast = readResp.last
+                            )
+                        }
+                    }
                 }
             } else if (!current.readNotificationsLast) {
                 val nextPage = current.readNotificationsPage + 1
@@ -1502,11 +1513,19 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(notificationsLoading = true)
         val unreadResponse = runCatching { repository.loadUnreadNotifications(session, 1) }
             .getOrDefault(wombat.joshattic.us.data.model.NotificationResponse(emptyList(), null, true))
-        val readResponse = runCatching { repository.loadReadNotifications(session, 1) }
-            .getOrDefault(wombat.joshattic.us.data.model.NotificationResponse(null, emptyList(), true))
 
         val unread = unreadResponse.unread.orEmpty()
-        val read = readResponse.read.orEmpty()
+        val unreadLast = unreadResponse.last
+
+        val readResponse = if (unreadLast) {
+            runCatching { repository.loadReadNotifications(session, 1) }.getOrNull()
+        } else {
+            null
+        }
+
+        val read = readResponse?.read.orEmpty()
+        val readLast = readResponse?.last ?: false
+
         val oldUnreadIds = _uiState.value.unreadNotifications.map { it.id }.toSet()
         val isInitialLoad = !_uiState.value.hasInitialNotificationsLoaded
 
@@ -1522,9 +1541,9 @@ class HomeViewModel(
             notificationsLoading = false,
             hasInitialNotificationsLoaded = true,
             unreadNotificationsPage = 1,
-            unreadNotificationsLast = unreadResponse.last,
+            unreadNotificationsLast = unreadLast,
             readNotificationsPage = 1,
-            readNotificationsLast = readResponse.last,
+            readNotificationsLast = readLast,
             inAppNotification = newNotification ?: _uiState.value.inAppNotification
         )
     }

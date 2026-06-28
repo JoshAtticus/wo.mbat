@@ -385,12 +385,20 @@ private fun CategoryMenuItem(
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -413,12 +421,13 @@ private fun CategoryMenuItem(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
+                color = contentColor,
                 modifier = Modifier.weight(1f)
             )
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = contentColor.copy(alpha = 0.7f)
             )
         }
     }
@@ -469,19 +478,19 @@ private fun NotificationSettings(
     ) {
         SettingToggleCard(
             title = "In-app Notifications",
-            subtitle = "Show in-app notification banners when replies or loves arrive while you're browsing",
+            subtitle = "Show in-app notification banners when notifications arrive while you're browsing",
             checked = inApp,
             onCheckedChange = onInAppChange
         )
         SettingToggleCard(
             title = "Mark notifications as read when opened",
-            subtitle = "Automatically clear/read a notification when you tap on it from the notification card or banner",
+            subtitle = "Automatically mark a notification as read when you tap on it from the notification card or banner",
             checked = readOnOpened,
             onCheckedChange = onReadOnOpenedChange
         )
         SettingToggleCard(
             title = "Mark all as read when tab opened",
-            subtitle = "Immediately mark all unread notifications as read when entering the Notifications tab",
+            subtitle = "Automatically mark all unread notifications as read when entering the Notifications tab",
             checked = readOnTabOpened,
             onCheckedChange = onReadOnTabOpenedChange
         )
@@ -499,11 +508,14 @@ private fun LinkSettings(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Links opened in wo.mbat should open in...", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 4.dp))
+        Text("Links opened in wo.mbat should open in...", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 4.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
         ) {
             Column(modifier = Modifier.padding(4.dp)) {
                 Row(
@@ -516,8 +528,8 @@ private fun LinkSettings(
                     RadioButton(selected = openInApp, onClick = { onOpenInAppChange(true) })
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
-                        Text("wo.mbat (in-app browser)", style = MaterialTheme.typography.bodyLarge)
-                        Text("Opens external links inside a premium Custom Tab wrapper", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("wo.mbat (in-app browser)", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Opens external links inside wo.mbat", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                     }
                 }
                 Row(
@@ -530,8 +542,8 @@ private fun LinkSettings(
                     RadioButton(selected = !openInApp, onClick = { onOpenInAppChange(false) })
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
-                        Text("Default web browser", style = MaterialTheme.typography.bodyLarge)
-                        Text("Launches links in Chrome, Firefox, or your default system browser", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Default web browser", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Opens links in you default browser", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                     }
                 }
             }
@@ -547,9 +559,9 @@ private fun BlockedUsersSettings(
     if (blockedUsers.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Block, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                Icon(Icons.Filled.Block, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("No blocked users yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No blocked users (yet) :D", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
             }
         }
     } else {
@@ -562,7 +574,10 @@ private fun BlockedUsersSettings(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -571,6 +586,7 @@ private fun BlockedUsersSettings(
                         Text(
                             text = "@$username",
                             style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f)
                         )
                         Button(
@@ -640,7 +656,7 @@ private fun WearSettings(
         item {
             SettingToggleCard(
                 title = "Show Images on Feed",
-                subtitle = "Load and render post images directly inside post cards on the Wear OS home/explore feed list",
+                subtitle = "Load and render post images directly inside post cards on your watch",
                 checked = showImages,
                 onCheckedChange = onShowImagesChange
             )
@@ -649,7 +665,7 @@ private fun WearSettings(
         item {
             SettingToggleCard(
                 title = "Show Profile Pictures on Feed",
-                subtitle = "Display user profile pictures next to authors' names on Wear OS posts list",
+                subtitle = "Display user profile pictures next to authors' names on your watch",
                 checked = showPfp,
                 onCheckedChange = onShowPfpChange
             )
@@ -695,18 +711,21 @@ private fun SettingToggleCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
             }
             Spacer(modifier = Modifier.width(16.dp))

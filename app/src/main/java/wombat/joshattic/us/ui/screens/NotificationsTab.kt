@@ -89,32 +89,27 @@ fun NotificationsTab(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        val unreadCount = unreadNotifications.size
-                        Text(
-                            text = "$unreadCount unread notification${if (unreadCount != 1) "s" else ""}",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        if (session == null) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Sign in to receive alerts about loves, comments, reposts, and follows.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (unreadNotifications.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(onClick = onMarkAllRead) {
-                                Icon(Icons.Filled.ArrowDownward, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Mark all read")
+            if (session == null || unreadNotifications.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            if (session == null) {
+                                Text(
+                                    text = "Sign in to receive alerts about loves, comments, reposts, and follows.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (unreadNotifications.isNotEmpty()) {
+                                Button(onClick = onMarkAllRead) {
+                                    Icon(Icons.Filled.ArrowDownward, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Mark all read")
+                                }
                             }
                         }
                     }

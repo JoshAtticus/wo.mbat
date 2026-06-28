@@ -18,32 +18,82 @@ fun WombatTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val (brand, brandVariant, brandLight) = getUserColorSchemeColors(userColor)
+    val p = getWombatColorPalette(userColor)
 
     val DarkColorScheme = darkColorScheme(
-        primary = brand,
+        // Primary
+        primary = p.brand,
         onPrimary = Color.White,
-        secondary = brandLight,
-        tertiary = brandVariant,
-        background = AppBackground,
-        surface = CardBackground,
-        surfaceVariant = Color(0xFF374151),
+        primaryContainer = p.darkContainer,
+        onPrimaryContainer = p.brandLight,
+        // Secondary
+        secondary = p.brandLight,
+        onSecondary = Color.White,
+        secondaryContainer = p.darkContainer,
+        onSecondaryContainer = p.brandLight,
+        // Tertiary
+        tertiary = p.brandVariant,
+        onTertiary = Color.White,
+        tertiaryContainer = p.darkContainer,
+        onTertiaryContainer = p.brandLight,
+        // Background / Surface
+        background = p.darkBackground,
         onBackground = SurfaceWhite,
+        surface = p.darkSurface,
         onSurface = SurfaceWhite,
-        onSurfaceVariant = Color(0xFF9CA3AF)
+        surfaceVariant = p.darkSurfaceVariant,
+        onSurfaceVariant = Color(0xFF9CA3AF),
+        // Outline
+        outline = p.brand.copy(alpha = 0.5f),
+        outlineVariant = p.darkSurfaceVariant,
+        // Inverse
+        inversePrimary = p.brand,
+        inverseSurface = Color(0xFFE5E7EB),
+        inverseOnSurface = Color(0xFF111827),
+        // Error
+        error = Color(0xFFEF4444),
+        onError = Color.White,
+        errorContainer = Color(0xFF7F1D1D),
+        onErrorContainer = Color(0xFFFCA5A5),
+        scrim = Color.Black
     )
 
     val LightColorScheme = lightColorScheme(
-        primary = brand,
+        // Primary
+        primary = p.brand,
         onPrimary = Color.White,
-        secondary = brandLight,
-        tertiary = brandVariant,
-        background = LightAppBackground,
-        surface = LightCardBackground,
-        surfaceVariant = LightCardVariant,
+        primaryContainer = p.lightContainer,
+        onPrimaryContainer = p.brandVariant,
+        // Secondary
+        secondary = p.brand,
+        onSecondary = Color.White,
+        secondaryContainer = p.lightContainer,
+        onSecondaryContainer = p.brandVariant,
+        // Tertiary
+        tertiary = p.brandVariant,
+        onTertiary = Color.White,
+        tertiaryContainer = p.lightContainer,
+        onTertiaryContainer = p.brandVariant,
+        // Background / Surface
+        background = p.lightBackground,
         onBackground = Color(0xFF111827),
+        surface = p.lightSurface,
         onSurface = Color(0xFF111827),
-        onSurfaceVariant = Color(0xFF4B5563)
+        surfaceVariant = p.lightSurfaceVariant,
+        onSurfaceVariant = Color(0xFF4B5563),
+        // Outline
+        outline = p.brand.copy(alpha = 0.4f),
+        outlineVariant = Color(0xFFE5E7EB),
+        // Inverse
+        inversePrimary = p.brandLight,
+        inverseSurface = Color(0xFF1F2937),
+        inverseOnSurface = Color(0xFFF9FAFB),
+        // Error
+        error = Color(0xFFDC2626),
+        onError = Color.White,
+        errorContainer = Color(0xFFFEE2E2),
+        onErrorContainer = Color(0xFF7F1D1D),
+        scrim = Color.Black
     )
 
     val colorScheme = when {
@@ -51,7 +101,6 @@ fun WombatTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
