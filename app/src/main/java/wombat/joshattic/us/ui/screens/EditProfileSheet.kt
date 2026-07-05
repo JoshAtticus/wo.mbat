@@ -122,8 +122,9 @@ fun EditProfileContent(
                             .clip(RoundedCornerShape(16.dp))
                             .background(accent.copy(alpha = 0.15f))
                     ) {
-                        val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner" +
-                                if (cacheBuster > 0) "?cb=$cacheBuster" else ""
+                        val hourlyBuster = remember { System.currentTimeMillis() / (1000 * 60 * 60) }
+                        val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner?cb=" +
+                                if (cacheBuster > 0) "$cacheBuster" else "$hourlyBuster"
                         
                         SubcomposeAsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)

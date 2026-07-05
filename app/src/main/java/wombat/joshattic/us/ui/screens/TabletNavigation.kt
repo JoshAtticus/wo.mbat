@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import wombat.joshattic.us.ui.state.BottomTab
 
@@ -90,6 +91,10 @@ fun WombatNavigationRail(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(profilePictureUrl)
                             .crossfade(true)
+                            .addHeader("Cache-Control", "no-cache")
+                            .addHeader("Pragma", "no-cache")
+                            .diskCachePolicy(CachePolicy.DISABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
                             .build(),
                         contentDescription = accountLabel,
                         modifier = Modifier.size(28.dp).clip(CircleShape)

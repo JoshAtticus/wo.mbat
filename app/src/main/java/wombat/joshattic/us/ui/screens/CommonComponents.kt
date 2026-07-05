@@ -345,6 +345,10 @@ fun WombatBottomNavigationBar(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(profilePictureUrl)
                             .crossfade(true)
+                            .addHeader("Cache-Control", "no-cache")
+                            .addHeader("Pragma", "no-cache")
+                            .diskCachePolicy(CachePolicy.DISABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
                             .build(),
                         contentDescription = accountLabel,
                         modifier = Modifier.size(28.dp).clip(CircleShape)
@@ -641,6 +645,7 @@ fun PostCard(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                var isActuallyTruncated by remember { mutableStateOf(false) }
                 HtmlText(
                     html = displayContent,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -648,8 +653,19 @@ fun PostCard(
                     onMentionClick = onMentionClick,
                     onPostClick = onPostClickById,
                     onClick = onClick,
-                    openLinksInApp = openLinksInApp
+                    openLinksInApp = openLinksInApp,
+                    onTruncatedChanged = { isActuallyTruncated = it }
                 )
+                if (isActuallyTruncated) {
+                    Text(
+                        text = "Read more...",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 2.dp)
+                            .clickable { onClick() }
+                    )
+                }
                 post.repost?.let { repostPost ->
                     val repostDisplay = remember(repostPost.content) { autoLinkAndMentions(stripImages(repostPost.content)) }
                     Card(
@@ -1038,12 +1054,13 @@ fun NotificationCard(
 fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderColor: Color? = null, cacheBuster: String? = null) {
     val context = LocalContext.current
     val imageRequest = remember(username, cacheBuster) {
-        val url = "https://wasteof-image-proxy.tnix.dev/$username?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" +
-            if (cacheBuster != null) "&cb=$cacheBuster" else ""
+        val url = "https://wasteof-image-proxy.tnix.dev/$username?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
         ImageRequest.Builder(context)
             .data(url)
             .crossfade(true)
-            .diskCachePolicy(CachePolicy.ENABLED)
+            .addHeader("Cache-Control", "no-cache")
+            .addHeader("Pragma", "no-cache")
+            .diskCachePolicy(CachePolicy.DISABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .build()
     }
@@ -1084,7 +1101,12 @@ sealed class WasteofUrl {
 }
 
 fun parseWasteofUrl(url: String): WasteofUrl? {
-    val uri = try { android.net.Uri.parse(url) } catch (e: Exception) { return null }
+    val absoluteUrl = if (url.startsWith("/")) {
+        "https://wasteof.money$url"
+    } else {
+        url
+    }
+    val uri = try { android.net.Uri.parse(absoluteUrl) } catch (e: Exception) { return null }
     val host = uri.host?.lowercase() ?: ""
     if (host == "wasteof.money" || host == "www.wasteof.money" || host == "beta.wasteof.money") {
         val pathSegments = uri.pathSegments
@@ -1095,6 +1117,11 @@ fun parseWasteofUrl(url: String): WasteofUrl? {
                 return WasteofUrl.Profile(value)
             } else if (type == "posts") {
                 return WasteofUrl.Post(value)
+            }
+        } else if (pathSegments.size == 1) {
+            val segment = pathSegments[0]
+            if (segment.startsWith("@")) {
+                return WasteofUrl.Profile(segment.drop(1))
             }
         }
     }
@@ -1109,7 +1136,8 @@ fun HtmlText(
     onMentionClick: ((String) -> Unit)? = null,
     onPostClick: ((String) -> Unit)? = null,
     onClick: (() -> Unit)? = null,
-    openLinksInApp: Boolean = true
+    openLinksInApp: Boolean = true,
+    onTruncatedChanged: ((Boolean) -> Unit)? = null
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val linkColor = MaterialTheme.colorScheme.onBackground.toArgb()
@@ -1149,7 +1177,12 @@ fun HtmlText(
                 val clickable = object : ClickableSpan() {
                     override fun onClick(widget: View) {
                         try {
-                            val parsed = parseWasteofUrl(url)
+                            val absoluteUrl = if (url.startsWith("/")) {
+                                "https://wasteof.money$url"
+                            } else {
+                                url
+                            }
+                            val parsed = parseWasteofUrl(absoluteUrl)
                             if (openLinksInApp && parsed != null) {
                                 when (parsed) {
                                     is WasteofUrl.Profile -> {
@@ -1160,7 +1193,7 @@ fun HtmlText(
                                     }
                                 }
                             } else {
-                                val uri = android.net.Uri.parse(url)
+                                val uri = android.net.Uri.parse(absoluteUrl)
                                 val context = widget.context
                                 if (openLinksInApp) {
                                     val customTabsIntent = androidx.browser.customtabs.CustomTabsIntent.Builder().build()
@@ -1273,6 +1306,16 @@ fun HtmlText(
                     textView.maxLines = Int.MAX_VALUE
                     textView.ellipsize = null
                 }
+            }
+
+            textView.post {
+                val isTruncated = if (maxLines != Int.MAX_VALUE && textView.layout != null) {
+                    textView.layout.lineCount > maxLines || 
+                    (textView.layout.lineCount == maxLines && textView.layout.getEllipsisCount(maxLines - 1) > 0)
+                } else {
+                    false
+                }
+                onTruncatedChanged?.invoke(isTruncated)
             }
         }
     )

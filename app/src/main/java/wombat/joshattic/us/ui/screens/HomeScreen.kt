@@ -218,8 +218,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             unreadCount = uiState.unreadNotificationCount,
                             accountLabel = uiState.accountLabel,
                             profilePictureUrl = uiState.session?.username?.let {
-                                "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" +
-                                if (uiState.profileCacheBuster > 0) "&cb=${uiState.profileCacheBuster}" else ""
+                                "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
                             },
                             onTabSelected = viewModel::selectTab
                         )
@@ -239,8 +238,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 unreadCount = uiState.unreadNotificationCount,
                                 accountLabel = uiState.accountLabel,
                                 profilePictureUrl = uiState.session?.username?.let {
-                                    "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3" +
-                                    if (uiState.profileCacheBuster > 0) "&cb=${uiState.profileCacheBuster}" else ""
+                                    "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
                                 },
                                 onTabSelected = viewModel::selectTab
                             )

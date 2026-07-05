@@ -197,7 +197,8 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner"
+                val hourlyBuster = remember { System.currentTimeMillis() / (1000 * 60 * 60) }
+                val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner?cb=$hourlyBuster"
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
