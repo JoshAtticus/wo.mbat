@@ -84,7 +84,8 @@ fun SettingsScreen(
     onWearShowProfilePicturesChange: (Boolean) -> Unit,
     onWearFeedTypeChange: (String) -> Unit,
     onUnblockUser: (String) -> Unit,
-    onFollowJosh: () -> Unit
+    onFollowJosh: () -> Unit,
+    onBlockedQuoteHandlingChange: (String) -> Unit
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
@@ -221,7 +222,9 @@ fun SettingsScreen(
                                     )
                                     SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
                                         blockedUsers = uiState.blockedUsernames.toList().sorted(),
-                                        onUnblockUser = onUnblockUser
+                                        onUnblockUser = onUnblockUser,
+                                        blockedQuoteHandling = uiState.blockedQuoteHandling,
+                                        onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange
                                     )
                                     SettingsCategory.WEAR_OS -> WearSettings(
                                         currentAccount = uiState.wearAccount,
@@ -274,7 +277,9 @@ fun SettingsScreen(
                         )
                         SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
                             blockedUsers = uiState.blockedUsernames.toList().sorted(),
-                            onUnblockUser = onUnblockUser
+                            onUnblockUser = onUnblockUser,
+                            blockedQuoteHandling = uiState.blockedQuoteHandling,
+                            onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange
                         )
                         SettingsCategory.WEAR_OS -> WearSettings(
                             currentAccount = uiState.wearAccount,
@@ -554,52 +559,162 @@ private fun LinkSettings(
 @Composable
 private fun BlockedUsersSettings(
     blockedUsers: List<String>,
-    onUnblockUser: (String) -> Unit
+    onUnblockUser: (String) -> Unit,
+    blockedQuoteHandling: String,
+    onBlockedQuoteHandlingChange: (String) -> Unit
 ) {
-    if (blockedUsers.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Block, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("No blocked users (yet) :D", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+    var showBlockHandlingSettings by remember { mutableStateOf(false) }
+
+    if (showBlockHandlingSettings) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { showBlockHandlingSettings = false }
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Block Handling Options", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Block Handling", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Choose what happens when a post quotes a post by a user you blocked.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Radio options
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { onBlockedQuoteHandlingChange("warning") }
+            ) {
+                RadioButton(selected = blockedQuoteHandling == "warning", onClick = { onBlockedQuoteHandlingChange("warning") })
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text("Replace with warning (Default)", style = MaterialTheme.typography.bodyLarge)
+                    Text("Show a warning placeholder instead of the quoted post content", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { onBlockedQuoteHandlingChange("hide_repost") }
+            ) {
+                RadioButton(selected = blockedQuoteHandling == "hide_repost", onClick = { onBlockedQuoteHandlingChange("hide_repost") })
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text("Hide quoted post entirely", style = MaterialTheme.typography.bodyLarge)
+                    Text("Completely hide the quoted post container, but keep the parent post", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { onBlockedQuoteHandlingChange("hide_post") }
+            ) {
+                RadioButton(selected = blockedQuoteHandling == "hide_post", onClick = { onBlockedQuoteHandlingChange("hide_post") })
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text("Hide quote posts entirely", style = MaterialTheme.typography.bodyLarge)
+                    Text("Completely filter out any quote post of a blocked user's post from your feed", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(blockedUsers, key = { it }) { username ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    )
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Block options card/button at top
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clickable { showBlockHandlingSettings = true },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "@$username",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(
-                            onClick = { onUnblockUser(username) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
+                    Icon(
+                        imageVector = Icons.Filled.Block,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Quote Repost Behavior", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("Manage how quote posts of blocked users are handled", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Go",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+
+            // Blocked users list
+            if (blockedUsers.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Filled.Block, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("No blocked users (yet) :D", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp, 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(blockedUsers, key = { it }) { username ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
                         ) {
-                            Text("Unblock", style = MaterialTheme.typography.labelMedium)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "@$username",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Button(
+                                    onClick = { onUnblockUser(username) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    ),
+                                    shape = RoundedCornerShape(16.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("Unblock")
+                                }
+                            }
                         }
                     }
                 }

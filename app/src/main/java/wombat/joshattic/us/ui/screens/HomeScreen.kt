@@ -158,6 +158,24 @@ fun HomeScreen(viewModel: HomeViewModel) {
         }
     }
 
+    uiState.blockedWarningTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearBlockedWarning() },
+            title = { Text("Hold up") },
+            text = { Text("This link leads to something from a user you blocked. Would you like to view it anyways?") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.bypassBlockedWarning() }) {
+                    Text("View Anyways")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.clearBlockedWarning() }) {
+                    Text("Go Back")
+                }
+            }
+        )
+    }
+
     confirmAction?.let { action ->
         AlertDialog(
             onDismissRequest = { confirmAction = null },
@@ -306,7 +324,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 showImages = uiState.showImagesInFeed,
                                                 showNewPosts = uiState.showNewPostsPopup,
                                                 openLinksInApp = uiState.openLinksInApp,
-                                                onPostClickById = viewModel::openPostById
+                                                onPostClickById = viewModel::openPostById,
+                                                blockedUsernames = uiState.blockedUsernames,
+                                                blockedQuoteHandling = uiState.blockedQuoteHandling
                                             )
                                             BottomTab.Explore -> ExploreTab(
                                                 trendingPosts = uiState.exploreTrendingPosts,
@@ -343,7 +363,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 onPostClickById = viewModel::openPostById,
                                                 followedUsernames = uiState.followedUsernames,
                                                 followLoadingUsernames = uiState.followLoadingUsernames,
-                                                onFollowClick = viewModel::toggleFollowUser
+                                                onFollowClick = viewModel::toggleFollowUser,
+                                                blockedUsernames = uiState.blockedUsernames,
+                                                blockedQuoteHandling = uiState.blockedQuoteHandling
                                             )
                                             BottomTab.Notifications -> NotificationsTab(
                                                 session = uiState.session,
@@ -403,7 +425,12 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 profileCacheBuster = uiState.profileCacheBuster,
                                                 showImages = uiState.showImagesInFeed,
                                                 openLinksInApp = uiState.openLinksInApp,
-                                                onPostClickById = viewModel::openPostById
+                                                onPostClickById = viewModel::openPostById,
+                                                followedUsernames = uiState.followedUsernames,
+                                                followLoadingUsernames = uiState.followLoadingUsernames,
+                                                onFollowClick = viewModel::toggleFollowUser,
+                                                blockedUsernames = uiState.blockedUsernames,
+                                                blockedQuoteHandling = uiState.blockedQuoteHandling
                                             )
                                         }
                                     }
@@ -485,7 +512,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             showCloseButton = true,
                                             focusedComment = uiState.focusedComment,
                                             onFocusComment = viewModel::focusComment,
-                                            onClearFocusComment = viewModel::clearFocusComment
+                                            onClearFocusComment = viewModel::clearFocusComment,
+                                            blockedUsernames = uiState.blockedUsernames,
+                                            blockedQuoteHandling = uiState.blockedQuoteHandling
                                         )
                                     }
                                     uiState.viewingWallUsername != null -> {
@@ -550,7 +579,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onWallClick = viewModel::openWall,
                                             showImages = uiState.showImagesInFeed,
                                             openLinksInApp = uiState.openLinksInApp,
-                                            onPostClickById = viewModel::openPostById
+                                            onPostClickById = viewModel::openPostById,
+                                            blockedUsernames = uiState.blockedUsernames,
+                                            blockedQuoteHandling = uiState.blockedQuoteHandling
                                         )
                                     }
                                     else -> {
@@ -619,7 +650,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onWallClick = viewModel::openWall,
                                 showImages = uiState.showImagesInFeed,
                                 openLinksInApp = uiState.openLinksInApp,
-                                onPostClickById = viewModel::openPostById
+                                onPostClickById = viewModel::openPostById,
+                                blockedUsernames = uiState.blockedUsernames,
+                                blockedQuoteHandling = uiState.blockedQuoteHandling
                             )
                         } else {
                             HorizontalPager(
@@ -662,7 +695,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         showImages = uiState.showImagesInFeed,
                                         showNewPosts = uiState.showNewPostsPopup,
                                         openLinksInApp = uiState.openLinksInApp,
-                                        onPostClickById = viewModel::openPostById
+                                        onPostClickById = viewModel::openPostById,
+                                        blockedUsernames = uiState.blockedUsernames,
+                                        blockedQuoteHandling = uiState.blockedQuoteHandling
                                     )
                                     BottomTab.Explore -> ExploreTab(
                                         trendingPosts = uiState.exploreTrendingPosts,
@@ -699,7 +734,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         onPostClickById = viewModel::openPostById,
                                         followedUsernames = uiState.followedUsernames,
                                         followLoadingUsernames = uiState.followLoadingUsernames,
-                                        onFollowClick = viewModel::toggleFollowUser
+                                        onFollowClick = viewModel::toggleFollowUser,
+                                        blockedUsernames = uiState.blockedUsernames,
+                                        blockedQuoteHandling = uiState.blockedQuoteHandling
                                     )
                                     BottomTab.Notifications -> NotificationsTab(
                                         session = uiState.session,
@@ -759,7 +796,12 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         profileCacheBuster = uiState.profileCacheBuster,
                                         showImages = uiState.showImagesInFeed,
                                         openLinksInApp = uiState.openLinksInApp,
-                                        onPostClickById = viewModel::openPostById
+                                        onPostClickById = viewModel::openPostById,
+                                        followedUsernames = uiState.followedUsernames,
+                                        followLoadingUsernames = uiState.followLoadingUsernames,
+                                        onFollowClick = viewModel::toggleFollowUser,
+                                        blockedUsernames = uiState.blockedUsernames,
+                                        blockedQuoteHandling = uiState.blockedQuoteHandling
                                     )
                                 }
                             }
@@ -827,7 +869,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onPostClickById = viewModel::openPostById,
                         focusedComment = uiState.focusedComment,
                         onFocusComment = viewModel::focusComment,
-                        onClearFocusComment = viewModel::clearFocusComment
+                        onClearFocusComment = viewModel::clearFocusComment,
+                        blockedUsernames = uiState.blockedUsernames,
+                        blockedQuoteHandling = uiState.blockedQuoteHandling
                     )
                 }
 
@@ -958,7 +1002,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onWearShowProfilePicturesChange = viewModel::setWearShowProfilePictures,
             onWearFeedTypeChange = viewModel::setWearFeedType,
             onUnblockUser = viewModel::unblockUser,
-            onFollowJosh = viewModel::followJoshAtticus
+            onFollowJosh = viewModel::followJoshAtticus,
+            onBlockedQuoteHandlingChange = viewModel::setBlockedQuoteHandling
         )
     }
 }

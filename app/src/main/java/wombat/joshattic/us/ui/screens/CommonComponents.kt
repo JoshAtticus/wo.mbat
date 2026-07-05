@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -497,8 +498,23 @@ fun PostCard(
     onPostClickById: ((String) -> Unit)? = null,
     isFollowing: Boolean? = null,
     followLoading: Boolean = false,
-    onFollowClick: (() -> Unit)? = null
+    onFollowClick: (() -> Unit)? = null,
+    blockedUsernames: Set<String> = emptySet(),
+    blockedQuoteHandling: String = "warning"
 ) {
+    if (blockedUsernames.contains(post.poster.name.lowercase())) {
+        Spacer(modifier = Modifier.size(0.dp))
+        return
+    }
+
+    val isQuoteRepostOfBlocked = post.repost != null &&
+        blockedUsernames.contains(post.repost.poster.name.lowercase()) &&
+        !post.content.replace(Regex("<.*?>"), "").trim().isBlank()
+
+    if (isQuoteRepostOfBlocked && blockedQuoteHandling == "hide_post") {
+        Spacer(modifier = Modifier.size(0.dp))
+        return
+    }
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
     var menuExpanded by remember { mutableStateOf(false) }
@@ -555,7 +571,9 @@ fun PostCard(
                 onPostClickById = onPostClickById,
                 isFollowing = isFollowing,
                 followLoading = followLoading,
-                onFollowClick = onFollowClick
+                onFollowClick = onFollowClick,
+                blockedUsernames = blockedUsernames,
+                blockedQuoteHandling = blockedQuoteHandling
             )
         }
         return
@@ -667,38 +685,71 @@ fun PostCard(
                     )
                 }
                 post.repost?.let { repostPost ->
-                    val repostDisplay = remember(repostPost.content) { autoLinkAndMentions(stripImages(repostPost.content)) }
-                    Card(
-                        shape = androidx.compose.ui.graphics.RectangleShape,
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = onPostClick != null) {
-                                onPostClick?.invoke(repostPost)
-                            }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    val isRepostPosterBlocked = blockedUsernames.contains(repostPost.poster.name.lowercase())
+                    if (isRepostPosterBlocked) {
+                        if (blockedQuoteHandling == "warning") {
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
                             ) {
-                                ProfilePicture(username = repostPost.poster.name, size = 24.dp)
-                                Column {
-                                    Text("Repost", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(repostPost.poster.name, style = MaterialTheme.typography.titleSmall)
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Block,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "This post is from a user you blocked.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
                                 }
                             }
-                            HtmlText(
-                                html = repostDisplay,
-                                maxLines = 4,
-                                onMentionClick = onMentionClick,
-                                onPostClick = onPostClickById,
-                                onClick = { onPostClick?.invoke(repostPost) },
-                                openLinksInApp = openLinksInApp
-                            )
+                        }
+                    } else {
+                        val repostDisplay = remember(repostPost.content) { autoLinkAndMentions(stripImages(repostPost.content)) }
+                        Card(
+                            shape = androidx.compose.ui.graphics.RectangleShape,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = onPostClick != null) {
+                                    onPostClick?.invoke(repostPost)
+                                }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    ProfilePicture(username = repostPost.poster.name, size = 24.dp)
+                                    Column {
+                                        Text("Repost", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(repostPost.poster.name, style = MaterialTheme.typography.titleSmall)
+                                    }
+                                }
+                                HtmlText(
+                                    html = repostDisplay,
+                                    maxLines = 4,
+                                    onMentionClick = onMentionClick,
+                                    onPostClick = onPostClickById,
+                                    onClick = { onPostClick?.invoke(repostPost) },
+                                    openLinksInApp = openLinksInApp
+                                )
+                            }
                         }
                     }
                 }
@@ -821,6 +872,7 @@ fun CommentThreadContent(
     depth: Int,
     onFocusComment: ((Comment) -> Unit)?
 ) {
+    val isBlockedPlaceholder = comment.content == "This comment is from a user you blocked"
     val isReply = comment.parent != null
     Row(
         modifier = Modifier
@@ -833,11 +885,25 @@ fun CommentThreadContent(
             modifier = Modifier.fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(modifier = Modifier.clickable { onProfileClick(comment.poster.name) }) {
-                ProfilePicture(
-                    username = comment.poster.name, 
-                    size = if (isReply) 28.dp else 34.dp
-                )
+            if (isBlockedPlaceholder) {
+                Box(
+                    modifier = Modifier.size(if (isReply) 28.dp else 34.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Block,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+            } else {
+                Box(modifier = Modifier.clickable { onProfileClick(comment.poster.name) }) {
+                    ProfilePicture(
+                        username = comment.poster.name, 
+                        size = if (isReply) 28.dp else 34.dp
+                    )
+                }
             }
             
             val safeReplies = comment.replies ?: emptyList()
@@ -861,13 +927,22 @@ fun CommentThreadContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = comment.poster.name, 
-                    style = if (isReply) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.clickable { onProfileClick(comment.poster.name) }
-                )
+                if (isBlockedPlaceholder) {
+                    Text(
+                        text = "Blocked User",
+                        style = if (isReply) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                } else {
+                    Text(
+                        text = comment.poster.name, 
+                        style = if (isReply) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.clickable { onProfileClick(comment.poster.name) }
+                    )
+                }
                 Text(
                     text = "•",
                     style = MaterialTheme.typography.bodySmall,
@@ -881,7 +956,7 @@ fun CommentThreadContent(
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
-                if (!isBanned) {
+                if (!isBanned && !isBlockedPlaceholder) {
                     IconButton(
                         onClick = { onReply(comment) }, 
                         modifier = Modifier.size(24.dp)
@@ -897,14 +972,23 @@ fun CommentThreadContent(
             }
             
             // Content text
-            val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
-            HtmlText(
-                html = displayContent,
-                onMentionClick = onMentionClick,
-                onPostClick = onPostClick,
-                openLinksInApp = openLinksInApp,
-                modifier = Modifier.padding(bottom = 2.dp)
-            )
+            if (isBlockedPlaceholder) {
+                Text(
+                    text = comment.content,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            } else {
+                val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
+                HtmlText(
+                    html = displayContent,
+                    onMentionClick = onMentionClick,
+                    onPostClick = onPostClick,
+                    openLinksInApp = openLinksInApp,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
             
             // Nested replies list
             val safeReplies = comment.replies ?: emptyList()

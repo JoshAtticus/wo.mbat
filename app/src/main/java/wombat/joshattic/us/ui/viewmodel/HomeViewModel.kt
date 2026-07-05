@@ -28,6 +28,7 @@ import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.state.HomeUiState
+import wombat.joshattic.us.ui.state.BlockedWarningTarget
 
 class HomeViewModel(
     private val repository: WombatRepository,
@@ -420,11 +421,22 @@ class HomeViewModel(
     fun openProfile(username: String) {
         val normalizedUsername = username.trim()
         val isBlocked = _uiState.value.blockedUsernames.contains(normalizedUsername.lowercase())
+        if (isBlocked) {
+            _uiState.value = _uiState.value.copy(
+                blockedWarningTarget = BlockedWarningTarget.Profile(normalizedUsername)
+            )
+            return
+        }
+        openProfileBypassingBlock(normalizedUsername)
+    }
+
+    fun openProfileBypassingBlock(username: String) {
+        val normalizedUsername = username.trim()
         _uiState.value = _uiState.value.copy(
             viewingProfileUsername = normalizedUsername,
             viewingProfile = null,
             viewingProfilePosts = emptyList(),
-            viewingProfileLoading = !isBlocked,
+            viewingProfileLoading = true,
             viewingProfileIsFollowing = null,
             viewingProfileFollowLoading = false,
             selectedPost = null,
@@ -435,7 +447,6 @@ class HomeViewModel(
             viewingProfilePage = 1,
             viewingProfileLast = false
         )
-        if (isBlocked) return
         viewModelScope.launch {
             val currentSession = _uiState.value.session
             runCatching {
@@ -469,7 +480,7 @@ class HomeViewModel(
                 }
                 _uiState.value = _uiState.value.copy(
                     viewingProfile = profile,
-                    viewingProfilePosts = filterBlockedPosts(posts),
+                    viewingProfilePosts = posts, // bypass filter
                     viewingProfileLoading = false,
                     viewingProfileIsFollowing = followAndLast.first,
                     viewingProfileLast = followAndLast.second,
@@ -507,7 +518,7 @@ class HomeViewModel(
             runCatching {
                 val response = repository.loadUserPosts(current.session, username, nextPage)
                 val posts = if (current.session != null) augmentLoveStatuses(response.posts, current.session) else response.posts
-                val filtered = filterBlockedPosts(posts)
+                val filtered = posts // bypass filter
                 Pair(filtered, response.last)
             }.onSuccess { (newPosts, isLast) ->
                 _uiState.value = _uiState.value.copy(
@@ -526,6 +537,17 @@ class HomeViewModel(
     }
 
     fun openPost(post: Post, scrollToCommentId: String? = null) {
+        val isBlocked = _uiState.value.blockedUsernames.contains(post.poster.name.lowercase())
+        if (isBlocked) {
+            _uiState.value = _uiState.value.copy(
+                blockedWarningTarget = BlockedWarningTarget.Post(post)
+            )
+            return
+        }
+        openPostBypassingBlock(post, scrollToCommentId)
+    }
+
+    fun openPostBypassingBlock(post: Post, scrollToCommentId: String? = null) {
         // If this is a pure repost wrapper (empty content + nested post), open the inner post
         // so that comments, love counts, and repost counts are loaded for the correct post ID.
         val isPureRepostWrapper = post.repost != null &&
@@ -562,7 +584,14 @@ class HomeViewModel(
             runCatching {
                 repository.loadPost(_uiState.value.session, postId)
             }.onSuccess { post ->
-                openPost(post)
+                if (_uiState.value.blockedUsernames.contains(post.poster.name.lowercase())) {
+                    _uiState.value = _uiState.value.copy(
+                        commentsLoading = false,
+                        blockedWarningTarget = BlockedWarningTarget.Post(post)
+                    )
+                } else {
+                    openPost(post)
+                }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     commentsLoading = false,
@@ -851,8 +880,10 @@ class HomeViewModel(
                 val nextPage = current.unreadNotificationsPage + 1
                 val response = runCatching { repository.loadUnreadNotifications(session, nextPage) }.getOrNull()
                 if (response != null) {
+                    val rawUnread = response.unread.orEmpty()
+                    val filteredUnread = handleBlockedNotifications(rawUnread, session, current.blockedUsernames)
                     _uiState.value = _uiState.value.copy(
-                        unreadNotifications = _uiState.value.unreadNotifications + response.unread.orEmpty(),
+                        unreadNotifications = _uiState.value.unreadNotifications + filteredUnread,
                         unreadNotificationsPage = nextPage,
                         unreadNotificationsLast = response.last
                     )
@@ -860,8 +891,12 @@ class HomeViewModel(
                     if (response.last) {
                         val readResp = runCatching { repository.loadReadNotifications(session, 1) }.getOrNull()
                         if (readResp != null) {
+                            val filteredRead = readResp.read.orEmpty().filterNot { notification ->
+                                val actorName = notification.data.actor?.name?.lowercase()
+                                actorName != null && current.blockedUsernames.contains(actorName)
+                            }
                             _uiState.value = _uiState.value.copy(
-                                readNotifications = readResp.read.orEmpty(),
+                                readNotifications = filteredRead,
                                 readNotificationsPage = 1,
                                 readNotificationsLast = readResp.last
                             )
@@ -872,8 +907,12 @@ class HomeViewModel(
                 val nextPage = current.readNotificationsPage + 1
                 val response = runCatching { repository.loadReadNotifications(session, nextPage) }.getOrNull()
                 if (response != null) {
+                    val filteredRead = response.read.orEmpty().filterNot { notification ->
+                        val actorName = notification.data.actor?.name?.lowercase()
+                        actorName != null && current.blockedUsernames.contains(actorName)
+                    }
                     _uiState.value = _uiState.value.copy(
-                        readNotifications = _uiState.value.readNotifications + response.read.orEmpty(),
+                        readNotifications = _uiState.value.readNotifications + filteredRead,
                         readNotificationsPage = nextPage,
                         readNotificationsLast = response.last
                     )
@@ -1105,8 +1144,22 @@ class HomeViewModel(
                 accountPosts = current.accountPosts.filterNotBlocked(normalized),
                 viewingProfilePosts = current.viewingProfilePosts.filterNotBlocked(normalized),
                 selectedPost = current.selectedPost?.takeUnless { it.poster.name.equals(username, ignoreCase = true) },
+                followedUsernames = current.followedUsernames - normalized,
                 toastMessage = if (reported) "You've reported this user" else null
             )
+
+            // Background automatic unfollow
+            val session = current.session
+            if (session != null) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    runCatching {
+                        val isFollowing = repository.getFollowStatus(session, username, session.username)
+                        if (isFollowing) {
+                            repository.toggleFollow(session, username)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1133,8 +1186,9 @@ class HomeViewModel(
             runCatching {
                 repository.getFollowers(_uiState.value.session, username, 1)
             }.onSuccess { response ->
+                val filtered = response.followers.filterNot { _uiState.value.blockedUsernames.contains(it.name.lowercase()) }
                 _uiState.value = _uiState.value.copy(
-                    userListToShow = response.followers,
+                    userListToShow = filtered,
                     userListIsLastPage = response.last,
                     userListLoading = false
                 )
@@ -1163,8 +1217,9 @@ class HomeViewModel(
             runCatching {
                 repository.getFollowing(_uiState.value.session, username, 1)
             }.onSuccess { response ->
+                val filtered = response.following.filterNot { _uiState.value.blockedUsernames.contains(it.name.lowercase()) }
                 _uiState.value = _uiState.value.copy(
-                    userListToShow = response.following,
+                    userListToShow = filtered,
                     userListIsLastPage = response.last,
                     userListLoading = false
                 )
@@ -1192,8 +1247,9 @@ class HomeViewModel(
             if (type == "followers") {
                 runCatching { repository.getFollowers(currentState.session, username, nextPage) }
                     .onSuccess { response ->
+                        val filtered = response.followers.filterNot { _uiState.value.blockedUsernames.contains(it.name.lowercase()) }
                         _uiState.value = _uiState.value.copy(
-                            userListToShow = (_uiState.value.userListToShow ?: emptyList()) + response.followers,
+                            userListToShow = (_uiState.value.userListToShow ?: emptyList()) + filtered,
                             userListPage = nextPage,
                             userListIsLastPage = response.last,
                             userListLoadingMore = false
@@ -1204,8 +1260,9 @@ class HomeViewModel(
             } else if (type == "following") {
                 runCatching { repository.getFollowing(currentState.session, username, nextPage) }
                     .onSuccess { response ->
+                        val filtered = response.following.filterNot { _uiState.value.blockedUsernames.contains(it.name.lowercase()) }
                         _uiState.value = _uiState.value.copy(
-                            userListToShow = (_uiState.value.userListToShow ?: emptyList()) + response.following,
+                            userListToShow = (_uiState.value.userListToShow ?: emptyList()) + filtered,
                             userListPage = nextPage,
                             userListIsLastPage = response.last,
                             userListLoadingMore = false
@@ -1356,13 +1413,33 @@ class HomeViewModel(
     }
 
     private fun filterBlockedPosts(posts: List<Post>): List<Post> =
-        posts.filterNotBlocked(_uiState.value.blockedUsernames)
+        posts.filterNotBlocked(_uiState.value.blockedUsernames, _uiState.value.blockedQuoteHandling)
 
     private fun List<Post>.filterNotBlocked(username: String): List<Post> =
         filterNot { it.poster.name.equals(username, ignoreCase = true) }
 
-    private fun List<Post>.filterNotBlocked(blockedUsernames: Set<String>): List<Post> =
-        filterNot { blockedUsernames.contains(it.poster.name.lowercase()) }
+    private fun List<Post>.filterNotBlocked(blockedUsernames: Set<String>, quoteHandling: String = "warning"): List<Post> {
+        return filter { post ->
+            val posterBlocked = blockedUsernames.contains(post.poster.name.lowercase())
+            if (posterBlocked) return@filter false
+            
+            val repost = post.repost
+            if (repost != null) {
+                val repostPosterBlocked = blockedUsernames.contains(repost.poster.name.lowercase())
+                if (repostPosterBlocked) {
+                    val isPureRepost = post.content.replace(Regex("<.*?>"), "").trim().isBlank()
+                    if (isPureRepost) {
+                        return@filter false
+                    } else {
+                        if (quoteHandling == "hide_post") {
+                            return@filter false
+                        }
+                    }
+                }
+            }
+            true
+        }
+    }
 
     private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = coroutineScope {
         posts.map { post ->
@@ -1451,10 +1528,11 @@ class HomeViewModel(
                 val current = _uiState.value
                 _uiState.value = current.copy(
                     blockedUsernames = blockedUsernames,
-                    feed = current.feed.filterNotBlocked(blockedUsernames),
-                    exploreTrendingPosts = current.exploreTrendingPosts.filterNotBlocked(blockedUsernames),
-                    accountPosts = current.accountPosts.filterNotBlocked(blockedUsernames),
-                    viewingProfilePosts = current.viewingProfilePosts.filterNotBlocked(blockedUsernames),
+                    feed = current.feed.filterNotBlocked(blockedUsernames, current.blockedQuoteHandling),
+                    exploreTrendingPosts = current.exploreTrendingPosts.filterNotBlocked(blockedUsernames, current.blockedQuoteHandling),
+                    accountPosts = current.accountPosts.filterNotBlocked(blockedUsernames, current.blockedQuoteHandling),
+                    viewingProfilePosts = current.viewingProfilePosts.filterNotBlocked(blockedUsernames, current.blockedQuoteHandling),
+                    userListToShow = current.userListToShow?.filterNot { blockedUsernames.contains(it.name.lowercase()) },
                     selectedPost = current.selectedPost?.takeUnless {
                         blockedUsernames.contains(it.poster.name.lowercase())
                     }
@@ -1496,6 +1574,33 @@ class HomeViewModel(
         }
     }
 
+    private fun handleBlockedNotifications(
+        notifications: List<Notification>,
+        session: AuthSession?,
+        blockedUsernames: Set<String>
+    ): List<Notification> {
+        if (blockedUsernames.isEmpty()) return notifications
+
+        val blockedList = notifications.filter { notification ->
+            val actorName = notification.data.actor?.name?.lowercase()
+            actorName != null && blockedUsernames.contains(actorName)
+        }
+
+        if (blockedList.isNotEmpty() && session != null) {
+            val blockedIds = blockedList.map { it.id }
+            viewModelScope.launch(Dispatchers.IO) {
+                runCatching {
+                    repository.markNotificationsRead(session, blockedIds)
+                }
+            }
+        }
+
+        return notifications.filterNot { notification ->
+            val actorName = notification.data.actor?.name?.lowercase()
+            actorName != null && blockedUsernames.contains(actorName)
+        }
+    }
+
     private suspend fun loadNotifications(session: AuthSession?) {
         if (session == null) {
             _uiState.value = _uiState.value.copy(
@@ -1514,7 +1619,8 @@ class HomeViewModel(
         val unreadResponse = runCatching { repository.loadUnreadNotifications(session, 1) }
             .getOrDefault(wombat.joshattic.us.data.model.NotificationResponse(emptyList(), null, true))
 
-        val unread = unreadResponse.unread.orEmpty()
+        val rawUnread = unreadResponse.unread.orEmpty()
+        val unread = handleBlockedNotifications(rawUnread, session, _uiState.value.blockedUsernames)
         val unreadLast = unreadResponse.last
 
         val readResponse = if (unreadLast) {
@@ -1523,7 +1629,11 @@ class HomeViewModel(
             null
         }
 
-        val read = readResponse?.read.orEmpty()
+        val rawRead = readResponse?.read.orEmpty()
+        val read = rawRead.filterNot { notification ->
+            val actorName = notification.data.actor?.name?.lowercase()
+            actorName != null && _uiState.value.blockedUsernames.contains(actorName)
+        }
         val readLast = readResponse?.last ?: false
 
         val oldUnreadIds = _uiState.value.unreadNotifications.map { it.id }.toSet()
@@ -1615,13 +1725,34 @@ class HomeViewModel(
         }
     }
 
+    private fun filterBlockedComments(comments: List<Comment>, blockedUsernames: Set<String>): List<Comment> {
+        return comments.mapNotNull { comment ->
+            val posterNameLower = comment.poster.name.lowercase()
+            val isBlocked = blockedUsernames.contains(posterNameLower)
+            val filteredReplies = filterBlockedComments(comment.replies ?: emptyList(), blockedUsernames)
+            if (isBlocked) {
+                if (filteredReplies.isNotEmpty()) {
+                    comment.copy(
+                        content = "This comment is from a user you blocked",
+                        replies = filteredReplies
+                    )
+                } else {
+                    null
+                }
+            } else {
+                comment.copy(replies = filteredReplies)
+            }
+        }
+    }
+
     private suspend fun loadComments(postId: String) {
         val session = _uiState.value.session
         _uiState.value = _uiState.value.copy(commentsLoading = true)
         runCatching {
             val topLevel = repository.loadComments(session, postId).comments
                 .map { it.copy(replies = it.replies ?: emptyList()) }
-            topLevel.map { loadRepliesRecursively(it, session) }
+            val fullComments = topLevel.map { loadRepliesRecursively(it, session) }
+            filterBlockedComments(fullComments, _uiState.value.blockedUsernames)
         }.onSuccess { fullComments ->
             _uiState.value = _uiState.value.copy(
                 comments = fullComments,
@@ -1713,6 +1844,18 @@ class HomeViewModel(
                 _uiState.value = _uiState.value.copy(wearFeedType = value)
             }
         }
+        viewModelScope.launch {
+            prefs.blockedQuoteHandling.collectLatest { value ->
+                val current = _uiState.value
+                _uiState.value = current.copy(
+                    blockedQuoteHandling = value,
+                    feed = current.feed.filterNotBlocked(current.blockedUsernames, value),
+                    exploreTrendingPosts = current.exploreTrendingPosts.filterNotBlocked(current.blockedUsernames, value),
+                    accountPosts = current.accountPosts.filterNotBlocked(current.blockedUsernames, value),
+                    viewingProfilePosts = current.viewingProfilePosts.filterNotBlocked(current.blockedUsernames, value)
+                )
+            }
+        }
     }
 
     fun openSettings() {
@@ -1767,6 +1910,10 @@ class HomeViewModel(
         viewModelScope.launch { repository.settingsPreferences.setWearFeedType(value) }
     }
 
+    fun setBlockedQuoteHandling(value: String) {
+        viewModelScope.launch { repository.settingsPreferences.setBlockedQuoteHandling(value) }
+    }
+
     fun unblockUser(username: String) {
         viewModelScope.launch {
             repository.unblockUser(username)
@@ -1809,6 +1956,26 @@ class HomeViewModel(
             refreshFeed()
             loadExploreTrending()
             onRefreshTriggered()
+        }
+    }
+
+    fun clearBlockedWarning() {
+        _uiState.value = _uiState.value.copy(
+            blockedWarningTarget = null,
+            commentsLoading = false
+        )
+    }
+
+    fun bypassBlockedWarning() {
+        val target = _uiState.value.blockedWarningTarget ?: return
+        _uiState.value = _uiState.value.copy(blockedWarningTarget = null)
+        when (target) {
+            is BlockedWarningTarget.Profile -> {
+                openProfileBypassingBlock(target.username)
+            }
+            is BlockedWarningTarget.Post -> {
+                openPostBypassingBlock(target.post)
+            }
         }
     }
 

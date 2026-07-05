@@ -78,7 +78,9 @@ fun FeedTab(
     showImages: Boolean = true,
     showNewPosts: Boolean = true,
     openLinksInApp: Boolean = true,
-    onPostClickById: ((String) -> Unit)? = null
+    onPostClickById: ((String) -> Unit)? = null,
+    blockedUsernames: Set<String> = emptySet(),
+    blockedQuoteHandling: String = "warning"
 ) {
     val coroutineScope = rememberCoroutineScope()
     val refreshState = rememberPullToRefreshState()
@@ -162,7 +164,9 @@ fun FeedTab(
                     onEditPost = onEditPost,
                     showImages = showImages,
                     openLinksInApp = openLinksInApp,
-                    onPostClickById = onPostClickById
+                    onPostClickById = onPostClickById,
+                    blockedUsernames = blockedUsernames,
+                    blockedQuoteHandling = blockedQuoteHandling
                 )
             }
         }

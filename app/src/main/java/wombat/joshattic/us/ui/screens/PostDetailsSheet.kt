@@ -91,6 +91,8 @@ fun PostDetailsContent(
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
+    blockedUsernames: Set<String> = emptySet(),
+    blockedQuoteHandling: String = "warning",
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -185,7 +187,9 @@ fun PostDetailsContent(
                     onEditPost = onEditPost,
                     showImages = showImages,
                     openLinksInApp = openLinksInApp,
-                    onPostClickById = onPostClickById
+                    onPostClickById = onPostClickById,
+                    blockedUsernames = blockedUsernames,
+                    blockedQuoteHandling = blockedQuoteHandling
                 )
             }
 
@@ -369,7 +373,9 @@ fun PostDetailsSheet(
     onPostClickById: ((String) -> Unit)? = null,
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
-    onClearFocusComment: () -> Unit = {}
+    onClearFocusComment: () -> Unit = {},
+    blockedUsernames: Set<String> = emptySet(),
+    blockedQuoteHandling: String = "warning"
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
@@ -419,7 +425,9 @@ fun PostDetailsSheet(
             showCloseButton = false,
             focusedComment = focusedComment,
             onFocusComment = onFocusComment,
-            onClearFocusComment = onClearFocusComment
+            onClearFocusComment = onClearFocusComment,
+            blockedUsernames = blockedUsernames,
+            blockedQuoteHandling = blockedQuoteHandling
         )
     }
 }

@@ -40,7 +40,9 @@ fun ExploreTab(
     onPostClickById: ((String) -> Unit)? = null,
     followedUsernames: Set<String> = emptySet(),
     followLoadingUsernames: Set<String> = emptySet(),
-    onFollowClick: ((String) -> Unit)? = null
+    onFollowClick: ((String) -> Unit)? = null,
+    blockedUsernames: Set<String> = emptySet(),
+    blockedQuoteHandling: String = "warning"
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -85,7 +87,9 @@ fun ExploreTab(
                     onPostClickById = onPostClickById,
                     isFollowing = isFollowing,
                     followLoading = followLoading,
-                    onFollowClick = onFollowClick?.let { { it(post.poster.name) } }
+                    onFollowClick = onFollowClick?.let { { it(post.poster.name) } },
+                    blockedUsernames = blockedUsernames,
+                    blockedQuoteHandling = blockedQuoteHandling
                 )
             }
         }

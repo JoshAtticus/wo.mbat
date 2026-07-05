@@ -124,7 +124,9 @@ fun ProfileScreen(
     onWallClick: (String) -> Unit = {},
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
-    onPostClickById: ((String) -> Unit)? = null
+    onPostClickById: ((String) -> Unit)? = null,
+    blockedUsernames: Set<String> = emptySet(),
+    blockedQuoteHandling: String = "warning"
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -421,7 +423,9 @@ fun ProfileScreen(
                         onEditPost = onEditPost,
                         showImages = showImages,
                         openLinksInApp = openLinksInApp,
-                        onPostClickById = onPostClickById
+                        onPostClickById = onPostClickById,
+                        blockedUsernames = blockedUsernames,
+                        blockedQuoteHandling = blockedQuoteHandling
                     )
                 }
             } else {

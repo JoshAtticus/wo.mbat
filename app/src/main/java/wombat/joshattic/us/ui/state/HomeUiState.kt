@@ -116,7 +116,9 @@ data class HomeUiState(
     val wearFeedType: String = "Home",
     val isOnline: Boolean = true,
     val followedUsernames: Set<String> = emptySet(),
-    val followLoadingUsernames: Set<String> = emptySet()
+    val followLoadingUsernames: Set<String> = emptySet(),
+    val blockedQuoteHandling: String = "warning",
+    val blockedWarningTarget: BlockedWarningTarget? = null
 ) {
     val accountLabel: String = session?.username ?: "Account"
     val unreadNotificationCount: Int = maxOf(unreadNotifications.size, socketUnreadCount)
@@ -132,3 +134,9 @@ enum class BottomTab {
 enum class SettingsCategory {
     FEED, NOTIFICATIONS, LINKS, BLOCKED_USERS, WEAR_OS, ABOUT
 }
+
+sealed interface BlockedWarningTarget {
+    data class Profile(val username: String) : BlockedWarningTarget
+    data class Post(val post: wombat.joshattic.us.data.model.Post) : BlockedWarningTarget
+}
+

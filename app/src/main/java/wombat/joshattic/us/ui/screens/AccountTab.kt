@@ -113,7 +113,12 @@ fun AccountTab(
     profileCacheBuster: Long = 0L,
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
-    onPostClickById: ((String) -> Unit)? = null
+    onPostClickById: ((String) -> Unit)? = null,
+    followedUsernames: Set<String> = emptySet(),
+    followLoadingUsernames: Set<String> = emptySet(),
+    onFollowClick: ((String) -> Unit)? = null,
+    blockedUsernames: Set<String> = emptySet(),
+    blockedQuoteHandling: String = "warning"
 ) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
@@ -395,7 +400,9 @@ fun AccountTab(
                             onEditPost = onEditPost,
                             showImages = showImages,
                             openLinksInApp = openLinksInApp,
-                            onPostClickById = onPostClickById
+                            onPostClickById = onPostClickById,
+                            blockedUsernames = blockedUsernames,
+                            blockedQuoteHandling = blockedQuoteHandling
                         )
                     }
                 }
