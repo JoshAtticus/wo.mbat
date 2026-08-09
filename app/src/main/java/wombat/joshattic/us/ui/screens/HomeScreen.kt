@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,6 +102,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
     val isTablet = configuration.screenWidthDp >= 600
 
     val pagerState = rememberPagerState(initialPage = uiState.selectedTab.ordinal) { 4 }
+    val useAltLogo = rememberSaveable { kotlin.random.Random.nextInt(500) == 0 }
 
     LaunchedEffect(pagerState.settledPage) {
         val targetTab = BottomTab.entries[pagerState.settledPage]
@@ -235,23 +237,32 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 }
                             },
                             title = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    if (viewingUser == null) {
-                                        Image(
-                                            painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo),
-                                            contentDescription = "wo.mbat logo",
-                                            modifier = Modifier.size(28.dp),
-                                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
+                                if (useAltLogo && viewingUser == null && uiState.selectedTab == BottomTab.Home) {
+                                    Image(
+                                        painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo_alt),
+                                        contentDescription = "wo.mbat",
+                                        modifier = Modifier.height(26.dp),
+                                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
+                                    )
+                                } else {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        if (viewingUser == null) {
+                                            Image(
+                                                painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo),
+                                                contentDescription = "wo.mbat logo",
+                                                modifier = Modifier.size(28.dp),
+                                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
+                                            )
+                                        }
+                                        Text(
+                                            text = viewingUser?.let { "@$it" } ?: titleForTab(uiState.selectedTab),
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold
                                         )
                                     }
-                                    Text(
-                                        text = viewingUser?.let { "@$it" } ?: titleForTab(uiState.selectedTab),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
                                 }
                             },
                             actions = {
@@ -311,20 +322,30 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 Column(modifier = Modifier.fillMaxSize()) {
                                     CenterAlignedTopAppBar(
                                         title = {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
+                                            if (useAltLogo && uiState.selectedTab == BottomTab.Home) {
                                                 Image(
-                                                    painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo),
-                                                    contentDescription = "wo.mbat logo",
-                                                    modifier = Modifier.size(28.dp)
+                                                    painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo_alt),
+                                                    contentDescription = "wo.mbat",
+                                                    modifier = Modifier.height(26.dp),
+                                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
                                                 )
-                                                Text(
-                                                    text = titleForTab(uiState.selectedTab),
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    fontWeight = FontWeight.Bold
-                                                )
+                                            } else {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Image(
+                                                        painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo),
+                                                        contentDescription = "wo.mbat logo",
+                                                        modifier = Modifier.size(28.dp),
+                                                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
+                                                    )
+                                                    Text(
+                                                        text = titleForTab(uiState.selectedTab),
+                                                        style = MaterialTheme.typography.titleLarge,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
                                             }
                                         },
                                         actions = {
