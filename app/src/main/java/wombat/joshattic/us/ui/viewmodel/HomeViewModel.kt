@@ -737,10 +737,29 @@ class HomeViewModel(
         )
     }
 
-    fun openFullScreenImages(images: List<String>, index: Int, username: String? = null) {
+    fun openFullScreenImages(images: List<String>, index: Int, post: Post?) {
         _uiState.value = _uiState.value.copy(
             fullScreenImages = images,
+            fullScreenPost = post,
+            fullScreenImageUsername = post?.poster?.name,
+            initialFullScreenImageIndex = index
+        )
+    }
+
+    fun openFullScreenImages(images: List<String>, index: Int, username: String?) {
+        _uiState.value = _uiState.value.copy(
+            fullScreenImages = images,
+            fullScreenPost = null,
             fullScreenImageUsername = username,
+            initialFullScreenImageIndex = index
+        )
+    }
+
+    fun openFullScreenImages(images: List<String>, index: Int, post: Post? = null, username: String? = null) {
+        _uiState.value = _uiState.value.copy(
+            fullScreenImages = images,
+            fullScreenPost = post,
+            fullScreenImageUsername = username ?: post?.poster?.name,
             initialFullScreenImageIndex = index
         )
     }
@@ -748,6 +767,7 @@ class HomeViewModel(
     fun closeFullScreenImages() {
         _uiState.value = _uiState.value.copy(
             fullScreenImages = null,
+            fullScreenPost = null,
             fullScreenImageUsername = null,
             initialFullScreenImageIndex = 0
         )

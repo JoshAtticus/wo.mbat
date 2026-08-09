@@ -111,6 +111,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -641,7 +642,7 @@ fun PostCard(
     onProfileClick: (String) -> Unit = {},
     onLoveClick: ((Post) -> Unit)? = null,
     onPostClick: ((Post) -> Unit)? = null,
-    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
+    onImageClick: (List<String>, Int, Post?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onReportPost: ((Post) -> Unit)? = null,
     onRepostClick: ((Post) -> Unit)? = null,
@@ -915,7 +916,7 @@ fun PostCard(
                 Spacer(modifier = Modifier.height(6.dp))
                 PostImageCarousel(
                     images = imageUrls,
-                    onImageClick = { images, index -> onImageClick(images, index, post.poster.name) },
+                    onImageClick = { images, index -> onImageClick(images, index, post) },
                     modifier = Modifier.padding(horizontal = 16.dp),
                     isDetailView = !truncated
                 )
@@ -1392,6 +1393,7 @@ fun parseWasteofUrl(url: String): WasteofUrl? {
 fun HtmlText(
     html: String,
     modifier: Modifier = Modifier,
+    color: Color? = null,
     maxLines: Int = Int.MAX_VALUE,
     onMentionClick: ((String) -> Unit)? = null,
     onPostClick: ((String) -> Unit)? = null,
@@ -1399,8 +1401,8 @@ fun HtmlText(
     openLinksInApp: Boolean = true,
     onTruncatedChanged: ((Boolean) -> Unit)? = null
 ) {
-    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
-    val linkColor = MaterialTheme.colorScheme.onBackground.toArgb()
+    val textColor = (color ?: MaterialTheme.colorScheme.onSurface).toArgb()
+    val linkColor = (color ?: MaterialTheme.colorScheme.onBackground).toArgb()
 
     val spannedText = remember(html, textColor, linkColor, onMentionClick, onPostClick, openLinksInApp) {
         val processedHtml = html.trim()
@@ -1928,11 +1930,21 @@ fun PostImageCarousel(
 fun FullScreenImageViewer(
     images: List<String>,
     initialIndex: Int,
-    username: String?,
-    onDismiss: () -> Unit
+    post: Post? = null,
+    username: String? = null,
+    onDismiss: () -> Unit,
+    onLoveClick: ((Post) -> Unit)? = null,
+    onCommentClick: ((Post) -> Unit)? = null,
+    onRepostClick: ((Post) -> Unit)? = null,
+    onProfileClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { images.size })
+    val safeInitialIndex = initialIndex.coerceIn(0, (images.size - 1).coerceAtLeast(0))
+    val pagerState = rememberPagerState(initialPage = safeInitialIndex, pageCount = { images.size })
+    val haptic = LocalHapticFeedback.current
+    val displayUsername = username ?: post?.poster?.name
+    var showUiControls by remember { mutableStateOf(true) }
+    var isZoomedIn by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1946,34 +1958,45 @@ fun FullScreenImageViewer(
             color = Color.Black
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
+                // Image Pager
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
                     pageSpacing = 16.dp,
-                    userScrollEnabled = true // Ensure scrolling is enabled
+                    userScrollEnabled = !isZoomedIn
                 ) { page ->
                     var scale by remember { mutableStateOf(1f) }
                     var offset by remember { mutableStateOf(Offset.Zero) }
-                    val state = rememberTransformableState { zoomChange, offsetChange, _ ->
+                    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
                         scale = (scale * zoomChange).coerceIn(1f, 5f)
-                        // Only allow panning if zoomed in
-                        if (scale > 1f) {
+                        if (scale > 1.02f) {
                             offset += offsetChange
+                            isZoomedIn = true
                         } else {
                             offset = Offset.Zero
+                            scale = 1f
+                            isZoomedIn = false
                         }
                     }
 
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .transformable(state = state)
+                            .transformable(state = transformableState, enabled = true)
                             .pointerInput(Unit) {
-                                // Reset scale and offset on double tap
                                 detectTapGestures(
+                                    onTap = {
+                                        showUiControls = !showUiControls
+                                    },
                                     onDoubleTap = {
-                                        scale = if (scale > 1f) 1f else 3f
-                                        offset = Offset.Zero
+                                        if (scale > 1.05f) {
+                                            scale = 1f
+                                            offset = Offset.Zero
+                                            isZoomedIn = false
+                                        } else {
+                                            scale = 3f
+                                            isZoomedIn = true
+                                        }
                                     }
                                 )
                             }
@@ -1981,10 +2004,11 @@ fun FullScreenImageViewer(
                         SubcomposeAsyncImage(
                             model = ImageRequest.Builder(context)
                                 .data(images[page])
+                                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
                                 .crossfade(true)
                                 .build(),
                             contentDescription = "Full screen image ${page + 1}",
-                            loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
+                            loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) } },
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer(
@@ -1998,46 +2022,226 @@ fun FullScreenImageViewer(
                     }
                 }
 
-                // Top Controls
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(WindowInsets.statusBars.asPaddingValues())
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Top Controls (Close button, Page Counter, Download button)
+                AnimatedVisibility(
+                    visible = showUiControls,
+                    enter = fadeIn(animationSpec = tween(200)),
+                    exit = fadeOut(animationSpec = tween(200)),
+                    modifier = Modifier.align(Alignment.TopCenter)
                 ) {
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(WindowInsets.statusBars.asPaddingValues())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
-                    }
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
+                        }
 
-                    IconButton(
-                        onClick = {
-                            downloadImage(context, images[pagerState.currentPage], username)
-                        },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                    ) {
-                        Icon(Icons.Filled.Download, contentDescription = "Download", tint = Color.White)
+                        if (images.size > 1) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.5f)
+                            ) {
+                                Text(
+                                    text = "${pagerState.currentPage + 1} / ${images.size}",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.width(40.dp))
+                        }
+
+                        IconButton(
+                            onClick = {
+                                downloadImage(context, images[pagerState.currentPage], displayUsername)
+                            },
+                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        ) {
+                            Icon(Icons.Filled.Download, contentDescription = "Download", tint = Color.White)
+                        }
                     }
                 }
 
-                // Bottom Indicator
-                if (images.size > 1) {
+                // Bottom Overlay: Fade-to-Black Gradient with Profile, Post Text & Actions
+                AnimatedVisibility(
+                    visible = showUiControls,
+                    enter = fadeIn(animationSpec = tween(200)),
+                    exit = fadeOut(animationSpec = tween(200)),
+                    modifier = Modifier.align(Alignment.BottomStart)
+                ) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(24.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.6f),
+                                        Color.Black.copy(alpha = 0.95f)
+                                    )
+                                )
+                            )
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 16.dp)
                     ) {
-                        Text(
-                            "${pagerState.currentPage + 1} / ${images.size}",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // (pfp) @username
+                            displayUsername?.let { uname ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.clickable(enabled = onProfileClick != null) {
+                                        onDismiss()
+                                        onProfileClick?.invoke(uname)
+                                    }
+                                ) {
+                                    ProfilePicture(username = uname, size = 32.dp)
+                                    Text(
+                                        text = "@${uname.lowercase()}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            // Truncated post text (max 2 lines)
+                            post?.let { p ->
+                                val cleanText = remember(p.content) {
+                                    autoLinkAndMentions(stripImages(p.content))
+                                }
+                                if (cleanText.isNotBlank()) {
+                                    var isActuallyTruncated by remember { mutableStateOf(false) }
+                                    Column {
+                                        HtmlText(
+                                            html = cleanText,
+                                            color = Color.White,
+                                            maxLines = 2,
+                                            openLinksInApp = true,
+                                            onMentionClick = { mention ->
+                                                onDismiss()
+                                                onProfileClick?.invoke(mention)
+                                            },
+                                            onTruncatedChanged = { isActuallyTruncated = it }
+                                        )
+                                        if (isActuallyTruncated) {
+                                            Text(
+                                                text = "...see more",
+                                                color = MaterialTheme.colorScheme.primary,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                modifier = Modifier
+                                                    .padding(top = 2.dp)
+                                                    .clickable {
+                                                        onDismiss()
+                                                        onCommentClick?.invoke(p)
+                                                    }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Action buttons: Like, Comment, Repost adapted for Image Viewer
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    // Like Button
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.18f))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                onLoveClick?.invoke(p)
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (p.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                            contentDescription = "Love",
+                                            tint = if (p.isLoving == true) Color(0xFFFF4081) else Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = p.loves.toString(),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+
+                                    // Comment Button
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.18f))
+                                            .clickable {
+                                                onDismiss()
+                                                onCommentClick?.invoke(p)
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Chat,
+                                            contentDescription = "Comments",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = p.comments.toString(),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+
+                                    // Repost Button
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.18f))
+                                            .clickable {
+                                                onDismiss()
+                                                onRepostClick?.invoke(p)
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Repeat,
+                                            contentDescription = "Repost",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = p.reposts.toString(),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

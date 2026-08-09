@@ -1096,8 +1096,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
         FullScreenImageViewer(
             images = images,
             initialIndex = uiState.initialFullScreenImageIndex,
+            post = uiState.fullScreenPost,
             username = uiState.fullScreenImageUsername,
-            onDismiss = viewModel::closeFullScreenImages
+            onDismiss = viewModel::closeFullScreenImages,
+            onLoveClick = viewModel::togglePostLove,
+            onCommentClick = viewModel::openPost,
+            onRepostClick = { post -> viewModel.submitRepost(post.id) },
+            onProfileClick = viewModel::openProfile
         )
     }
 

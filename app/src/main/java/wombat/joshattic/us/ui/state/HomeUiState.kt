@@ -74,6 +74,7 @@ data class HomeUiState(
     val editProfileError: String? = null,
     val profileCacheBuster: Long = 0L,
     val fullScreenImages: List<String>? = null,
+    val fullScreenPost: Post? = null,
     val fullScreenImageUsername: String? = null,
     val initialFullScreenImageIndex: Int = 0,
     val isBanned: Boolean = false,

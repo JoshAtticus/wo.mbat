@@ -62,7 +62,7 @@ fun FeedTab(
     onMentionClick: (String) -> Unit,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
-    onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
+    onImageClick: (List<String>, Int, Post?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onReportPost: ((Post) -> Unit)? = null,
     onLoadNextPage: () -> Unit = {},
