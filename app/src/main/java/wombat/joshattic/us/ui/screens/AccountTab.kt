@@ -44,6 +44,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.ui.zIndex
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -154,222 +156,236 @@ fun AccountTab(
                         val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner" +
                             if (profileCacheBuster > 0) "?cb=$profileCacheBuster" else ""
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(140.dp)
-                                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 0.dp))
-                                .background(accent.copy(alpha = 0.18f))
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            SubcomposeAsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(bannerUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                loading = {
-                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                                    }
-                                },
-                                contentDescription = "Profile banner",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                            // Gradient scrim at the bottom of the banner for smoother blending
+                            // 1. Banner image
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.BottomCenter)
                                     .fillMaxWidth()
-                                    .height(48.dp)
-                                    .background(
-                                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Transparent,
-                                                MaterialTheme.colorScheme.background.copy(alpha = 0.8f)
-                                            )
-                                        )
-                                    )
-                            )
-                        }
-                    }
-
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .offset(y = (-24).dp)
-                                .background(
-                                    Brush.verticalGradient(
-                                        0.0f to Color.Transparent,
-                                        0.1f to accent.copy(alpha = 0.08f),
-                                        1.0f to accent.copy(alpha = 0.08f)
-                                    ),
-                                    RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
-                                ),
-                            shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box {
-                                        ProfilePicture(
-                                            username = profile.name,
-                                            size = 72.dp,
-                                            borderColor = accent,
-                                            cacheBuster = if (profileCacheBuster > 0) profileCacheBuster.toString() else null
-                                        )
-                                        if (profile.online) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .align(Alignment.BottomEnd)
-                                                    .offset(x = (-2).dp, y = (-2).dp)
-                                                    .background(Color(0xFF22C55E), CircleShape)
-                                                    .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
-                                            )
+                                    .height(140.dp)
+                                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                                    .background(accent.copy(alpha = 0.18f))
+                            ) {
+                                SubcomposeAsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(bannerUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    loading = {
+                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                                         }
-                                    }
-                                    Spacer(modifier = Modifier.width(14.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        var expanded by remember { mutableStateOf(false) }
+                                    },
+                                    contentDescription = "Profile banner",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+
+                            // 2. Discord-style Avatar overlapping half on banner, half on content card below
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 16.dp)
+                                    .offset(y = 90.dp)
+                                    .zIndex(3f)
+                            ) {
+                                ProfilePicture(
+                                    username = profile.name,
+                                    size = 84.dp,
+                                    borderColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    borderWidth = 4.dp,
+                                    cacheBuster = if (profileCacheBuster > 0) profileCacheBuster.toString() else null
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .align(Alignment.BottomEnd)
+                                        .offset(x = (-2).dp, y = (-2).dp)
+                                        .background(if (profile.online) Color(0xFF22C55E) else Color(0xFF64748B), CircleShape)
+                                        .border(3.5.dp, MaterialTheme.colorScheme.surfaceContainerLow, CircleShape)
+                                )
+                            }
+
+                            // 3. Profile Content Card
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 132.dp),
+                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 12.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.clickable { expanded = true }
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(profile.name, style = MaterialTheme.typography.titleLarge, color = accent)
-                                            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Switch Account", tint = accent)
-                                            
-                                            DropdownMenu(
-                                                expanded = expanded,
-                                                onDismissRequest = { expanded = false }
+                                            FilledTonalIconButton(
+                                                onClick = onEditProfileClick,
+                                                shape = CircleShape,
+                                                modifier = Modifier.size(40.dp)
                                             ) {
-                                                savedAccounts.forEach { account ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(account.username) },
-                                                        onClick = { 
-                                                            expanded = false
-                                                            onSwitchAccount(account.username)
-                                                        },
-                                                        leadingIcon = {
-                                                            ProfilePicture(username = account.username, size = 24.dp)
-                                                        },
-                                                        trailingIcon = {
-                                                            if (account.username == profile.name) {
-                                                                Icon(Icons.Filled.Check, contentDescription = "Active")
-                                                            } else {
-                                                                val unread = savedAccountUnreadCounts[account.username] ?: 0
-                                                                if (unread > 0) {
-                                                                    Badge(containerColor = MaterialTheme.colorScheme.error) {
-                                                                        Text(unread.toString(), color = MaterialTheme.colorScheme.onError)
+                                                Icon(Icons.Filled.Edit, contentDescription = "Edit Profile", modifier = Modifier.size(20.dp), tint = accent)
+                                            }
+
+                                            FilledTonalIconButton(
+                                                onClick = { onWallClick(profile.name) },
+                                                shape = CircleShape,
+                                                modifier = Modifier.size(40.dp)
+                                            ) {
+                                                Icon(Icons.Filled.Forum, contentDescription = "Wall", modifier = Modifier.size(20.dp), tint = accent)
+                                            }
+
+                                            var expanded by remember { mutableStateOf(false) }
+                                            Box {
+                                                FilledTonalIconButton(
+                                                    onClick = { expanded = true },
+                                                    shape = CircleShape,
+                                                    modifier = Modifier.size(40.dp)
+                                                ) {
+                                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "Switch Account", modifier = Modifier.size(20.dp))
+                                                }
+
+                                                DropdownMenu(
+                                                    expanded = expanded,
+                                                    onDismissRequest = { expanded = false },
+                                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                                                    tonalElevation = 3.dp
+                                                ) {
+                                                    savedAccounts.forEach { account ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(account.username) },
+                                                            onClick = { 
+                                                                expanded = false
+                                                                onSwitchAccount(account.username)
+                                                            },
+                                                            leadingIcon = {
+                                                                ProfilePicture(username = account.username, size = 24.dp)
+                                                            },
+                                                            trailingIcon = {
+                                                                if (account.username == profile.name) {
+                                                                    Icon(Icons.Filled.Check, contentDescription = "Active")
+                                                                } else {
+                                                                    val unread = savedAccountUnreadCounts[account.username] ?: 0
+                                                                    if (unread > 0) {
+                                                                        Badge(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.error) {
+                                                                            Text(unread.toString(), color = androidx.compose.material3.MaterialTheme.colorScheme.onError)
+                                                                        }
                                                                     }
                                                                 }
                                                             }
-                                                        }
+                                                        )
+                                                    }
+                                                    HorizontalDivider()
+                                                    DropdownMenuItem(
+                                                        text = { Text("Add Account") },
+                                                        onClick = {
+                                                            expanded = false
+                                                            onAddAccount()
+                                                        },
+                                                        leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Sign out") },
+                                                        onClick = {
+                                                            expanded = false
+                                                            onLogout()
+                                                        },
+                                                        leadingIcon = { Icon(Icons.Filled.ExitToApp, contentDescription = null) }
                                                     )
                                                 }
-                                                HorizontalDivider()
-                                                DropdownMenuItem(
-                                                    text = { Text("Add Account") },
-                                                    onClick = {
-                                                        expanded = false
-                                                        onAddAccount()
-                                                    },
-                                                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Sign out") },
-                                                    onClick = {
-                                                        expanded = false
-                                                        onLogout()
-                                                    },
-                                                    leadingIcon = { Icon(Icons.Filled.ExitToApp, contentDescription = null) }
-                                                )
                                             }
                                         }
-                                        Text(
-                                            text = if (profile.online) "Online" else "Offline",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
                                     }
-                                    IconButton(
-                                        onClick = onEditProfileClick,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Edit,
-                                            contentDescription = "Edit Profile",
-                                            tint = accent
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = onSettingsClick,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Settings,
-                                            contentDescription = "Settings",
-                                            tint = accent
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(14.dp))
-                                 HtmlText(
-                                     html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")),
-                                     maxLines = 4,
-                                     onMentionClick = onMentionClick,
-                                     onPostClick = onPostClickById,
-                                     openLinksInApp = openLinksInApp
-                                 )
-                                Spacer(modifier = Modifier.height(14.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    ProfileStat(
-                                        label = "Followers",
-                                        value = profile.stats?.followers ?: 0,
-                                        accentColor = accent,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { onShowFollowers(profile.name) }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = profile.name,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                        color = accent,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
-                                    ProfileStat(
-                                        label = "Following",
-                                        value = profile.stats?.following ?: 0,
-                                        accentColor = accent,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { onShowFollowing(profile.name) }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    HtmlText(
+                                        html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")),
+                                        maxLines = 4,
+                                        onMentionClick = onMentionClick,
+                                        onPostClick = onPostClickById,
+                                        openLinksInApp = openLinksInApp
                                     )
-                                    ProfileStat(
-                                        label = "Posts",
-                                        value = profile.stats?.posts ?: 0,
-                                        accentColor = accent,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(16.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { onWallClick(profile.name) }
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(vertical = 10.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Forum,
-                                                contentDescription = "Wall",
-                                                tint = accent,
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                            Text(
-                                                text = "Wall",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1
-                                            )
+
+                                    // Joined Date / History Chip below bio
+                                    profile.history?.joined?.let { joinedTime ->
+                                        if (joinedTime > 0) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            val joinedDateStr = remember(joinedTime) {
+                                                val date = java.util.Date(joinedTime)
+                                                val format = java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.getDefault())
+                                                "Joined " + format.format(date)
+                                            }
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                                modifier = Modifier.padding(vertical = 2.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Forum,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(12.dp),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        text = joinedDateStr,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
                                         }
+                                    }
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        ProfileStat(
+                                            label = "Followers",
+                                            value = profile.stats?.followers ?: 0,
+                                            accentColor = accent,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = { onShowFollowers(profile.name) }
+                                        )
+                                        ProfileStat(
+                                            label = "Following",
+                                            value = profile.stats?.following ?: 0,
+                                            accentColor = accent,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = { onShowFollowing(profile.name) }
+                                        )
+                                        ProfileStat(
+                                            label = "Posts",
+                                            value = profile.stats?.posts ?: 0,
+                                            accentColor = accent,
+                                            modifier = Modifier.weight(1f)
+                                        )
                                     }
                                 }
                             }
@@ -389,6 +405,7 @@ fun AccountTab(
                             onClick = { onPostClick(post) },
                             truncated = true,
                             currentUsername = currentUsername,
+                            savedAccounts = savedAccounts,
                             onMentionClick = onMentionClick,
                             onProfileClick = onProfileClick,
                             onLoveClick = onLoveClick,

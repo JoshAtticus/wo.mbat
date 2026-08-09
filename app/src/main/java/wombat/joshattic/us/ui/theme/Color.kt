@@ -18,10 +18,18 @@ data class WombatColorPalette(
     val darkBackground: Color,
     val darkSurface: Color,
     val darkSurfaceVariant: Color,
+    val darkSurfaceContainerLow: Color,
+    val darkSurfaceContainer: Color,
+    val darkSurfaceContainerHigh: Color,
+    val darkSurfaceContainerHighest: Color,
     // Light theme backgrounds — hue-tinted light
     val lightBackground: Color,
     val lightSurface: Color,
     val lightSurfaceVariant: Color,
+    val lightSurfaceContainerLow: Color,
+    val lightSurfaceContainer: Color,
+    val lightSurfaceContainerHigh: Color,
+    val lightSurfaceContainerHighest: Color,
     // Container colors
     val darkContainer: Color,
     val lightContainer: Color,
@@ -69,16 +77,23 @@ fun getWombatColorPalette(userColor: String?): WombatColorPalette {
     lightHsl[2] = (hsl[2] + 0.35f).coerceIn(0f, 1f)
     val brandLight = Color(ColorUtils.HSLToColor(lightHsl))
 
-    // Dark backgrounds — same hue, very low saturation, very low lightness
-    // This gives a "tinted dark" feel like Spotify/Discord
+    // Dark backgrounds — hue-tinted dark
     val darkBg = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.25f).coerceIn(0f, 1f), 0.07f)))
-    val darkSurface = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.22f).coerceIn(0f, 1f), 0.12f)))
-    val darkSurfaceVariant = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.18f).coerceIn(0f, 1f), 0.18f)))
+    val darkSurface = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.22f).coerceIn(0f, 1f), 0.11f)))
+    val darkSurfaceVariant = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.18f).coerceIn(0f, 1f), 0.17f)))
+    val darkSurfaceContainerLow = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.22f).coerceIn(0f, 1f), 0.09f)))
+    val darkSurfaceContainer = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.20f).coerceIn(0f, 1f), 0.12f)))
+    val darkSurfaceContainerHigh = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.18f).coerceIn(0f, 1f), 0.15f)))
+    val darkSurfaceContainerHighest = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.16f).coerceIn(0f, 1f), 0.19f)))
 
-    // Light backgrounds — same hue, very low saturation, very high lightness
-    val lightBg = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.15f).coerceIn(0f, 1f), 0.96f)))
-    val lightSurface = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.10f).coerceIn(0f, 1f), 0.99f)))
-    val lightSurfaceVariant = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.12f).coerceIn(0f, 1f), 0.94f)))
+    // Light backgrounds — slate light background with pure white card containers for high contrast
+    val lightBg = Color(0xFFF1F5F9)
+    val lightSurface = Color(0xFFFFFFFF)
+    val lightSurfaceVariant = Color(0xFFE2E8F0)
+    val lightSurfaceContainerLow = Color(0xFFFFFFFF)
+    val lightSurfaceContainer = Color(0xFFF8FAFC)
+    val lightSurfaceContainerHigh = Color(0xFFE2E8F0)
+    val lightSurfaceContainerHighest = Color(0xFFCBD5E1)
 
     // Container colors
     val darkContainer = Color(ColorUtils.HSLToColor(floatArrayOf(hue, (sat * 0.6f).coerceIn(0f, 1f), 0.22f)))
@@ -91,9 +106,17 @@ fun getWombatColorPalette(userColor: String?): WombatColorPalette {
         darkBackground = darkBg,
         darkSurface = darkSurface,
         darkSurfaceVariant = darkSurfaceVariant,
+        darkSurfaceContainerLow = darkSurfaceContainerLow,
+        darkSurfaceContainer = darkSurfaceContainer,
+        darkSurfaceContainerHigh = darkSurfaceContainerHigh,
+        darkSurfaceContainerHighest = darkSurfaceContainerHighest,
         lightBackground = lightBg,
         lightSurface = lightSurface,
         lightSurfaceVariant = lightSurfaceVariant,
+        lightSurfaceContainerLow = lightSurfaceContainerLow,
+        lightSurfaceContainer = lightSurfaceContainer,
+        lightSurfaceContainerHigh = lightSurfaceContainerHigh,
+        lightSurfaceContainerHighest = lightSurfaceContainerHighest,
         darkContainer = darkContainer,
         lightContainer = lightContainer
     )

@@ -12,8 +12,14 @@ data class User(
     val color: String,
     val stats: UserStats?,
     val online: Boolean,
-    val permissions: Permissions? = null
+    val permissions: Permissions? = null,
+    val links: List<String> = emptyList(),
+    val history: UserHistory? = null,
+    val beta: Boolean = false
 )
+
+@Immutable
+data class UserHistory(val joined: Long)
 
 @Immutable
 data class UserStats(val followers: Int, val following: Int, val posts: Int)
@@ -141,6 +147,14 @@ data class FollowingResponse(
 )
 
 data class UpdateBioRequest(val bio: String)
+
+data class SearchPostsResponse(val results: List<Post>, val last: Boolean)
+
+data class SearchUsersResponse(val results: List<User>, val last: Boolean)
+
+data class TrendingResponse(val posts: List<Post>, val since: String)
+
+data class FrogResponse(val frog: String)
 
 data class ImageUploadResponse(
     val success: Boolean,

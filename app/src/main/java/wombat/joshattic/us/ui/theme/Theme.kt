@@ -43,6 +43,11 @@ fun WombatTheme(
         onSurface = SurfaceWhite,
         surfaceVariant = p.darkSurfaceVariant,
         onSurfaceVariant = Color(0xFF9CA3AF),
+        // M3 Surface Containers
+        surfaceContainerLow = p.darkSurfaceContainerLow,
+        surfaceContainer = p.darkSurfaceContainer,
+        surfaceContainerHigh = p.darkSurfaceContainerHigh,
+        surfaceContainerHighest = p.darkSurfaceContainerHighest,
         // Outline
         outline = p.brand.copy(alpha = 0.5f),
         outlineVariant = p.darkSurfaceVariant,
@@ -81,6 +86,11 @@ fun WombatTheme(
         onSurface = Color(0xFF111827),
         surfaceVariant = p.lightSurfaceVariant,
         onSurfaceVariant = Color(0xFF4B5563),
+        // M3 Surface Containers
+        surfaceContainerLow = p.lightSurfaceContainerLow,
+        surfaceContainer = p.lightSurfaceContainer,
+        surfaceContainerHigh = p.lightSurfaceContainerHigh,
+        surfaceContainerHighest = p.lightSurfaceContainerHighest,
         // Outline
         outline = p.brand.copy(alpha = 0.4f),
         outlineVariant = Color(0xFFE5E7EB),

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,6 +44,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,9 +54,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -85,7 +84,8 @@ fun SettingsScreen(
     onWearFeedTypeChange: (String) -> Unit,
     onUnblockUser: (String) -> Unit,
     onFollowJosh: () -> Unit,
-    onBlockedQuoteHandlingChange: (String) -> Unit
+    onBlockedQuoteHandlingChange: (String) -> Unit,
+    frogMessage: String? = null
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
@@ -237,7 +237,10 @@ fun SettingsScreen(
                                         onShowPfpChange = onWearShowProfilePicturesChange,
                                         onFeedTypeChange = onWearFeedTypeChange
                                     )
-                                    SettingsCategory.ABOUT -> AboutSettings(onFollowJosh = onFollowJosh)
+                                    SettingsCategory.ABOUT -> AboutSettings(
+                                        onFollowJosh = onFollowJosh,
+                                        frogMessage = frogMessage
+                                    )
                                 }
                             }
                         }
@@ -292,7 +295,10 @@ fun SettingsScreen(
                             onShowPfpChange = onWearShowProfilePicturesChange,
                             onFeedTypeChange = onWearFeedTypeChange
                         )
-                        SettingsCategory.ABOUT -> AboutSettings(onFollowJosh = onFollowJosh)
+                        SettingsCategory.ABOUT -> AboutSettings(
+                            onFollowJosh = onFollowJosh,
+                            frogMessage = frogMessage
+                        )
                     }
                 }
             }
@@ -875,8 +881,9 @@ private fun PaddingValues(
 }
 
 @Composable
-private fun AboutSettings(onFollowJosh: () -> Unit) {
+private fun AboutSettings(onFollowJosh: () -> Unit, frogMessage: String? = null) {
     val uriHandler = LocalUriHandler.current
+    var frogRevealed by remember { mutableStateOf(false) }
     
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -940,6 +947,42 @@ private fun AboutSettings(onFollowJosh: () -> Unit) {
                 iconColor = Color.White,
                 onClick = onFollowJosh
             )
+        }
+
+        // 🐸 Secret frog easter egg
+        if (frogMessage != null) {
+            item {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { frogRevealed = !frogRevealed },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (frogRevealed) 1f else 0.3f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (frogRevealed) "🐸" else "• • •",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        if (frogRevealed) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = frogMessage,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

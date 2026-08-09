@@ -55,6 +55,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -137,9 +142,14 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
@@ -193,6 +203,7 @@ import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.ui.state.BottomTab
+import wombat.joshattic.us.ui.theme.applyGoogleSansFlexTypeface
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import java.text.DateFormat
@@ -295,92 +306,203 @@ fun WombatBottomNavigationBar(
     unreadCount: Int,
     accountLabel: String,
     profilePictureUrl: String?,
-    onTabSelected: (BottomTab) -> Unit
+    onTabSelected: (BottomTab) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val navBarItemColors = NavigationBarItemDefaults.colors(
-        selectedIconColor = MaterialTheme.colorScheme.primary,
-        selectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    val haptic = LocalHapticFeedback.current
+    val selectedColor = MaterialTheme.colorScheme.primaryContainer
+    val selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+    val unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface
+    Surface(
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
+        modifier = modifier
     ) {
-        NavigationBarItem(
-            selected = selectedTab == BottomTab.Home,
-            onClick = { onTabSelected(BottomTab.Home) },
-            icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
-            label = { Text("Home") },
-            colors = navBarItemColors
-        )
-        NavigationBarItem(
-            selected = selectedTab == BottomTab.Explore,
-            onClick = { onTabSelected(BottomTab.Explore) },
-            icon = { Icon(Icons.Filled.Tag, contentDescription = "Explore") },
-            label = { Text("Explore") },
-            colors = navBarItemColors
-        )
-        NavigationBarItem(
-            selected = selectedTab == BottomTab.Notifications,
-            onClick = { onTabSelected(BottomTab.Notifications) },
-            icon = {
-                BadgedBox(
-                    badge = {
-                        if (unreadCount > 0) {
-                            Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) }
-                        }
-                    }
+        Row(
+            modifier = Modifier
+                .height(64.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            // Home
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onTabSelected(BottomTab.Home)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (selectedTab == BottomTab.Home) selectedColor else Color.Transparent),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Notifications, contentDescription = "Notifications")
-                }
-            },
-            label = { Text("Notifications") },
-            colors = navBarItemColors
-        )
-        NavigationBarItem(
-            selected = selectedTab == BottomTab.Account,
-            onClick = { onTabSelected(BottomTab.Account) },
-            icon = {
-                if (profilePictureUrl != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(profilePictureUrl)
-                            .crossfade(true)
-                            .addHeader("Cache-Control", "no-cache")
-                            .addHeader("Pragma", "no-cache")
-                            .diskCachePolicy(CachePolicy.DISABLED)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .build(),
-                        contentDescription = accountLabel,
-                        modifier = Modifier.size(28.dp).clip(CircleShape)
+                    Icon(
+                        Icons.Filled.Home,
+                        contentDescription = "Home",
+                        tint = if (selectedTab == BottomTab.Home) selectedIconColor else unselectedIconColor,
+                        modifier = Modifier.size(22.dp)
                     )
-                } else {
-                    Icon(Icons.Filled.AccountCircle, contentDescription = "Account")
                 }
-            },
-            label = { Text(accountLabel, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
-            colors = navBarItemColors
-        )
+            }
+
+            // Explore
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onTabSelected(BottomTab.Explore)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (selectedTab == BottomTab.Explore) selectedColor else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Tag,
+                        contentDescription = "Explore",
+                        tint = if (selectedTab == BottomTab.Explore) selectedIconColor else unselectedIconColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            // Notifications
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onTabSelected(BottomTab.Notifications)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (selectedTab == BottomTab.Notifications) selectedColor else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BadgedBox(
+                        badge = {
+                            if (unreadCount > 0) {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError
+                                ) { Text(if (unreadCount > 99) "99+" else unreadCount.toString(), fontWeight = FontWeight.Bold) }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            Icons.Filled.Notifications,
+                            contentDescription = "Notifications",
+                            tint = if (selectedTab == BottomTab.Notifications) selectedIconColor else unselectedIconColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+
+            // Account
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onTabSelected(BottomTab.Account)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (selectedTab == BottomTab.Account) selectedColor else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (profilePictureUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(profilePictureUrl)
+                                .crossfade(true)
+                                .addHeader("Cache-Control", "no-cache")
+                                .addHeader("Pragma", "no-cache")
+                                .diskCachePolicy(CachePolicy.DISABLED)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .build(),
+                            contentDescription = accountLabel,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .then(
+                                    if (selectedTab == BottomTab.Account)
+                                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                    else Modifier
+                                )
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.AccountCircle,
+                            contentDescription = "Account",
+                            tint = if (selectedTab == BottomTab.Account) selectedIconColor else unselectedIconColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun ProfileStat(label: String, value: Int, accentColor: Color? = null, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     Surface(
-        shape = RoundedCornerShape(16.dp), 
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(20.dp), 
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 value.toString(),
-                style = MaterialTheme.typography.titleMedium,
-                color = accentColor ?: MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = accentColor ?: MaterialTheme.colorScheme.primary,
                 maxLines = 1
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 label, 
-                style = MaterialTheme.typography.bodySmall, 
+                style = MaterialTheme.typography.labelSmall, 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
@@ -397,9 +519,15 @@ fun UserActionsMenu(
     username: String
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        tonalElevation = 3.dp
+    ) {
         DropdownMenuItem(
             text = { Text("Share Profile") },
+            leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
             onClick = {
                 onDismiss()
                 val sendIntent = android.content.Intent().apply {
@@ -411,12 +539,18 @@ fun UserActionsMenu(
                 context.startActivity(shareIntent)
             }
         )
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
         DropdownMenuItem(
-            text = { Text("Block") },
+            text = { Text("Block", color = MaterialTheme.colorScheme.error) },
+            leadingIcon = { Icon(Icons.Filled.Block, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             onClick = onBlock
         )
         DropdownMenuItem(
-            text = { Text("Block & Report") },
+            text = { Text("Block & Report", color = MaterialTheme.colorScheme.error) },
+            leadingIcon = { Icon(Icons.Filled.Flag, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             onClick = onBlockReport
         )
     }
@@ -433,9 +567,15 @@ fun PostActionsMenu(
     onEdit: (() -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        tonalElevation = 3.dp
+    ) {
         DropdownMenuItem(
             text = { Text("Share Post") },
+            leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
             onClick = {
                 onDismiss()
                 val sendIntent = android.content.Intent().apply {
@@ -450,24 +590,38 @@ fun PostActionsMenu(
         if (onEdit != null) {
             DropdownMenuItem(
                 text = { Text("Edit Post") },
+                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
                 onClick = onEdit
+            )
+        }
+        if (onBlock != null || onReport != null) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
             )
         }
         if (onBlock != null) {
             DropdownMenuItem(
-                text = { Text("Block") },
+                text = { Text("Block User", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Filled.Block, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 onClick = onBlock
             )
         }
         if (onReport != null) {
             DropdownMenuItem(
-                text = { Text("Report Post") },
+                text = { Text("Report Post", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Filled.Flag, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 onClick = onReport
             )
         }
         if (onDelete != null) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
             DropdownMenuItem(
                 text = { Text("Delete Post", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 onClick = onDelete
             )
         }
@@ -482,6 +636,7 @@ fun PostCard(
     clickable: Boolean = true,
     truncated: Boolean = false,
     currentUsername: String? = null,
+    savedAccounts: List<wombat.joshattic.us.data.model.AuthSession> = emptyList(),
     onMentionClick: ((String) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: ((Post) -> Unit)? = null,
@@ -541,7 +696,7 @@ fun PostCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    "@${post.poster.name} reposted this",
+                    "@${post.poster.name.lowercase()} reposted this",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -555,6 +710,7 @@ fun PostCard(
                 clickable = clickable,
                 truncated = truncated,
                 currentUsername = currentUsername,
+                savedAccounts = savedAccounts,
                 onMentionClick = onMentionClick,
                 onProfileClick = onProfileClick,
                 onLoveClick = onLoveClick,
@@ -580,30 +736,23 @@ fun PostCard(
     }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(300))
+            .then(if (clickable) Modifier.clickable { onClick() } else Modifier)
     ) {
-        Column(
-            modifier = if (clickable) Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(vertical = 12.dp) else Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(vertical = 14.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1f, fill = false)
                         .clickable { onProfileClick(post.poster.name) },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -611,7 +760,7 @@ fun PostCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(post.poster.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(post.poster.name.lowercase(), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (post.pinned == true) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Icon(
@@ -626,39 +775,46 @@ fun PostCard(
                     }
                 }
                 
-                val isOwnPost = currentUsername == post.poster.name
-                if (currentUsername != null && !isOwnPost && onFollowClick != null) {
-                    if (followLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        IconButton(onClick = onFollowClick) {
-                            Icon(
-                                imageVector = if (isFollowing == true) Icons.Filled.Check else Icons.Filled.PersonAdd,
-                                contentDescription = if (isFollowing == true) "Unfollow" else "Follow",
-                                tint = if (isFollowing == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val isOwnPost = currentUsername?.trim()?.equals(post.poster.name.trim(), ignoreCase = true) == true ||
+                                    savedAccounts.any { it.username.trim().equals(post.poster.name.trim(), ignoreCase = true) }
+                    if (currentUsername != null && !isOwnPost && onFollowClick != null) {
+                        if (followLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .size(24.dp),
+                                strokeWidth = 2.dp
                             )
+                        } else {
+                            val haptic = LocalHapticFeedback.current
+                            IconButton(onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onFollowClick()
+                            }) {
+                                Icon(
+                                    imageVector = if (isFollowing == true) Icons.Filled.Check else Icons.Filled.PersonAdd,
+                                    contentDescription = if (isFollowing == true) "Unfollow" else "Follow",
+                                    tint = if (isFollowing == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
-                }
-                if (onBlockUser != null || onReportPost != null || onDeletePost != null || onEditPost != null) {
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Post options")
+                    if (onBlockUser != null || onReportPost != null || onDeletePost != null || onEditPost != null) {
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Filled.MoreVert, contentDescription = "Post options")
+                            }
+                            PostActionsMenu(
+                                expanded = menuExpanded,
+                                onDismiss = { menuExpanded = false },
+                                postId = post.id,
+                                onBlock = if (!isOwnPost) onBlockUser?.let { { menuExpanded = false; it(post.poster.name) } } else null,
+                                onReport = if (!isOwnPost) onReportPost?.let { { menuExpanded = false; it(post) } } else null,
+                                onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null,
+                                onEdit = if (isOwnPost) onEditPost?.let { { menuExpanded = false; it(post) } } else null
+                            )
                         }
-                        PostActionsMenu(
-                            expanded = menuExpanded,
-                            onDismiss = { menuExpanded = false },
-                            postId = post.id,
-                            onBlock = if (!isOwnPost) onBlockUser?.let { { menuExpanded = false; it(post.poster.name) } } else null,
-                            onReport = if (!isOwnPost) onReportPost?.let { { menuExpanded = false; it(post) } } else null,
-                            onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null,
-                            onEdit = if (isOwnPost) onEditPost?.let { { menuExpanded = false; it(post) } } else null
-                        )
                     }
                 }
             }
@@ -719,16 +875,17 @@ fun PostCard(
                     } else {
                         val repostDisplay = remember(repostPost.content) { autoLinkAndMentions(stripImages(repostPost.content)) }
                         Card(
-                            shape = androidx.compose.ui.graphics.RectangleShape,
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
                                 .clickable(enabled = onPostClick != null) {
                                     onPostClick?.invoke(repostPost)
                                 }
                         ) {
                             Column(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Row(
@@ -755,6 +912,7 @@ fun PostCard(
                 }
             }
             if (showImages && imageUrls.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
                 PostImageCarousel(
                     images = imageUrls,
                     onImageClick = { images, index -> onImageClick(images, index, post.poster.name) },
@@ -762,10 +920,10 @@ fun PostCard(
                     isDetailView = !truncated
                 )
             }
-            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 PostMetric(
                     value = post.loves,
@@ -785,17 +943,25 @@ fun PostCard(
                     )
                     DropdownMenu(
                         expanded = repostMenuExpanded,
-                        onDismissRequest = { repostMenuExpanded = false }
+                        onDismissRequest = { repostMenuExpanded = false },
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                        tonalElevation = 3.dp
                     ) {
                         DropdownMenuItem(
                             text = { Text("Repost") },
+                            leadingIcon = { Icon(Icons.Filled.Repeat, contentDescription = null) },
                             onClick = {
                                 repostMenuExpanded = false
                                 onRepostClick?.invoke(post)
                             }
                         )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        )
                         DropdownMenuItem(
                             text = { Text("Quote") },
+                            leadingIcon = { Icon(Icons.Filled.FormatQuote, contentDescription = null) },
                             onClick = {
                                 repostMenuExpanded = false
                                 onQuoteClick?.invoke(post)
@@ -1049,37 +1215,46 @@ fun NotificationCard(
             .animateContentSize(animationSpec = tween(300))
             .then(
                 if (!notification.read) Modifier.border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(20.dp)
+                    width = 1.5.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(24.dp)
                 ) else Modifier
             )
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (notification.read) MaterialTheme.colorScheme.surface
-            else MaterialTheme.colorScheme.surface.copy(alpha = 0f).let {
-                // Subtle tinted overlay — 10% primary on top of surface
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                    .compositeOver(MaterialTheme.colorScheme.surface)
-            },
+            containerColor = if (notification.read) MaterialTheme.colorScheme.surfaceContainerLow
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface
         )
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ProfilePicture(username = actorName, size = 36.dp)
+                Box {
+                    ProfilePicture(username = actorName, size = 42.dp)
+                    if (!notification.read) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .align(Alignment.TopEnd)
+                                .offset(x = 2.dp, y = (-2).dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         actorName,
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = notificationLabel(notification.type),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (!isOverlay) {
@@ -1135,10 +1310,11 @@ fun NotificationCard(
 }
 
 @Composable
-fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderColor: Color? = null, cacheBuster: String? = null) {
+fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderColor: Color? = null, borderWidth: androidx.compose.ui.unit.Dp = 3.dp, cacheBuster: String? = null) {
     val context = LocalContext.current
-    val imageRequest = remember(username, cacheBuster) {
-        val url = "https://wasteof-image-proxy.tnix.dev/$username?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
+    val cleanUsername = username.trim().lowercase()
+    val imageRequest = remember(cleanUsername, cacheBuster) {
+        val url = "https://wasteof-image-proxy.tnix.dev/$cleanUsername?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
         ImageRequest.Builder(context)
             .data(url)
             .crossfade(true)
@@ -1158,7 +1334,7 @@ fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderCo
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(CircleShape)
-                    .border(3.dp, borderColor, CircleShape)
+                    .border(borderWidth, borderColor, CircleShape)
             )
             SubcomposeAsyncImage(
                 model = imageRequest,
@@ -1328,13 +1504,18 @@ fun HtmlText(
                 )
             }
         }
-        spannable
+        var len = spannable.length
+        while (len > 0 && (spannable[len - 1] == '\n' || spannable[len - 1] == '\r' || spannable[len - 1] == ' ')) {
+            len--
+        }
+        if (len < spannable.length) spannable.subSequence(0, len) else spannable
     }
 
     AndroidView(
         modifier = modifier,
         factory = { context ->
             TextView(context).apply {
+                applyGoogleSansFlexTypeface(this, roundness = 50f)
                 // Use a custom movement method that handles link clicks without scrolling.
                 // LinkMovementMethod internally calls scrollTo() which makes the
                 // TextView scrollable inside notification cards and post cards.
@@ -1413,23 +1594,86 @@ fun PostMetric(
     isActive: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
-    Column(
-        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+    val haptic = LocalHapticFeedback.current
+    val isLoveMetric = label == "loves"
+    val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+
+    val containerColor = if (isActive) {
+        if (isLoveMetric) {
+            if (isDarkTheme) Color(0xFF5C1D24) else Color(0xFFFEE2E2)
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        }
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+
+    val contentColor = if (isActive) {
+        if (isLoveMetric) {
+            if (isDarkTheme) Color(0xFFFF8A80) else Color(0xFFEF4444)
+        } else {
+            MaterialTheme.colorScheme.primary
+        }
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    var animMode by remember { mutableStateOf(0) }
+    val iconScale by animateFloatAsState(
+        targetValue = if (isActive) 1.35f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "MetricIconScale"
+    )
+    val iconRotation by animateFloatAsState(
+        targetValue = if (isActive && animMode == 1) 360f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "MetricIconRotation"
+    )
+    val iconOffsetY by animateFloatAsState(
+        targetValue = if (isActive && animMode == 2) -4f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "MetricIconOffsetY"
+    )
+
+    Surface(
+        shape = CircleShape,
+        color = containerColor,
+        contentColor = contentColor,
+        modifier = if (onClick != null) Modifier.clickable {
+            if (!isActive) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                animMode = (0..2).random()
+            } else {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
+            onClick()
+        } else Modifier
     ) {
         Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(value.toString(), style = MaterialTheme.typography.titleSmall)
             Icon(
                 imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(12.dp),
-                tint = if (isActive) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+                contentDescription = label,
+                modifier = Modifier
+                    .size(16.dp)
+                    .graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                        rotationZ = iconRotation
+                        translationY = iconOffsetY
+                    },
+                tint = contentColor
+            )
+            Text(
+                text = value.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = contentColor
             )
         }
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -1465,7 +1709,38 @@ fun notificationLabel(type: String): String {
 }
 
 fun formatTime(time: Long): String {
-    return DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(time))
+    if (time <= 0) return ""
+    val now = System.currentTimeMillis()
+    val diffMs = now - time
+    if (diffMs < 0) return "just now"
+
+    val diffSec = diffMs / 1000
+    if (diffSec < 60) {
+        return "${diffSec.coerceAtLeast(1)}s ago"
+    }
+
+    val diffMin = diffSec / 60
+    if (diffMin < 60) {
+        return "${diffMin}m ago"
+    }
+
+    val diffHours = diffMin / 60
+    if (diffHours < 24) {
+        return "${diffHours}h ago"
+    }
+
+    val diffDays = diffHours / 24
+    if (diffDays < 30) {
+        return "${diffDays}d ago"
+    }
+
+    val diffMonths = diffDays / 30
+    if (diffMonths < 12) {
+        return "${diffMonths}mo ago"
+    }
+
+    val diffYears = diffDays / 365
+    return "${diffYears.coerceAtLeast(1)}y ago"
 }
 
 fun markdownToHtml(md: String): String {
@@ -1515,32 +1790,36 @@ fun markdownToHtml(md: String): String {
 
 fun isAllowedImageHost(url: String): Boolean {
     return try {
-        val host = java.net.URL(url).host.lowercase()
-        host == "i.ibb.co"
+        val uri = java.net.URI(url)
+        val scheme = uri.scheme?.lowercase()
+        (scheme == "http" || scheme == "https") && !uri.host.isNullOrBlank()
     } catch (e: Exception) {
         false
     }
 }
 
 fun extractImages(html: String): List<String> {
-    val imgRegex = """<img[^>]*src=["']([^"']+)["'][^>]*>""".toRegex(RegexOption.IGNORE_CASE)
-    return imgRegex.findAll(html)
-        .mapNotNull { it.groupValues.getOrNull(1) }
+    val imgTagRegex = """<img[^>]*src=["']([^"']+)["'][^>]*>""".toRegex(RegexOption.IGNORE_CASE)
+    val directUrlRegex = """(?<!["'=/>])(https?://[^\s<>"']+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s<>"']*)?)""".toRegex(RegexOption.IGNORE_CASE)
+
+    val fromTags = imgTagRegex.findAll(html).mapNotNull { it.groupValues.getOrNull(1) }
+    val fromDirect = directUrlRegex.findAll(html).mapNotNull { it.groupValues.getOrNull(1) }
+
+    return (fromTags + fromDirect)
         .filter { url -> isAllowedImageHost(url) }
         .distinct()
         .toList()
 }
 
 fun stripImages(html: String): String {
-    val imgRegex = """<img[^>]*src=["']([^"']+)["'][^>]*>""".toRegex(RegexOption.IGNORE_CASE)
-    return imgRegex.replace(html) { match ->
-        val src = match.groupValues.getOrNull(1) ?: ""
-        if (isAllowedImageHost(src)) {
-            "" // remove supported images (they go to carousel at bottom)
-        } else {
-            match.value // keep unrelated images (though we only support listed ones)
-        }
+    val imgTagRegex = """<img[^>]*src=["']([^"']+)["'][^>]*>""".toRegex(RegexOption.IGNORE_CASE)
+    var result = imgTagRegex.replace(html, "")
+    val directUrlRegex = """(?<!["'=/>])(https?://[^\s<>"']+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s<>"']*)?)""".toRegex(RegexOption.IGNORE_CASE)
+    result = directUrlRegex.replace(result) { match ->
+        val url = match.value
+        if (isAllowedImageHost(url)) "" else url
     }
+    return result
 }
 
 fun autoLinkAndMentions(html: String): String {

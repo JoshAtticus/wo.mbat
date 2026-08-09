@@ -69,6 +69,7 @@ fun FeedTab(
     onRepostClick: (Post) -> Unit = {},
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
+    savedAccounts: List<wombat.joshattic.us.data.model.AuthSession> = emptyList(),
     onDeletePost: ((Post) -> Unit)? = null,
     onEditPost: ((Post) -> Unit)? = null,
     scrollToTop: Boolean = false,
@@ -79,6 +80,9 @@ fun FeedTab(
     showNewPosts: Boolean = true,
     openLinksInApp: Boolean = true,
     onPostClickById: ((String) -> Unit)? = null,
+    followedUsernames: Set<String> = emptySet(),
+    followLoadingUsernames: Set<String> = emptySet(),
+    onFollowClick: ((String) -> Unit)? = null,
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning"
 ) {
@@ -118,56 +122,55 @@ fun FeedTab(
         }
     }
 
-    PullToRefreshBox(
-        modifier = Modifier.fillMaxSize(),
-        state = refreshState,
-        isRefreshing = loading,
-        onRefresh = onRefresh
-    ) {
-        // Load more when reaching near the end
-        LaunchedEffect(listState, posts.size) {
-            snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-                .collect { lastVisibleIndex ->
-                    if (lastVisibleIndex != null && lastVisibleIndex >= posts.size - 5) {
-                        onLoadNextPage()
-                    }
-                }
-        }
-
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize()
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            modifier = Modifier.fillMaxSize(),
+            state = rememberPullToRefreshState(),
+            isRefreshing = loading,
+            onRefresh = onRefresh
         ) {
-            if (!loading && posts.isEmpty()) {
-                item { EmptyStateCard(title = "Nothing here yet", message = "Pull down to refresh.") }
-            }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = if (showNewPosts && newPostsUsernames.isNotEmpty()) 48.dp else 12.dp, bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (!loading && posts.isEmpty()) {
+                    item { EmptyStateCard(title = "Nothing here yet", message = "Pull down to refresh.") }
+                }
 
-            items(posts.distinctBy { it.id }, key = { it.id }, contentType = { "post" }) { post ->
-                PostCard(
-                    post = post,
-                    onClick = { onPostClick(post) },
-                    truncated = true,
-                    currentUsername = currentUsername,
-                    onMentionClick = onMentionClick,
-                    onProfileClick = onProfileClick,
-                    onLoveClick = onLoveClick,
-                    onPostClick = onPostClick,
-                    onImageClick = onImageClick,
-                    onBlockUser = onBlockUser,
-                    onReportPost = onReportPost,
-                    onRepostClick = onRepostClick,
-                    onQuoteClick = onQuoteClick,
-                    onDeletePost = onDeletePost,
-                    onEditPost = onEditPost,
-                    showImages = showImages,
-                    openLinksInApp = openLinksInApp,
-                    onPostClickById = onPostClickById,
-                    blockedUsernames = blockedUsernames,
-                    blockedQuoteHandling = blockedQuoteHandling
-                )
+                items(posts.distinctBy { it.id }, key = { it.id }, contentType = { "post" }) { post ->
+                    val isPosterFollowed = followedUsernames.contains(post.poster.name.lowercase())
+                    val isFollowLoading = followLoadingUsernames.contains(post.poster.name.lowercase())
+                    PostCard(
+                        post = post,
+                        onClick = { onPostClick(post) },
+                        truncated = true,
+                        currentUsername = currentUsername,
+                        savedAccounts = savedAccounts,
+                        onMentionClick = onMentionClick,
+                        onProfileClick = onProfileClick,
+                        onLoveClick = onLoveClick,
+                        onPostClick = onPostClick,
+                        onImageClick = onImageClick,
+                        onBlockUser = onBlockUser,
+                        onReportPost = onReportPost,
+                        onRepostClick = onRepostClick,
+                        onQuoteClick = onQuoteClick,
+                        onDeletePost = onDeletePost,
+                        onEditPost = onEditPost,
+                        showImages = showImages,
+                        openLinksInApp = openLinksInApp,
+                        onPostClickById = onPostClickById,
+                        isFollowing = isPosterFollowed,
+                        followLoading = isFollowLoading,
+                        onFollowClick = onFollowClick?.let { action -> { action(post.poster.name) } },
+                        blockedUsernames = blockedUsernames,
+                        blockedQuoteHandling = blockedQuoteHandling
+                    )
+                }
             }
         }
 

@@ -1,5 +1,6 @@
 package wombat.joshattic.us.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
@@ -22,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -38,13 +40,15 @@ fun WombatNavigationRail(
     modifier: Modifier = Modifier
 ) {
     val navRailItemColors = NavigationRailItemDefaults.colors(
-        selectedIconColor = MaterialTheme.colorScheme.primary,
-        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedTextColor = MaterialTheme.colorScheme.primary,
+        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
     )
 
     NavigationRail(
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier.fillMaxHeight()
     ) {
         Spacer(modifier = Modifier.height(24.dp))
@@ -52,7 +56,7 @@ fun WombatNavigationRail(
             selected = selectedTab == BottomTab.Home,
             onClick = { onTabSelected(BottomTab.Home) },
             icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
-            label = { Text("Home") },
+            label = { Text("Home", fontWeight = if (selectedTab == BottomTab.Home) FontWeight.Bold else FontWeight.Normal) },
             colors = navRailItemColors
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -60,7 +64,7 @@ fun WombatNavigationRail(
             selected = selectedTab == BottomTab.Explore,
             onClick = { onTabSelected(BottomTab.Explore) },
             icon = { Icon(Icons.Filled.Tag, contentDescription = "Explore") },
-            label = { Text("Explore") },
+            label = { Text("Explore", fontWeight = if (selectedTab == BottomTab.Explore) FontWeight.Bold else FontWeight.Normal) },
             colors = navRailItemColors
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -71,14 +75,17 @@ fun WombatNavigationRail(
                 BadgedBox(
                     badge = {
                         if (unreadCount > 0) {
-                            Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) }
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            ) { Text(if (unreadCount > 99) "99+" else unreadCount.toString(), fontWeight = FontWeight.Bold) }
                         }
                     }
                 ) {
                     Icon(Icons.Filled.Notifications, contentDescription = "Notifications")
                 }
             },
-            label = { Text("Notifications") },
+            label = { Text("Notifications", fontWeight = if (selectedTab == BottomTab.Notifications) FontWeight.Bold else FontWeight.Normal) },
             colors = navRailItemColors
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -97,13 +104,16 @@ fun WombatNavigationRail(
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .build(),
                         contentDescription = accountLabel,
-                        modifier = Modifier.size(28.dp).clip(CircleShape)
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .then(if (selectedTab == BottomTab.Account) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
                     )
                 } else {
                     Icon(Icons.Filled.AccountCircle, contentDescription = "Account")
                 }
             },
-            label = { Text(accountLabel, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+            label = { Text(accountLabel, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, fontWeight = if (selectedTab == BottomTab.Account) FontWeight.Bold else FontWeight.Normal) },
             colors = navRailItemColors
         )
     }

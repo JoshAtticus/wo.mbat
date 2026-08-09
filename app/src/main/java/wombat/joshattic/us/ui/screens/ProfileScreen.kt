@@ -28,6 +28,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.zIndex
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -103,6 +108,7 @@ fun ProfileScreen(
     isFollowing: Boolean?,
     followLoading: Boolean,
     currentUsername: String?,
+    savedAccounts: List<wombat.joshattic.us.data.model.AuthSession> = emptyList(),
     onClose: () -> Unit,
     onFollowClick: () -> Unit,
     onBlockClick: (String) -> Unit,
@@ -130,21 +136,6 @@ fun ProfileScreen(
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-                .offset(x = (-8).dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = "Close profile")
-            }
-            Text(
-                text = profile?.name?.let { "@$it" } ?: "Profile",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
 
         if (isBlocked) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -202,101 +193,145 @@ fun ProfileScreen(
                 val hourlyBuster = remember { System.currentTimeMillis() / (1000 * 60 * 60) }
                 val bannerUrl = "https://api.wasteof.money/users/${profile.name}/banner?cb=$hourlyBuster"
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 0.dp))
-                        .background(accent.copy(alpha = 0.18f))
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    SubcomposeAsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(bannerUrl)
-                            .crossfade(true)
-                            .build(),
-                        loading = {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            }
-                        },
-                        contentDescription = "Profile banner",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    // Gradient scrim at the bottom of the banner for smoother blending
+                    // 1. Banner image
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.8f)
-                                    )
-                                )
-                            )
-                    )
-                }
-            }
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                            .background(accent.copy(alpha = 0.18f))
+                    ) {
+                        SubcomposeAsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(bannerUrl)
+                                .crossfade(true)
+                                .build(),
+                            loading = {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                }
+                            },
+                            contentDescription = "Profile banner",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
 
-            item {
-                // Profile card overlapping the banner slightly via negative offset
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset(y = (-24).dp)
-                        .background(
-                            Brush.verticalGradient(
-                                0.0f to Color.Transparent,
-                                0.1f to accent.copy(alpha = 0.08f),
-                                1.0f to accent.copy(alpha = 0.08f)
-                            ),
-                            RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
-                        ),
-                    shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Profile picture with online dot indicator
-                            Box {
-                                ProfilePicture(username = profile.name, size = 72.dp, borderColor = accent)
-                                if (profile.online) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .align(Alignment.BottomEnd)
-                                            .offset(x = (-2).dp, y = (-2).dp)
-                                            .background(Color(0xFF22C55E), CircleShape)
-                                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    profile.name,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = accent
-                                )
-                                Text(
-                                    text = if (profile.online) "Online" else "Offline",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (profile.online) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            if (currentUsername?.equals(profile.name, ignoreCase = true) != true) {
-                                Button(
-                                    onClick = onFollowClick,
-                                    enabled = currentUsername != null && !followLoading,
-                                    shape = RoundedCornerShape(20.dp)
+                    // 2. Discord-style Avatar overlapping half on banner, half on content card below
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 16.dp)
+                            .offset(y = 90.dp)
+                            .zIndex(3f)
+                    ) {
+                        ProfilePicture(
+                            username = profile.name,
+                            size = 84.dp,
+                            borderColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            borderWidth = 4.dp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .align(Alignment.BottomEnd)
+                                .offset(x = (-2).dp, y = (-2).dp)
+                                .background(if (profile.online) Color(0xFF22C55E) else Color(0xFF64748B), CircleShape)
+                                .border(3.5.dp, MaterialTheme.colorScheme.surfaceContainerLow, CircleShape)
+                        )
+                    }
+
+                    // 3. Profile Content Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 132.dp),
+                        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+                        ) {
+                            // Top Row: Uniform Circle Icon Buttons (Follow, Wall, More) on the right
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(if (isFollowing == true) "Unfollow" else "Follow")
+                                    if (currentUsername?.equals(profile.name, ignoreCase = true) != true) {
+                                        val isFollowingUser = isFollowing == true
+                                        val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                                        FilledTonalIconButton(
+                                            onClick = {
+                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                                onFollowClick()
+                                            },
+                                            enabled = currentUsername != null && !followLoading,
+                                            shape = CircleShape,
+                                            modifier = Modifier.size(40.dp),
+                                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                                containerColor = if (isFollowingUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                                contentColor = if (isFollowingUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isFollowingUser) Icons.Filled.Check else Icons.Filled.PersonAdd,
+                                                contentDescription = if (isFollowingUser) "Unfollow" else "Follow",
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                    FilledTonalIconButton(
+                                        onClick = { onWallClick(profile.name) },
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Forum, contentDescription = "Wall", modifier = Modifier.size(20.dp), tint = accent)
+                                    }
+                                    Box {
+                                        FilledTonalIconButton(
+                                            onClick = { profileMenuExpanded = true },
+                                            shape = CircleShape,
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Icon(Icons.Filled.MoreVert, contentDescription = "Profile options", modifier = Modifier.size(20.dp))
+                                        }
+                                        UserActionsMenu(
+                                            expanded = profileMenuExpanded,
+                                            onDismiss = { profileMenuExpanded = false },
+                                            onBlock = {
+                                                profileMenuExpanded = false
+                                                onBlockClick(profile.name)
+                                            },
+                                            onBlockReport = {
+                                                profileMenuExpanded = false
+                                                onBlockReportClick(profile.name)
+                                            },
+                                            username = profile.name
+                                        )
+                                    }
                                 }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(14.dp))
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = profile.name,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = accent,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
                         HtmlText(
                             html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")),
                             maxLines = 4,
@@ -304,6 +339,41 @@ fun ProfileScreen(
                             onPostClick = onPostClickById,
                             openLinksInApp = openLinksInApp
                         )
+
+                        // Joined Date / History Chip below bio
+                        profile.history?.joined?.let { joinedTime ->
+                            if (joinedTime > 0) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val joinedDateStr = remember(joinedTime) {
+                                    val date = java.util.Date(joinedTime)
+                                    val format = java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.getDefault())
+                                    "Joined " + format.format(date)
+                                }
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Forum,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(12.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = joinedDateStr,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(14.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -330,52 +400,10 @@ fun ProfileScreen(
                                 accentColor = accent,
                                 modifier = Modifier.weight(1f)
                             )
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { onWallClick(profile.name) }
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 10.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Forum,
-                                        contentDescription = "Wall",
-                                        tint = accent,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Text(
-                                        text = "Wall",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                            Box {
-                                IconButton(onClick = { profileMenuExpanded = true }, modifier = Modifier.size(32.dp)) {
-                                    Icon(Icons.Filled.MoreVert, contentDescription = "Profile options")
-                                }
-                                UserActionsMenu(
-                                    expanded = profileMenuExpanded,
-                                    onDismiss = { profileMenuExpanded = false },
-                                    onBlock = {
-                                        profileMenuExpanded = false
-                                        onBlockClick(profile.name)
-                                    },
-                                    onBlockReport = {
-                                        profileMenuExpanded = false
-                                        onBlockReportClick(profile.name)
-                                    },
-                                    username = profile.name
-                                )
-                            }
                         }
                     }
                 }
+            }
             }
 
             // Posts section with a subtle header
@@ -420,6 +448,7 @@ fun ProfileScreen(
                         onQuoteClick = onQuoteClick,
                         onDeletePost = onDeletePost,
                         currentUsername = currentUsername,
+                        savedAccounts = savedAccounts,
                         onEditPost = onEditPost,
                         showImages = showImages,
                         openLinksInApp = openLinksInApp,

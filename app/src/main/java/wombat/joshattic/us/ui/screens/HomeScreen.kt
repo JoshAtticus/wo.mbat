@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -20,8 +21,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PostAdd
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.FloatingActionButton
@@ -54,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.ui.state.BottomTab
+import wombat.joshattic.us.ui.state.SettingsCategory
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.Row
@@ -66,6 +75,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.background
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.Surface
 import androidx.compose.material.icons.filled.Info
 
 @Composable
@@ -95,9 +111,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
     LaunchedEffect(uiState.selectedTab) {
         val targetPage = uiState.selectedTab.ordinal
-        // Use scrollToPage (instant) to avoid fighting with an in-progress animation
-        if (pagerState.currentPage != targetPage || pagerState.isScrollInProgress) {
-            pagerState.scrollToPage(targetPage)
+        if (pagerState.currentPage != targetPage) {
+            pagerState.animateScrollToPage(targetPage)
         }
     }
 
@@ -207,41 +222,59 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 snackbarHost = { SnackbarHost(snackbarHostState) },
                 topBar = {
                     if (!isTablet) {
+                        val viewingUser = uiState.viewingProfileUsername
                         CenterAlignedTopAppBar(
-                            title = { Text(titleForTab(uiState.selectedTab)) }
-                        )
-                    }
-                },
-                floatingActionButton = {
-                    if (!isTablet && uiState.selectedTab == BottomTab.Home && !uiState.isBanned) {
-                        FloatingActionButton(
-                            onClick = {
-                                if (uiState.session != null) {
-                                    viewModel.toggleComposer()
-                                } else {
-                                    viewModel.selectTab(BottomTab.Account)
+                            navigationIcon = {
+                                if (viewingUser != null) {
+                                    IconButton(onClick = viewModel::closeProfile) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = "Close profile"
+                                        )
+                                    }
                                 }
                             },
-                            shape = CircleShape,
-                            modifier = Modifier.size(64.dp)
-                        ) {
-                            Icon(Icons.Filled.PostAdd, contentDescription = "Create post", modifier = Modifier.size(28.dp))
-                        }
-                    }
-                },
-                bottomBar = {
-                    if (!isTablet) {
-                        WombatBottomNavigationBar(
-                            selectedTab = uiState.selectedTab,
-                            unreadCount = uiState.unreadNotificationCount,
-                            accountLabel = uiState.accountLabel,
-                            profilePictureUrl = uiState.session?.username?.let {
-                                "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
+                            title = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (viewingUser == null) {
+                                        Image(
+                                            painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo),
+                                            contentDescription = "wo.mbat logo",
+                                            modifier = Modifier.size(28.dp),
+                                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
+                                        )
+                                    }
+                                    Text(
+                                        text = viewingUser?.let { "@$it" } ?: titleForTab(uiState.selectedTab),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             },
-                            onTabSelected = viewModel::selectTab
+                            actions = {
+                                if (viewingUser == null && uiState.selectedTab == BottomTab.Account) {
+                                    IconButton(onClick = viewModel::openSettings) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Settings,
+                                            contentDescription = "Settings",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            },
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.background,
+                                titleContentColor = MaterialTheme.colorScheme.onBackground
+                            )
                         )
                     }
-                }
+                },
+                floatingActionButton = {},
+                bottomBar = {}
+
             ) { innerPadding ->
                 Box(modifier = Modifier.fillMaxSize().padding(
                     top = innerPadding.calculateTopPadding(),
@@ -277,7 +310,36 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             ) {
                                 Column(modifier = Modifier.fillMaxSize()) {
                                     CenterAlignedTopAppBar(
-                                        title = { Text(titleForTab(uiState.selectedTab)) }
+                                        title = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Image(
+                                                    painter = painterResource(id = wombat.joshattic.us.R.drawable.ic_logo),
+                                                    contentDescription = "wo.mbat logo",
+                                                    modifier = Modifier.size(28.dp)
+                                                )
+                                                Text(
+                                                    text = titleForTab(uiState.selectedTab),
+                                                    style = MaterialTheme.typography.titleLarge,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        },
+                                        actions = {
+                                            IconButton(onClick = viewModel::openSettings) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Settings,
+                                                    contentDescription = "Settings",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        },
+                                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                            containerColor = MaterialTheme.colorScheme.background,
+                                            titleContentColor = MaterialTheme.colorScheme.onBackground
+                                        )
                                     )
                                     HorizontalDivider(
                                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -315,7 +377,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 },
                                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                                 currentUsername = uiState.session?.username,
-                                                onDeletePost = { viewModel.deletePost(it.id) },
+                                                savedAccounts = uiState.savedAccounts,
+                                                onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                                 onEditPost = viewModel::openEditComposer,
                                                 scrollToTop = uiState.scrollToTop,
                                                 onScrollToTopComplete = viewModel::clearScrollToTop,
@@ -356,7 +419,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 },
                                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                                 currentUsername = uiState.session?.username,
-                                                onDeletePost = { viewModel.deletePost(it.id) },
+                                                onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                                 onEditPost = viewModel::openEditComposer,
                                                 showImages = uiState.showImagesInFeed,
                                                 openLinksInApp = uiState.openLinksInApp,
@@ -365,7 +428,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 followLoadingUsernames = uiState.followLoadingUsernames,
                                                 onFollowClick = viewModel::toggleFollowUser,
                                                 blockedUsernames = uiState.blockedUsernames,
-                                                blockedQuoteHandling = uiState.blockedQuoteHandling
+                                                blockedQuoteHandling = uiState.blockedQuoteHandling,
+                                                searchQuery = uiState.exploreSearchQuery,
+                                                searchPostResults = uiState.exploreSearchPostResults,
+                                                searchUserResults = uiState.exploreSearchUserResults,
+                                                searchLoading = uiState.exploreSearchLoading,
+                                                onSearchQueryChange = viewModel::setExploreSearchQuery,
+                                                selectedTimeframe = uiState.exploreTrendingTimeframe,
+                                                onTimeframeChange = viewModel::setExploreTrendingTimeframe
                                             )
                                             BottomTab.Notifications -> NotificationsTab(
                                                 session = uiState.session,
@@ -416,7 +486,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 onRepostClick = { viewModel.submitRepost(it.id) },
                                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                                 currentUsername = uiState.session?.username,
-                                                onDeletePost = { viewModel.deletePost(it.id) },
+                                                onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                                 onShowFollowers = viewModel::showFollowers,
                                                 onShowFollowing = viewModel::showFollowing,
                                                 onWallClick = viewModel::openWall,
@@ -445,7 +515,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 viewModel.selectTab(BottomTab.Account)
                                             }
                                         },
-                                        shape = CircleShape,
+                                        shape = RoundedCornerShape(20.dp),
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                         modifier = Modifier
                                             .align(Alignment.BottomEnd)
                                             .padding(16.dp)
@@ -504,7 +576,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onRepostClick = { viewModel.submitRepost(it.id) },
                                             onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                             currentUsername = uiState.session?.username,
-                                            onDeletePost = { viewModel.deletePost(it.id) },
+                                            onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                             onEditPost = viewModel::openEditComposer,
                                             showImages = uiState.showImagesInFeed,
                                             openLinksInApp = uiState.openLinksInApp,
@@ -572,7 +644,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onLoadNextPage = viewModel::loadNextProfilePage,
                                             onRepostClick = { viewModel.submitRepost(it.id) },
                                             onQuoteClick = { viewModel.openQuoteComposer(it.id) },
-                                            onDeletePost = { viewModel.deletePost(it.id) },
+                                 savedAccounts = uiState.savedAccounts,
+                                            onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                             onShowFollowers = viewModel::showFollowers,
                                             onShowFollowing = viewModel::showFollowing,
                                             onEditPost = viewModel::openEditComposer,
@@ -643,7 +716,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onLoadNextPage = viewModel::loadNextProfilePage,
                                 onRepostClick = { viewModel.submitRepost(it.id) },
                                 onQuoteClick = { viewModel.openQuoteComposer(it.id) },
-                                onDeletePost = { viewModel.deletePost(it.id) },
+                                savedAccounts = uiState.savedAccounts,
+                                onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                 onShowFollowers = viewModel::showFollowers,
                                 onShowFollowing = viewModel::showFollowing,
                                 onEditPost = viewModel::openEditComposer,
@@ -686,7 +760,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         },
                                         onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                         currentUsername = uiState.session?.username,
-                                        onDeletePost = { viewModel.deletePost(it.id) },
+                                        savedAccounts = uiState.savedAccounts,
+                                        onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                         onEditPost = viewModel::openEditComposer,
                                         scrollToTop = uiState.scrollToTop,
                                         onScrollToTopComplete = viewModel::clearScrollToTop,
@@ -727,7 +802,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         },
                                         onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                         currentUsername = uiState.session?.username,
-                                        onDeletePost = { viewModel.deletePost(it.id) },
+                                        savedAccounts = uiState.savedAccounts,
+                                        onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                         onEditPost = viewModel::openEditComposer,
                                         showImages = uiState.showImagesInFeed,
                                         openLinksInApp = uiState.openLinksInApp,
@@ -736,7 +812,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         followLoadingUsernames = uiState.followLoadingUsernames,
                                         onFollowClick = viewModel::toggleFollowUser,
                                         blockedUsernames = uiState.blockedUsernames,
-                                        blockedQuoteHandling = uiState.blockedQuoteHandling
+                                        blockedQuoteHandling = uiState.blockedQuoteHandling,
+                                        searchQuery = uiState.exploreSearchQuery,
+                                        searchPostResults = uiState.exploreSearchPostResults,
+                                        searchUserResults = uiState.exploreSearchUserResults,
+                                        searchLoading = uiState.exploreSearchLoading,
+                                        onSearchQueryChange = viewModel::setExploreSearchQuery,
+                                        selectedTimeframe = uiState.exploreTrendingTimeframe,
+                                        onTimeframeChange = viewModel::setExploreTrendingTimeframe
                                     )
                                     BottomTab.Notifications -> NotificationsTab(
                                         session = uiState.session,
@@ -787,7 +870,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         onRepostClick = { viewModel.submitRepost(it.id) },
                                         onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                         currentUsername = uiState.session?.username,
-                                        onDeletePost = { viewModel.deletePost(it.id) },
+                                        onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                         onShowFollowers = viewModel::showFollowers,
                                         onShowFollowing = viewModel::showFollowing,
                                         onWallClick = viewModel::openWall,
@@ -808,6 +891,92 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         }
                     }
 
+                    // ── Floating bottom bar (phone only) ────────────────────────────
+                    if (!isTablet) {
+                        val showFab = uiState.selectedTab == BottomTab.Home && !uiState.isBanned
+
+                        // Single Animatable drives all FAB size transitions, sequenced in a coroutine
+                        // so each animateTo() fully completes before the next starts — no race conditions.
+                        val fabAnim = remember { androidx.compose.animation.core.Animatable(if (showFab) 68f else 0f) }
+
+                        LaunchedEffect(showFab) {
+                            if (showFab) {
+                                // Appear: overshoot to 76, then spring back to 68
+                                fabAnim.animateTo(76f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                                fabAnim.animateTo(68f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
+                            } else {
+                                // Disappear: expand to 76, then tween smoothly to 0
+                                fabAnim.animateTo(76f, tween(durationMillis = 80))
+                                fabAnim.animateTo(0f, tween(durationMillis = 260))
+                            }
+                        }
+
+                        val fabSizeDp = fabAnim.value.dp
+
+                        // Nav bar weight expands to fill space as FAB shrinks
+                        val navWeight by animateFloatAsState(
+                            targetValue = if (fabAnim.value < 1f) 1f else 0.72f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+                            label = "navWeight"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                WombatBottomNavigationBar(
+                                    selectedTab = uiState.selectedTab,
+                                    unreadCount = uiState.unreadNotificationCount,
+                                    accountLabel = uiState.accountLabel,
+                                    profilePictureUrl = uiState.session?.username?.let {
+                                        "https://wasteof-image-proxy.tnix.dev/$it?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
+                                    },
+                                    onTabSelected = { tab ->
+                                        viewModel.selectTab(tab)
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(tab.ordinal)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(navWeight)
+                                )
+
+                                if (fabSizeDp > 0.dp) {
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shadowElevation = 8.dp,
+                                        tonalElevation = 6.dp,
+                                        onClick = {
+                                            if (uiState.session != null) {
+                                                viewModel.toggleComposer()
+                                            } else {
+                                                viewModel.selectTab(BottomTab.Account)
+                                            }
+                                        },
+                                        modifier = Modifier.size(fabSizeDp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Filled.PostAdd,
+                                                contentDescription = "Create post",
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(26.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
             if (uiState.showComposer) {
                 ComposerSheet(
                     draft = uiState.composeDraft,
@@ -822,10 +991,12 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     drafts = uiState.composerDrafts,
                     onRestoreDraft = viewModel::restoreDraft,
                     onDeleteDraft = viewModel::deleteDraft,
-                    currentUsername = uiState.session?.username,
-                    onDeletePost = { viewModel.deletePost(it.id) },
+                    currentUsername = uiState.composeEditPostAuthor ?: uiState.session?.username,
+                    onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                     isEditing = uiState.composeEditPostId != null,
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    savedAccounts = uiState.savedAccounts,
+                    onSwitchAccount = { session -> viewModel.switchAccount(session.username) }
                 )
             }
 
@@ -863,7 +1034,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onRepostClick = { viewModel.submitRepost(it.id) },
                         onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                         currentUsername = uiState.session?.username,
-                        onDeletePost = { viewModel.deletePost(it.id) },
+                        savedAccounts = uiState.savedAccounts,
+                        onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                         onEditPost = viewModel::openEditComposer,
                         showImages = uiState.showImagesInFeed,
                         openLinksInApp = uiState.openLinksInApp,
@@ -991,7 +1163,12 @@ fun HomeScreen(viewModel: HomeViewModel) {
         SettingsScreen(
             uiState = uiState,
             onClose = viewModel::closeSettings,
-            onCategorySelect = viewModel::selectSettingsCategory,
+            onCategorySelect = { category ->
+                viewModel.selectSettingsCategory(category)
+                if (category == SettingsCategory.ABOUT) {
+                    viewModel.loadFrog()
+                }
+            },
             onShowImagesInFeedChange = viewModel::setShowImagesInFeed,
             onShowNewPostsPopupChange = viewModel::setShowNewPostsPopup,
             onInAppNotificationsChange = viewModel::setInAppNotifications,
@@ -1004,7 +1181,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onWearFeedTypeChange = viewModel::setWearFeedType,
             onUnblockUser = viewModel::unblockUser,
             onFollowJosh = viewModel::followJoshAtticus,
-            onBlockedQuoteHandlingChange = viewModel::setBlockedQuoteHandling
+            onBlockedQuoteHandlingChange = viewModel::setBlockedQuoteHandling,
+            frogMessage = uiState.exploreFrogMessage
         )
     }
 }

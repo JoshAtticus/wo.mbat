@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,6 +54,13 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import wombat.joshattic.us.data.model.AuthSession
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -64,6 +72,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -87,6 +96,7 @@ import androidx.core.text.HtmlCompat
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.Post
+import wombat.joshattic.us.ui.theme.applyGoogleSansFlexTypeface
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 
 class RichEditText(context: Context) : EditText(context) {
@@ -110,8 +120,12 @@ fun ComposerSheet(
     currentUsername: String? = null,
     onDeletePost: ((Post) -> Unit)? = null,
     isEditing: Boolean = false,
-    viewModel: HomeViewModel? = null
+    viewModel: HomeViewModel? = null,
+    savedAccounts: List<AuthSession> = emptyList(),
+    onSwitchAccount: ((AuthSession) -> Unit)? = null
 ) {
+    val haptic = LocalHapticFeedback.current
+    var accountMenuExpanded by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -178,9 +192,18 @@ fun ComposerSheet(
     }
 
     if (showDraftsDialog) {
+        val draftsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val dismissDraftsSheet: () -> Unit = {
+            coroutineScope.launch {
+                draftsSheetState.hide()
+            }.invokeOnCompletion {
+                showDraftsDialog = false
+            }
+        }
+
         ModalBottomSheet(
             onDismissRequest = { showDraftsDialog = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = draftsSheetState,
             containerColor = MaterialTheme.colorScheme.background,
             dragHandle = null
         ) {
@@ -197,7 +220,7 @@ fun ComposerSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Drafts Manager", style = MaterialTheme.typography.headlineSmall)
-                    IconButton(onClick = { showDraftsDialog = false }) {
+                    IconButton(onClick = { dismissDraftsSheet() }) {
                         Icon(Icons.Filled.Close, contentDescription = "Close")
                     }
                 }
@@ -257,7 +280,7 @@ fun ComposerSheet(
                                     ) {
                                         IconButton(onClick = {
                                             onRestoreDraft(d)
-                                            showDraftsDialog = false
+                                            dismissDraftsSheet()
                                         }) {
                                             Icon(Icons.Filled.Restore, contentDescription = "Restore", tint = MaterialTheme.colorScheme.primary)
                                         }
@@ -279,7 +302,8 @@ fun ComposerSheet(
         sheetState = sheetState,
         dragHandle = null,
         modifier = Modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.background
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Column(
@@ -293,103 +317,216 @@ fun ComposerSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(if (isEditing) "Edit post" else "New post", style = MaterialTheme.typography.titleLarge)
+                    Box {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable(enabled = savedAccounts.isNotEmpty() && !isEditing) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    accountMenuExpanded = true
+                                }
+                                .padding(vertical = 4.dp, horizontal = 6.dp)
+                        ) {
+                            Box {
+                                currentUsername?.let { username ->
+                                    ProfilePicture(username = username, size = 40.dp)
+                                }
+                                if (savedAccounts.size > 1 && !isEditing) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .align(Alignment.BottomEnd)
+                                            .offset(x = 2.dp, y = 2.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                            .border(1.5.dp, MaterialTheme.colorScheme.surfaceContainerLow, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                    }
+                                }
+                            }
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = if (isEditing) "Edit post" else "New post",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    )
+                                    if (savedAccounts.size > 1 && !isEditing) {
+                                        Icon(
+                                            Icons.Filled.ArrowDropDown,
+                                            contentDescription = "Switch account",
+                                            modifier = Modifier.size(20.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = accountMenuExpanded,
+                            onDismissRequest = { accountMenuExpanded = false },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                            tonalElevation = 3.dp
+                        ) {
+                            Text(
+                                text = "Switch Account",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                            savedAccounts.forEach { acc ->
+                                val isActiveAcc = acc.username.equals(currentUsername, ignoreCase = true)
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            ProfilePicture(username = acc.username, size = 28.dp)
+                                            Text(
+                                                text = "@${acc.username}",
+                                                fontWeight = if (isActiveAcc) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        accountMenuExpanded = false
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onSwitchAccount?.invoke(acc)
+                                    },
+                                    trailingIcon = {
+                                        if (isActiveAcc) {
+                                            Icon(
+                                                Icons.Filled.Check,
+                                                contentDescription = "Current account",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
                     if (!isEditing) {
-                        TextButton(onClick = { showDraftsDialog = true }) {
-                            Text("Drafts (${drafts.size})")
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.clickable { showDraftsDialog = true }
+                        ) {
+                            Text(
+                                text = "Drafts (${drafts.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
                         }
                     }
                 }
 
-                // Formatting toolbar
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Expressive Floating Formatting Toolbar
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    IconButton(
-                        onClick = {
-                            richEditTextRef?.let { editText ->
-                                toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.BOLD) }, { it.style == Typeface.BOLD })
-                                updateFormattingStates(editText)
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isBoldActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            contentColor = if (isBoldActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.size(44.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.FormatBold, contentDescription = "Bold", modifier = Modifier.size(22.dp))
-                    }
-                    IconButton(
-                        onClick = {
-                            richEditTextRef?.let { editText ->
-                                toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.ITALIC) }, { it.style == Typeface.ITALIC })
-                                updateFormattingStates(editText)
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isItalicActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            contentColor = if (isItalicActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Filled.FormatItalic, contentDescription = "Italic", modifier = Modifier.size(22.dp))
-                    }
-                    IconButton(
-                        onClick = {
-                            richEditTextRef?.let { editText ->
-                                toggleSpan(editText, StrikethroughSpan::class.java, { StrikethroughSpan() })
-                                updateFormattingStates(editText)
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isStrikethroughActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            contentColor = if (isStrikethroughActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Filled.FormatStrikethrough, contentDescription = "Strikethrough", modifier = Modifier.size(22.dp))
-                    }
-                    IconButton(
-                        onClick = {
-                            richEditTextRef?.let { editText ->
-                                toggleSpan(editText, UnderlineSpan::class.java, { UnderlineSpan() })
-                                updateFormattingStates(editText)
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isUnderlineActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            contentColor = if (isUnderlineActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Filled.FormatUnderlined, contentDescription = "Underline", modifier = Modifier.size(22.dp))
-                    }
-                    IconButton(
-                        onClick = {
-                            richEditTextRef?.let { editText ->
-                                toggleBlockquote(editText)
-                                updateFormattingStates(editText)
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isQuoteActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            contentColor = if (isQuoteActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Filled.FormatQuote, contentDescription = "Blockquote", modifier = Modifier.size(22.dp))
-                    }
-                    IconButton(
-                        onClick = {
-                            imageUploadError = null
-                            imagePickerLauncher.launch("image/*")
-                        },
-                        enabled = !isUploadingImage,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(22.dp))
+                        IconButton(
+                            onClick = {
+                                richEditTextRef?.let { editText ->
+                                    toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.BOLD) }, { it.style == Typeface.BOLD })
+                                    updateFormattingStates(editText)
+                                }
+                            },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isBoldActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                contentColor = if (isBoldActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Filled.FormatBold, contentDescription = "Bold", modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                richEditTextRef?.let { editText ->
+                                    toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.ITALIC) }, { it.style == Typeface.ITALIC })
+                                    updateFormattingStates(editText)
+                                }
+                            },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isItalicActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                contentColor = if (isItalicActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Filled.FormatItalic, contentDescription = "Italic", modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                richEditTextRef?.let { editText ->
+                                    toggleSpan(editText, StrikethroughSpan::class.java, { StrikethroughSpan() })
+                                    updateFormattingStates(editText)
+                                }
+                            },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isStrikethroughActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                contentColor = if (isStrikethroughActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Filled.FormatStrikethrough, contentDescription = "Strikethrough", modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                richEditTextRef?.let { editText ->
+                                    toggleSpan(editText, UnderlineSpan::class.java, { UnderlineSpan() })
+                                    updateFormattingStates(editText)
+                                }
+                            },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isUnderlineActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                contentColor = if (isUnderlineActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Filled.FormatUnderlined, contentDescription = "Underline", modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                richEditTextRef?.let { editText ->
+                                    toggleBlockquote(editText)
+                                    updateFormattingStates(editText)
+                                }
+                            },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isQuoteActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                contentColor = if (isQuoteActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Filled.FormatQuote, contentDescription = "Blockquote", modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                imageUploadError = null
+                                imagePickerLauncher.launch("image/*")
+                            },
+                            enabled = !isUploadingImage,
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
 
@@ -425,8 +562,8 @@ fun ComposerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 220.dp)
-                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
-                            .border(borderWidth, borderColors, RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
+                            .border(borderWidth, borderColors, RoundedCornerShape(20.dp))
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null
@@ -444,6 +581,7 @@ fun ComposerSheet(
                             factory = { context ->
                                 RichEditText(context).apply {
                                     richEditTextRef = this
+                                    applyGoogleSansFlexTypeface(this, roundness = 50f)
                                     this.setBackground(null)
                                     this.setGravity(android.view.Gravity.TOP or android.view.Gravity.START)
                                     this.inputType = android.text.InputType.TYPE_CLASS_TEXT or 
@@ -579,11 +717,15 @@ fun ComposerSheet(
                         onSubmit(draft)
                     },
                     enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
-                    modifier = Modifier.align(Alignment.End)
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .height(48.dp)
+                        .padding(horizontal = 4.dp)
                 ) {
                     Icon(Icons.Filled.PostAdd, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isEditing) "Save" else "Post")
+                    Text(if (isEditing) "Save" else "Post", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }

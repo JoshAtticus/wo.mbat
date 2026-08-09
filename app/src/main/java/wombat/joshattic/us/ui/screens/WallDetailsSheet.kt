@@ -5,9 +5,15 @@
 
 package wombat.joshattic.us.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,17 +50,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.Comment
 
 @Composable
@@ -157,29 +166,35 @@ fun WallDetailsContent(
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (focusedComment != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onClearFocusComment() }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back to wall thread",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Back to wall thread",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                    AnimatedContent(
+                        targetState = focusedComment != null,
+                        transitionSpec = { fadeIn() + expandVertically() togetherWith fadeOut() + shrinkVertically() },
+                        label = "wallThreadHeaderTransition"
+                    ) { isFocused ->
+                        if (isFocused) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onClearFocusComment() }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back to wall thread",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Back to wall thread",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else {
+                            Text("Wall Messages", style = MaterialTheme.typography.titleMedium)
                         }
-                    } else {
-                        Text("Wall Messages", style = MaterialTheme.typography.titleMedium)
                     }
                     if (loading && comments.isEmpty()) {
                         Row(
@@ -223,7 +238,6 @@ fun WallDetailsContent(
             }
         }
 
-        // Input area (TextField + Send/Reply button) — imePadding lifts it above the software keyboard
         if (!isBanned) {
             AnimatedVisibility(
                 visible = isReplyBoxVisible,
@@ -240,70 +254,58 @@ fun WallDetailsContent(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp, bottom = 16.dp)
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
-                        AnimatedVisibility(visible = replyingTo != null) {
+                        if (replyingTo != null) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    .padding(bottom = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Filled.Chat,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    "Replying to @${replyingTo?.poster?.name ?: ""}",
+                                    text = "Replying to @${replyingTo.poster.name}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.weight(1f)
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                                IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
-                                    Icon(
-                                        Icons.Filled.Close,
-                                        contentDescription = "Cancel reply",
-                                        modifier = Modifier.size(14.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                TextButton(
+                                    onClick = onCancelReply,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(24.dp)
+                                ) {
+                                    Text("Cancel", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
 
-                        OutlinedTextField(
-                            value = draft,
-                            onValueChange = onDraftChange,
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(24.dp),
-                            maxLines = 4,
-                            placeholder = {
-                                Text(
-                                    if (replyingTo != null) "Reply to @${replyingTo.poster.name}..."
-                                    else "Write a message on @$username's wall..."
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = draft,
+                                onValueChange = onDraftChange,
+                                placeholder = {
+                                    Text(if (replyingTo != null) "Write a reply..." else "Post a message...")
+                                },
+                                modifier = Modifier.weight(1f),
+                                maxLines = 3,
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            Button(
+                                onClick = onSubmit,
+                                enabled = draft.isNotBlank(),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send",
+                                    modifier = Modifier.size(18.dp)
                                 )
-                            },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = onSubmit,
-                                    enabled = draft.isNotBlank()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "Send message",
-                                        tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                    )
-                                }
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -333,6 +335,12 @@ fun WallDetailsSheet(
     onClearFocusComment: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val coroutineScope = rememberCoroutineScope()
+    val handleDismiss: () -> Unit = {
+        coroutineScope.launch { sheetState.hide() }.invokeOnCompletion {
+            onDismiss()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -348,7 +356,7 @@ fun WallDetailsSheet(
             isBanned = isBanned,
             onDraftChange = onDraftChange,
             onSubmit = onSubmit,
-            onDismiss = onDismiss,
+            onDismiss = handleDismiss,
             onLoadNextPage = onLoadNextPage,
             replyingTo = replyingTo,
             onCancelReply = onCancelReply,

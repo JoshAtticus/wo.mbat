@@ -31,33 +31,42 @@ class AuthPreferences(private val context: Context) {
     val sessionFlow: Flow<AuthSession?> = context.dataStore.data.map { preferences ->
         val sessions = preferences.toSessions()
         val activeUsername = preferences[Keys.ActiveUsername]
-        sessions.find { it.username == activeUsername } ?: sessions.firstOrNull()
+        if (activeUsername != null) {
+            sessions.find { it.username.trim().equals(activeUsername.trim(), ignoreCase = true) } ?: sessions.firstOrNull()
+        } else {
+            sessions.firstOrNull()
+        }
     }
 
     suspend fun saveSession(token: String, username: String) {
         context.dataStore.edit { preferences ->
+            val cleanUsername = username.trim().lowercase()
             val sessions = preferences.toSessions().toMutableList()
-            sessions.removeAll { it.username == username }
-            sessions.add(AuthSession(token = token, username = username))
+            sessions.removeAll { it.username.trim().lowercase() == cleanUsername }
+            sessions.add(AuthSession(token = token, username = cleanUsername))
             
             preferences[Keys.Sessions] = gson.toJson(sessions)
-            preferences[Keys.ActiveUsername] = username
+            preferences[Keys.ActiveUsername] = cleanUsername
         }
     }
 
     suspend fun switchAccount(username: String) {
         context.dataStore.edit { preferences ->
-            preferences[Keys.ActiveUsername] = username
+            val cleanUsername = username.trim().lowercase()
+            val sessions = preferences.toSessions()
+            val matching = sessions.find { it.username.trim().lowercase() == cleanUsername }
+            preferences[Keys.ActiveUsername] = matching?.username ?: cleanUsername
         }
     }
 
     suspend fun removeSession(username: String) {
         context.dataStore.edit { preferences ->
+            val cleanUsername = username.trim().lowercase()
             val sessions = preferences.toSessions().toMutableList()
-            sessions.removeAll { it.username == username }
+            sessions.removeAll { it.username.trim().lowercase() == cleanUsername }
             preferences[Keys.Sessions] = gson.toJson(sessions)
             
-            if (preferences[Keys.ActiveUsername] == username) {
+            if (preferences[Keys.ActiveUsername]?.trim()?.lowercase() == cleanUsername) {
                 val nextActive = sessions.firstOrNull()?.username
                 if (nextActive != null) {
                     preferences[Keys.ActiveUsername] = nextActive
@@ -79,14 +88,15 @@ class AuthPreferences(private val context: Context) {
     private fun Preferences.toSessions(): List<AuthSession> {
         val json = this[Keys.Sessions]
         if (json != null) {
-            return gson.fromJson(json, type) ?: emptyList()
+            val rawList: List<AuthSession> = gson.fromJson(json, type) ?: emptyList()
+            return rawList.map { it.copy(username = it.username.trim().lowercase()) }
         }
         
         // Legacy fallback
         val legacyToken = this[Keys.LegacyToken]
         val legacyUsername = this[Keys.ActiveUsername]
         if (legacyToken != null && legacyUsername != null) {
-            return listOf(AuthSession(token = legacyToken, username = legacyUsername))
+            return listOf(AuthSession(token = legacyToken, username = legacyUsername.trim().lowercase()))
         }
         
         return emptyList()

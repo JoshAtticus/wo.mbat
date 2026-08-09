@@ -28,8 +28,12 @@ import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.NotificationResponse
 import wombat.joshattic.us.data.model.Permissions
 import wombat.joshattic.us.data.model.Post
+import wombat.joshattic.us.data.model.SearchPostsResponse
+import wombat.joshattic.us.data.model.SearchUsersResponse
+import wombat.joshattic.us.data.model.FrogResponse
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.network.ApiService
+import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.data.storage.AuthPreferences
 import wombat.joshattic.us.data.storage.BlockedUsersDatabase
 import wombat.joshattic.us.data.storage.SettingsPreferences
@@ -38,7 +42,8 @@ class WombatRepository(
     private val apiService: ApiService,
     private val authPreferences: AuthPreferences,
     private val blockedUsersDatabase: BlockedUsersDatabase,
-    val settingsPreferences: SettingsPreferences
+    val settingsPreferences: SettingsPreferences,
+    private val uploadApiService: ApiService = RetrofitClient.uploadApiService
 ) {
     private val socketManager = wombat.joshattic.us.data.network.WasteofSocketManager()
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
@@ -62,8 +67,9 @@ class WombatRepository(
 
     suspend fun login(username: String, password: String): Result<AuthSession> = runCatching {
         val loginResponse = apiService.login(LoginRequest(username = username, password = password))
-        authPreferences.saveSession(loginResponse.token, username)
-        AuthSession(token = loginResponse.token, username = username)
+        val cleanUsername = username.trim()
+        authPreferences.saveSession(loginResponse.token, cleanUsername)
+        AuthSession(token = loginResponse.token, username = cleanUsername)
     }
 
     suspend fun loadFeed(session: AuthSession?, page: Int = 1): FeedResponse {
@@ -89,8 +95,20 @@ class WombatRepository(
     suspend fun loadCommentReplies(session: AuthSession?, commentId: String, page: Int = 1): CommentResponse =
         apiService.getCommentReplies(commentId, page, session?.token)
 
-    suspend fun loadTrendingPosts(session: AuthSession?): FeedResponse {
-        return apiService.getTrendingPosts(session?.token)
+    suspend fun loadTrendingPosts(session: AuthSession?, timeframe: String? = null): FeedResponse {
+        return apiService.getTrendingPosts(session?.token, timeframe)
+    }
+
+    suspend fun searchPosts(session: AuthSession?, query: String, page: Int = 1): SearchPostsResponse {
+        return apiService.searchPosts(query = query, page = page, token = session?.token)
+    }
+
+    suspend fun searchUsers(session: AuthSession?, query: String, page: Int = 1): SearchUsersResponse {
+        return apiService.searchUsers(query = query, page = page, token = session?.token)
+    }
+
+    suspend fun getFrog(): FrogResponse {
+        return apiService.getFrog()
     }
 
     suspend fun loadUnreadNotifications(session: AuthSession?, page: Int = 1): NotificationResponse {
@@ -251,7 +269,7 @@ class WombatRepository(
         val filename = uri.lastPathSegment ?: "image.jpg"
         val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
         val part = MultipartBody.Part.createFormData("file", filename, requestBody)
-        val response = apiService.uploadImageToProxy(
+        val response = uploadApiService.uploadImageToProxy(
             url = IBBWOM_UPLOAD_URL,
             apiKey = IBBWOM_API_KEY,
             file = part

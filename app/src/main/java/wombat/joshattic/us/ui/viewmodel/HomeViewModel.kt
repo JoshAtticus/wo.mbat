@@ -26,6 +26,7 @@ import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Permissions
 import wombat.joshattic.us.data.model.Post
+import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.state.HomeUiState
@@ -157,7 +158,7 @@ class HomeViewModel(
 
     fun login() {
         val snapshot = _uiState.value
-        val username = snapshot.loginUsername.trim()
+        val username = snapshot.loginUsername.trim().lowercase()
         val password = snapshot.loginPassword
         if (username.isBlank()) {
             _uiState.value = snapshot.copy(loginError = "Enter your username.")
@@ -199,6 +200,7 @@ class HomeViewModel(
             selectedPost = if (nextVisible) null else _uiState.value.selectedPost,
             composeRepostId = if (!nextVisible) null else _uiState.value.composeRepostId,
             composeEditPostId = if (!nextVisible) null else _uiState.value.composeEditPostId,
+            composeEditPostAuthor = if (!nextVisible) null else _uiState.value.composeEditPostAuthor,
             composeOriginalContent = if (!nextVisible) null else _uiState.value.composeOriginalContent
         )
     }
@@ -209,6 +211,7 @@ class HomeViewModel(
             composeDraft = post.content,
             composeOriginalContent = post.content,
             composeEditPostId = post.id,
+            composeEditPostAuthor = post.poster.name,
             composeRepostId = null,
             selectedPost = null
         )
@@ -217,6 +220,7 @@ class HomeViewModel(
     fun clearEditPostId() {
         _uiState.value = _uiState.value.copy(
             composeEditPostId = null,
+            composeEditPostAuthor = null,
             composeOriginalContent = null
         )
     }
@@ -254,18 +258,28 @@ class HomeViewModel(
             val draft = contentOverride?.trim() ?: _uiState.value.composeDraft.trim()
             val repostId = _uiState.value.composeRepostId
             val editPostId = _uiState.value.composeEditPostId
+            val editPostAuthor = _uiState.value.composeEditPostAuthor
             if (draft.isBlank() && repostId == null && editPostId == null) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Write something before posting.")
                 return@launch
             }
 
             if (editPostId != null) {
-                runCatching { repository.editPost(session, editPostId, draft) }
+                val targetSession = if (editPostAuthor != null) {
+                    _uiState.value.savedAccounts.firstOrNull {
+                        it.username.trim().equals(editPostAuthor.trim(), ignoreCase = true)
+                    } ?: session
+                } else {
+                    session
+                }
+
+                runCatching { repository.editPost(targetSession, editPostId, draft) }
                     .onSuccess { updatedPost ->
                         _uiState.value = _uiState.value.copy(
                             showComposer = false,
                             composeDraft = "",
-                            composeEditPostId = null
+                            composeEditPostId = null,
+                            composeEditPostAuthor = null
                         )
                         updatePostInState(updatedPost, fallbackId = editPostId, fallbackContent = draft)
                     }
@@ -365,12 +379,54 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 
+    fun setExploreSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(
+            exploreSearchQuery = query,
+            exploreSearchActive = query.isNotEmpty()
+        )
+        if (query.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                exploreSearchPostResults = emptyList(),
+                exploreSearchUserResults = emptyList(),
+                exploreSearchLoading = false
+            )
+            return
+        }
+        viewModelScope.launch {
+            delay(300L) // debounce
+            if (_uiState.value.exploreSearchQuery != query) return@launch // stale
+            _uiState.value = _uiState.value.copy(exploreSearchLoading = true)
+            val session = _uiState.value.session
+            val postsResult = runCatching { repository.searchPosts(session, query) }
+            val usersResult = runCatching { repository.searchUsers(session, query) }
+            _uiState.value = _uiState.value.copy(
+                exploreSearchLoading = false,
+                exploreSearchPostResults = postsResult.getOrNull()?.results?.let { filterBlockedPosts(it) } ?: _uiState.value.exploreSearchPostResults,
+                exploreSearchUserResults = usersResult.getOrNull()?.results ?: _uiState.value.exploreSearchUserResults
+            )
+        }
+    }
+
+    fun setExploreTrendingTimeframe(timeframe: String?) {
+        _uiState.value = _uiState.value.copy(exploreTrendingTimeframe = timeframe)
+        loadExploreTrending()
+    }
+
+    fun loadFrog() {
+        if (_uiState.value.exploreFrogMessage != null) return // already loaded
+        viewModelScope.launch {
+            runCatching { repository.getFrog() }
+                .onSuccess { _uiState.value = _uiState.value.copy(exploreFrogMessage = it.frog) }
+        }
+    }
+
     fun loadExploreTrending() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(exploreTrendingLoading = true, errorMessage = null)
             val currentSession = _uiState.value.session
+            val timeframe = _uiState.value.exploreTrendingTimeframe
             runCatching {
-                val response = repository.loadTrendingPosts(currentSession)
+                val response = repository.loadTrendingPosts(currentSession, timeframe)
                 val posts = if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
                 val filteredPosts = filterBlockedPosts(posts)
                 
@@ -701,11 +757,18 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(commentDraft = comment, errorMessage = null)
     }
 
-    fun deletePost(postId: String) {
-        val session = _uiState.value.session ?: return
+    fun deletePost(postId: String, postAuthor: String? = null) {
+        val currentSession = _uiState.value.session
+        val savedAccounts = _uiState.value.savedAccounts
+        val targetSession = if (postAuthor != null) {
+            savedAccounts.firstOrNull { it.username.trim().equals(postAuthor.trim(), ignoreCase = true) } ?: currentSession
+        } else {
+            currentSession
+        } ?: return
+
         viewModelScope.launch {
             runCatching {
-                repository.deletePost(session, postId)
+                repository.deletePost(targetSession, postId)
             }.onSuccess {
                 _uiState.value = _uiState.value.copy(
                     feed = _uiState.value.feed.filter { it.id != postId },

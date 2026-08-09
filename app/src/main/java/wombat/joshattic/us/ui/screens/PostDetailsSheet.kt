@@ -5,9 +5,15 @@
 
 package wombat.joshattic.us.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,10 +54,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.Post
 
@@ -67,21 +75,22 @@ fun PostDetailsContent(
     onDismiss: () -> Unit,
     onExpandComments: () -> Unit,
     onCollapseComments: () -> Unit,
-    onMentionClick: (String) -> Unit,
+    onMentionClick: ((String) -> Unit)? = null,
     replyingTo: Comment? = null,
     onCancelReply: () -> Unit = {},
     onReplyToComment: (Comment) -> Unit = {},
     onProfileClick: (String) -> Unit = {},
-    onLoveClick: (Post) -> Unit = {},
-    onPostClick: (Post) -> Unit = {},
+    onLoveClick: ((Post) -> Unit)? = null,
+    onPostClick: ((Post) -> Unit)? = null,
     onImageClick: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onReportPost: ((Post) -> Unit)? = null,
     scrollToCommentId: String? = null,
     onScrollToCommentComplete: () -> Unit = {},
-    onRepostClick: (Post) -> Unit = {},
-    onQuoteClick: (Post) -> Unit = {},
+    onRepostClick: ((Post) -> Unit)? = null,
+    onQuoteClick: ((Post) -> Unit)? = null,
     currentUsername: String? = null,
+    savedAccounts: List<wombat.joshattic.us.data.model.AuthSession> = emptyList(),
     onDeletePost: ((Post) -> Unit)? = null,
     onEditPost: ((Post) -> Unit)? = null,
     showImages: Boolean = true,
@@ -104,9 +113,11 @@ fun PostDetailsContent(
         }
     }
     val handleMentionClick = remember(onMentionClick, onDismiss) {
-        { username: String ->
-            onDismiss()
-            onMentionClick(username)
+        onMentionClick?.let { orig ->
+            { username: String ->
+                onDismiss()
+                orig(username)
+            }
         }
     }
 
@@ -134,19 +145,25 @@ fun PostDetailsContent(
     }
 
     Column(modifier = modifier.fillMaxHeight()) {
-        if (showCloseButton) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Filled.Close, contentDescription = "Close post details")
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            if (showCloseButton) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close post details")
+                    }
                 }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
         }
 
         val isImeVisible = WindowInsets.isImeVisible
@@ -183,6 +200,7 @@ fun PostDetailsContent(
                     onRepostClick = onRepostClick,
                     onQuoteClick = onQuoteClick,
                     currentUsername = currentUsername,
+                    savedAccounts = savedAccounts,
                     onDeletePost = onDeletePost,
                     onEditPost = onEditPost,
                     showImages = showImages,
@@ -195,29 +213,35 @@ fun PostDetailsContent(
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (focusedComment != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onClearFocusComment() }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back to post thread",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Back to post thread",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                    AnimatedContent(
+                        targetState = focusedComment != null,
+                        transitionSpec = { fadeIn() + expandVertically() togetherWith fadeOut() + shrinkVertically() },
+                        label = "threadHeaderTransition"
+                    ) { isFocused ->
+                        if (isFocused) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onClearFocusComment() }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back to post thread",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Back to post thread",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else {
+                            Text("Comments", style = MaterialTheme.typography.titleMedium)
                         }
-                    } else {
-                        Text("Comments", style = MaterialTheme.typography.titleMedium)
                     }
                     if (loading) {
                         Row(
@@ -366,6 +390,7 @@ fun PostDetailsSheet(
     onRepostClick: (Post) -> Unit = {},
     onQuoteClick: (Post) -> Unit = {},
     currentUsername: String? = null,
+    savedAccounts: List<wombat.joshattic.us.data.model.AuthSession> = emptyList(),
     onDeletePost: ((Post) -> Unit)? = null,
     onEditPost: ((Post) -> Unit)? = null,
     showImages: Boolean = true,
@@ -417,6 +442,7 @@ fun PostDetailsSheet(
             onRepostClick = onRepostClick,
             onQuoteClick = onQuoteClick,
             currentUsername = currentUsername,
+            savedAccounts = savedAccounts,
             onDeletePost = onDeletePost,
             onEditPost = onEditPost,
             showImages = showImages,

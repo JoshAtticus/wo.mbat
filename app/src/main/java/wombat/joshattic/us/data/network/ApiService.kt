@@ -32,6 +32,9 @@ import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.model.FollowersResponse
 import wombat.joshattic.us.data.model.FollowingResponse
 import wombat.joshattic.us.data.model.CreateWallCommentResponse
+import wombat.joshattic.us.data.model.SearchPostsResponse
+import wombat.joshattic.us.data.model.SearchUsersResponse
+import wombat.joshattic.us.data.model.FrogResponse
 
 interface ApiService {
     @POST("session")
@@ -134,8 +137,27 @@ interface ApiService {
 
     @GET("explore/posts/trending")
     suspend fun getTrendingPosts(
-        @Header("authorization") token: String? = null
+        @Header("authorization") token: String? = null,
+        @Query("timeframe") timeframe: String? = null
     ): FeedResponse
+
+    @GET("search/posts")
+    suspend fun searchPosts(
+        @Query("q") query: String,
+        @Query("page") page: Int = 1,
+        @Query("sort") sort: String? = null,
+        @Header("authorization") token: String? = null
+    ): SearchPostsResponse
+
+    @GET("search/users")
+    suspend fun searchUsers(
+        @Query("q") query: String,
+        @Query("page") page: Int = 1,
+        @Header("authorization") token: String? = null
+    ): SearchUsersResponse
+
+    @GET("frog")
+    suspend fun getFrog(): FrogResponse
 
     @POST("posts/{post_id}/loves")
     suspend fun togglePostLove(
