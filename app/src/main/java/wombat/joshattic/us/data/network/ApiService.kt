@@ -10,6 +10,7 @@ import retrofit2.http.Query
 import retrofit2.http.PUT
 import retrofit2.http.Multipart
 import retrofit2.http.Part
+import retrofit2.http.Url
 import okhttp3.MultipartBody
 import wombat.joshattic.us.data.model.UpdateBioRequest
 import wombat.joshattic.us.data.model.EditPostRequest
@@ -224,4 +225,12 @@ interface ApiService {
         @Path("username") username: String,
         @Header("authorization") token: String
     )
+
+    @Multipart
+    @POST
+    suspend fun uploadImageToProxy(
+        @Url url: String,
+        @Header("X-API-Key") apiKey: String,
+        @Part file: MultipartBody.Part
+    ): wombat.joshattic.us.data.model.ImageUploadResponse
 }

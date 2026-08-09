@@ -244,7 +244,25 @@ class WombatRepository(
         apiService.deleteBanner(session.username, session.token)
     }
 
+    suspend fun uploadImageToProxy(context: android.content.Context, uri: android.net.Uri): String {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IllegalArgumentException("Could not read image from URI")
+        val mimeType = context.contentResolver.getType(uri) ?: "image/*"
+        val filename = uri.lastPathSegment ?: "image.jpg"
+        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("file", filename, requestBody)
+        val response = apiService.uploadImageToProxy(
+            url = IBBWOM_UPLOAD_URL,
+            apiKey = IBBWOM_API_KEY,
+            file = part
+        )
+        if (!response.success) throw Exception("Image upload failed")
+        return response.url
+    }
+
     companion object {
         private const val DEFAULT_GUEST_USER = "jeffalo"
+        private const val IBBWOM_UPLOAD_URL = "https://ibbwom.joshattic.us/api/upload"
+        private const val IBBWOM_API_KEY = "srv_Ucj2d4Um65VXtwY7VSRgK1FxKxXbzTfXHV-ZJhQNSqk"
     }
 }

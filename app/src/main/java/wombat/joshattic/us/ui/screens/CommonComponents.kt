@@ -1516,7 +1516,7 @@ fun markdownToHtml(md: String): String {
 fun isAllowedImageHost(url: String): Boolean {
     return try {
         val host = java.net.URL(url).host.lowercase()
-        host == "i.ibb.co" || host == "u.cubeupload.com"
+        host == "i.ibb.co"
     } catch (e: Exception) {
         false
     }

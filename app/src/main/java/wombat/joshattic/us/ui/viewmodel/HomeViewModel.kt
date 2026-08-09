@@ -1,6 +1,7 @@
 package wombat.joshattic.us.ui.viewmodel
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -1912,6 +1913,10 @@ class HomeViewModel(
 
     fun setBlockedQuoteHandling(value: String) {
         viewModelScope.launch { repository.settingsPreferences.setBlockedQuoteHandling(value) }
+    }
+
+    suspend fun uploadImage(context: Context, uri: Uri): String {
+        return repository.uploadImageToProxy(context, uri)
     }
 
     fun unblockUser(username: String) {

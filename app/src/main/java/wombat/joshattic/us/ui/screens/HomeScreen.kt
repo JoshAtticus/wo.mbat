@@ -824,7 +824,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onDeleteDraft = viewModel::deleteDraft,
                     currentUsername = uiState.session?.username,
                     onDeletePost = { viewModel.deletePost(it.id) },
-                    isEditing = uiState.composeEditPostId != null
+                    isEditing = uiState.composeEditPostId != null,
+                    viewModel = viewModel
                 )
             }
 

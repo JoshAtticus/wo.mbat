@@ -141,3 +141,11 @@ data class FollowingResponse(
 )
 
 data class UpdateBioRequest(val bio: String)
+
+data class ImageUploadResponse(
+    val success: Boolean,
+    val url: String,
+    val filename: String,
+    val size: Long,
+    @SerializedName("mime_type") val mimeType: String
+)

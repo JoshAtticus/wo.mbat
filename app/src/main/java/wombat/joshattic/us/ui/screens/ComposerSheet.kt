@@ -14,6 +14,8 @@ import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.view.View
 import android.widget.EditText
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,7 +64,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -71,17 +72,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
 import coil.compose.SubcomposeAsyncImage
+import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 
@@ -105,12 +109,14 @@ fun ComposerSheet(
     onDeleteDraft: (String) -> Unit,
     currentUsername: String? = null,
     onDeletePost: ((Post) -> Unit)? = null,
-    isEditing: Boolean = false
+    isEditing: Boolean = false,
+    viewModel: HomeViewModel? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showAddImage by remember { mutableStateOf(false) }
-    var imageUrl by remember { mutableStateOf("") }
-    var imageError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var imageUploadError by remember { mutableStateOf<String?>(null) }
+    var isUploadingImage by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
 
     // Unified HTML draft synchronization states
@@ -150,22 +156,25 @@ fun ComposerSheet(
         onDraftChange(combinedHtml)
     }
 
-    fun addImage() {
-        val url = imageUrl.trim()
-        if (url.isBlank()) {
-            imageError = "Enter an image URL"
-            return
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null && viewModel != null) {
+            isUploadingImage = true
+            imageUploadError = null
+            coroutineScope.launch {
+                try {
+                    val uploadedUrl = viewModel.uploadImage(context, uri)
+                    val updatedImages = currentImages + uploadedUrl
+                    currentImages = updatedImages
+                    richEditTextRef?.let { updateDraft(it.text, updatedImages) }
+                } catch (e: Exception) {
+                    imageUploadError = e.message ?: "Upload failed"
+                } finally {
+                    isUploadingImage = false
+                }
+            }
         }
-        if (!isAllowedImageHost(url)) {
-            imageError = "Image URL must be from i.ibb.co or u.cubeupload.com"
-            return
-        }
-        val updatedImages = currentImages + url
-        currentImages = updatedImages
-        richEditTextRef?.let { updateDraft(it.text, updatedImages) }
-        imageUrl = ""
-        imageError = null
-        showAddImage = false
     }
 
     if (showDraftsDialog) {
@@ -372,37 +381,36 @@ fun ComposerSheet(
                     ) {
                         Icon(Icons.Filled.FormatQuote, contentDescription = "Blockquote", modifier = Modifier.size(22.dp))
                     }
-                    IconButton(onClick = { showAddImage = !showAddImage; imageError = null }, modifier = Modifier.size(44.dp)) {
+                    IconButton(
+                        onClick = {
+                            imageUploadError = null
+                            imagePickerLauncher.launch("image/*")
+                        },
+                        enabled = !isUploadingImage,
+                        modifier = Modifier.size(44.dp)
+                    ) {
                         Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(22.dp))
                     }
                 }
 
-                if (showAddImage) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedTextField(
-                            value = imageUrl,
-                            onValueChange = { imageUrl = it; imageError = null },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("https://i.ibb.co/xxx or https://u.cubeupload.com/xxx") },
-                            label = { Text("Image URL (i.ibb.co or u.cubeupload.com only)") }
-                        )
-                        if (imageError != null) {
-                            Text(imageError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { addImage() }, enabled = imageUrl.isNotBlank()) {
-                                Text("Insert Image")
-                            }
-                            TextButton(onClick = {
-                                showAddImage = false
-                                imageUrl = ""
-                                imageError = null
-                            }) {
-                                Text("Cancel")
-                            }
-                        }
+                if (isUploadingImage) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("Uploading image…", style = MaterialTheme.typography.bodySmall)
                     }
+                }
+
+                if (imageUploadError != null) {
+                    Text(
+                        text = imageUploadError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
                 }
 
                 // Styled wrapping container around the rich text editor
