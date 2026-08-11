@@ -51,32 +51,40 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.ModeComment
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import wombat.joshattic.us.wear.WearUiState
+import wombat.joshattic.us.wear.data.model.Comment
 import wombat.joshattic.us.wear.data.model.Post
 
 @Composable
 fun PostDetailScreen(
     uiState: WearUiState,
     onLoveClick: () -> Unit,
-    onSubmitComment: (String) -> Unit,
+    onSubmitComment: (text: String, parentId: String?) -> Unit,
     onRepostClick: (Post) -> Unit,
     onQuoteClick: (Post) -> Unit,
     onBack: () -> Unit
 ) {
     val post = uiState.selectedPost ?: return
 
+    // Track target parent comment ID for replies
+    var replyTargetCommentId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var replyTargetUsername by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+
     // RemoteInput launcher for on-watch text entry (keyboard or voice)
     val KEY_COMMENT = "comment_text"
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val bundle: Bundle? = RemoteInput.getResultsFromIntent(result.data ?: Intent())
         bundle?.getCharSequence(KEY_COMMENT)?.toString()?.takeIf { it.isNotBlank() }
-            ?.let { onSubmitComment(it) }
+            ?.let { text -> onSubmitComment(text, replyTargetCommentId) }
     }
 
-    fun launchCommentInput() {
+    fun launchCommentInput(parentCommentId: String? = null, parentUsername: String? = null) {
+        replyTargetCommentId = parentCommentId
+        replyTargetUsername = parentUsername
+        val label = if (parentUsername != null) "Reply to @$parentUsername…" else "Write a reply…"
         val remoteInput = RemoteInput.Builder(KEY_COMMENT)
-            .setLabel("Write a reply…")
+            .setLabel(label)
             .build()
         val intent = androidx.wear.input.RemoteInputIntentHelper.createActionRemoteInputIntent()
         androidx.wear.input.RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
@@ -94,40 +102,49 @@ fun PostDetailScreen(
         DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(post.time))
     }
 
+    val flattenedComments = androidx.compose.runtime.remember(uiState.comments) {
+        flattenCommentsWithLevel(uiState.comments)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         TimeText()
 
         ScalingLazyColumn(
             state = rememberScalingLazyListState(),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 32.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp)
         ) {
             // Post content card
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     // Author
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(
+                        SubcomposeAsyncImage(
                             model = "https://wasteof-image-proxy.tnix.dev/${post.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                             contentDescription = post.poster.name,
+                            loading = {
+                                CircularProgressIndicator(modifier = Modifier.padding(2.dp), strokeWidth = 1.5.dp)
+                            },
                             modifier = Modifier.size(24.dp).clip(CircleShape)
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = post.poster.name,
                             style = MaterialTheme.typography.caption1,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colors.onSurface
                         )
                     }
                     Spacer(Modifier.height(8.dp))
                     // Full post text
                     Text(
                         text = postPlainText,
-                        style = MaterialTheme.typography.body2
+                        style = MaterialTheme.typography.body2,
+                        color = MaterialTheme.colors.onSurface
                     )
                     
                     // Repost and Images
@@ -144,30 +161,50 @@ fun PostDetailScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
                                 .padding(8.dp)
                         ) {
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    AsyncImage(
+                                    SubcomposeAsyncImage(
                                         model = "https://wasteof-image-proxy.tnix.dev/${post.repost.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                                         contentDescription = null,
+                                        loading = {
+                                            CircularProgressIndicator(modifier = Modifier.padding(1.dp), strokeWidth = 1.dp)
+                                        },
                                         modifier = Modifier.size(18.dp).clip(CircleShape)
                                     )
                                     Spacer(Modifier.width(4.dp))
-                                    Text(post.repost.poster.name, style = MaterialTheme.typography.caption2, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        post.repost.poster.name,
+                                        style = MaterialTheme.typography.caption2,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colors.onSurface
+                                    )
                                 }
                                 Spacer(Modifier.height(4.dp))
-                                Text(repostText, style = MaterialTheme.typography.caption2)
+                                Text(repostText, style = MaterialTheme.typography.caption2, color = MaterialTheme.colors.onSurfaceVariant)
                                 
                                 if (repostImages.isNotEmpty()) {
                                     Spacer(Modifier.height(4.dp))
                                     repostImages.forEach { url ->
                                         val fullUrl = if (url.startsWith("/")) "https://api.wasteof.money$url" else url
-                                        AsyncImage(
+                                        SubcomposeAsyncImage(
                                             model = fullUrl,
                                             contentDescription = null,
-                                            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp, max = 150.dp).padding(vertical = 2.dp),
+                                            loading = {
+                                                Box(
+                                                    modifier = Modifier.fillMaxWidth().height(80.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(min = 40.dp, max = 150.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .padding(vertical = 2.dp),
                                             contentScale = androidx.compose.ui.layout.ContentScale.Fit
                                         )
                                     }
@@ -180,10 +217,22 @@ fun PostDetailScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         images.forEach { url ->
                             val fullUrl = if (url.startsWith("/")) "https://api.wasteof.money$url" else url
-                            AsyncImage(
+                            SubcomposeAsyncImage(
                                 model = fullUrl,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp, max = 150.dp).padding(vertical = 4.dp),
+                                loading = {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 40.dp, max = 150.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .padding(vertical = 4.dp),
                                 contentScale = androidx.compose.ui.layout.ContentScale.Fit
                             )
                         }
@@ -193,7 +242,7 @@ fun PostDetailScreen(
                     Text(
                         text = formattedTime,
                         style = MaterialTheme.typography.caption3,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                        color = MaterialTheme.colors.onSurfaceVariant
                     )
                     
                     Spacer(Modifier.height(8.dp))
@@ -202,7 +251,7 @@ fun PostDetailScreen(
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Chip(
@@ -213,31 +262,31 @@ fun PostDetailScreen(
                                     imageVector = if (post.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                     contentDescription = "Love",
                                     tint = if (post.isLoving == true) Color(0xFFEF4444) else MaterialTheme.colors.onSurface,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             },
-                            colors = ChipDefaults.secondaryChipColors(),
-                            modifier = Modifier.weight(1f).height(36.dp)
+                            colors = ChipDefaults.chipColors(backgroundColor = MaterialTheme.colors.surface),
+                            modifier = Modifier.weight(1f).height(34.dp)
                         )
                         Chip(
                             onClick = { showRepostDialog = true },
                             label = { Text("${post.reposts}", style = MaterialTheme.typography.caption2) },
                             icon = {
-                                Icon(Icons.Filled.Repeat, "Repost", modifier = Modifier.size(16.dp))
+                                Icon(Icons.Filled.Repeat, "Repost", modifier = Modifier.size(15.dp))
                             },
-                            colors = ChipDefaults.secondaryChipColors(),
-                            modifier = Modifier.weight(1f).height(36.dp)
+                            colors = ChipDefaults.chipColors(backgroundColor = MaterialTheme.colors.surface),
+                            modifier = Modifier.weight(1f).height(34.dp)
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                     Chip(
                         onClick = { launchCommentInput() },
-                        label = { Text("Reply (${post.comments})", style = MaterialTheme.typography.caption2) },
+                        label = { Text("Reply to Post (${post.comments})", style = MaterialTheme.typography.caption2) },
                         icon = {
                             Icon(
                                 Icons.Filled.ModeComment,
                                 contentDescription = "Reply",
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         },
                         colors = ChipDefaults.primaryChipColors(),
@@ -275,15 +324,16 @@ fun PostDetailScreen(
                 Text(
                     text = "Comments",
                     style = MaterialTheme.typography.caption1,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    color = MaterialTheme.colors.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
 
             if (uiState.commentsLoading) {
                 item {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                 }
             } else if (uiState.comments.isEmpty()) {
@@ -291,43 +341,60 @@ fun PostDetailScreen(
                     Text(
                         "No comments yet",
                         style = MaterialTheme.typography.caption2,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colors.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
                 }
             }
 
-            items(uiState.comments.distinctBy { it.id }, key = { it.id }) { comment ->
+            items(flattenedComments, key = { (comment, _) -> comment.id }) { (comment, level) ->
                 val commentPlainText = androidx.compose.runtime.remember(comment.content) {
                     comment.content.stripHtml()
                 }
 
+                val indentDp = (level.coerceAtMost(3) * 10).dp
+
                 Chip(
-                    onClick = { launchCommentInput() },
+                    onClick = { launchCommentInput(parentCommentId = comment.id, parentUsername = comment.poster.name) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    colors = ChipDefaults.secondaryChipColors(),
+                        .padding(start = indentDp + 2.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+                    colors = ChipDefaults.chipColors(
+                        backgroundColor = if (level > 0) MaterialTheme.colors.surface.copy(alpha = 0.7f) else MaterialTheme.colors.surface
+                    ),
                     label = {
-                        Column(Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                AsyncImage(
+                                SubcomposeAsyncImage(
                                     model = "https://wasteof-image-proxy.tnix.dev/${comment.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                                     contentDescription = comment.poster.name,
-                                    modifier = Modifier.size(16.dp)
+                                    loading = {
+                                        CircularProgressIndicator(modifier = Modifier.padding(1.dp), strokeWidth = 1.dp)
+                                    },
+                                    modifier = Modifier.size(16.dp).clip(CircleShape)
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
                                     comment.poster.name,
                                     style = MaterialTheme.typography.caption2,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colors.onSurface
                                 )
+                                if (level > 0) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        "reply",
+                                        style = MaterialTheme.typography.caption3,
+                                        color = MaterialTheme.colors.primary
+                                    )
+                                }
                             }
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = commentPlainText,
                                 style = MaterialTheme.typography.caption2,
-                                maxLines = 3,
+                                color = MaterialTheme.colors.onSurface,
+                                maxLines = 4,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
@@ -336,4 +403,16 @@ fun PostDetailScreen(
             }
         }
     }
+}
+
+private fun flattenCommentsWithLevel(comments: List<Comment>, level: Int = 0): List<Pair<Comment, Int>> {
+    val result = mutableListOf<Pair<Comment, Int>>()
+    for (comment in comments) {
+        result.add(comment to level)
+        val replies = comment.replies ?: emptyList()
+        if (replies.isNotEmpty()) {
+            result.addAll(flattenCommentsWithLevel(replies, level + 1))
+        }
+    }
+    return result
 }

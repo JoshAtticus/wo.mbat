@@ -60,14 +60,26 @@ private val WearTypography = DefaultWearTypography.copy(
     caption3 = DefaultWearTypography.caption3.withFontFamily(GoogleSansFlexBody)
 )
 
+val BrandIndigo = Color(0xFF6366F1)
+val BrandIndigoVariant = Color(0xFF4F46E5)
+val BrandTeal = Color(0xFF0D9488)
+val DarkCardSurface = Color(0xFF1E293B)
+val DarkCardVariant = Color(0xFF111827)
+val DarkCardBorder = Color(0xFF334155)
+
 val WasteofColors = Colors(
-    primary = Color(0xFF8B5CF6),
-    primaryVariant = Color(0xFF7C3AED),
-    secondary = Color(0xFF10B981),
-    secondaryVariant = Color(0xFF059669),
+    primary = BrandIndigo,
+    primaryVariant = BrandIndigoVariant,
+    secondary = BrandTeal,
+    secondaryVariant = Color(0xFF0F766E),
+    background = Color.Black,
+    surface = DarkCardSurface,
     error = Color(0xFFEF4444),
     onPrimary = Color.White,
     onSecondary = Color.White,
+    onBackground = Color(0xFFF8FAFC),
+    onSurface = Color(0xFFF8FAFC),
+    onSurfaceVariant = Color(0xFF94A3B8),
     onError = Color.White
 )
 

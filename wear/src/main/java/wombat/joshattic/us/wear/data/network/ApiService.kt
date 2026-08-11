@@ -22,6 +22,13 @@ interface ApiService {
         @Header("authorization") token: String? = null
     ): CommentResponse
 
+    @GET("comments/{comment_id}/replies")
+    suspend fun getCommentReplies(
+        @Path("comment_id") commentId: String,
+        @Query("page") page: Int = 1,
+        @Header("authorization") token: String? = null
+    ): CommentResponse
+
     @POST("posts/{post_id}/comments")
     suspend fun makeComment(
         @Path("post_id") postId: String,

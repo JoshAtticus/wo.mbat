@@ -80,8 +80,8 @@ fun WearApp(viewModel: WearViewModel) {
             PostDetailScreen(
                 uiState = uiState,
                 onLoveClick = { viewModel.toggleLove(uiState.selectedPost!!) },
-                onSubmitComment = { text ->
-                    uiState.selectedPost?.let { viewModel.submitComment(it.id, text) }
+                onSubmitComment = { text, parentId ->
+                    uiState.selectedPost?.let { viewModel.submitComment(it.id, text, parentId) }
                 },
                 onRepostClick = { post ->
                     viewModel.submitRepost(post.id)

@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,7 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import wombat.joshattic.us.wear.WearUiState
 import wombat.joshattic.us.wear.data.model.Notification
 
@@ -51,21 +52,22 @@ fun NotificationsScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 32.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp)
         ) {
             item {
                 Text(
                     text = "Notifications",
                     style = MaterialTheme.typography.caption1,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                    color = MaterialTheme.colors.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
 
             if (uiState.notificationsLoading && uiState.notifications.isEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                 }
             } else if (uiState.notifications.isEmpty()) {
@@ -73,6 +75,7 @@ fun NotificationsScreen(
                     Text(
                         "No unread notifications",
                         style = MaterialTheme.typography.caption2,
+                        color = MaterialTheme.colors.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp)
                     )
                 }
@@ -93,13 +96,13 @@ fun NotificationsScreen(
                         Text(
                             text = "Previous",
                             style = MaterialTheme.typography.caption2,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                            color = MaterialTheme.colors.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
                         )
                     }
                 }
                 
-                // Filter out any notifications that might also be in the unread list
                 val filteredRead = readNotifs.filter { read ->
                     unreadNotifs.none { unread -> unread.id == read.id }
                 }
@@ -138,41 +141,46 @@ private fun NotificationItem(notif: Notification, onNotificationClick: (Notifica
         onClick = { onNotificationClick(notif) },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        colors = ChipDefaults.secondaryChipColors(),
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        colors = ChipDefaults.chipColors(
+            backgroundColor = MaterialTheme.colors.surface
+        ),
         label = {
-            Column(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = icon,
                         contentDescription = notif.type,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colors.primary
+                        modifier = Modifier.size(13.dp),
+                        tint = if (notif.type == "love") Color(0xFFEF4444) else MaterialTheme.colors.primary
                     )
                     Spacer(Modifier.width(4.dp))
-                    // Actor avatar and name
                     val actor = notif.data.actor
                     if (actor != null) {
-                        AsyncImage(
+                        SubcomposeAsyncImage(
                             model = "https://wasteof-image-proxy.tnix.dev/${actor.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                             contentDescription = actor.name,
-                            modifier = Modifier.size(24.dp).clip(CircleShape)
+                            loading = {
+                                CircularProgressIndicator(modifier = Modifier.padding(1.dp), strokeWidth = 1.dp)
+                            },
+                            modifier = Modifier.size(18.dp).clip(CircleShape)
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = actor.name,
                             style = MaterialTheme.typography.caption2,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colors.onSurface
                         )
                     } else {
-                        Text("System", style = MaterialTheme.typography.caption2)
+                        Text("System", style = MaterialTheme.typography.caption2, color = MaterialTheme.colors.onSurface)
                     }
                 }
                 Spacer(Modifier.height(2.dp))
-                // Summary text
                 Text(
                     text = summary,
                     style = MaterialTheme.typography.caption2,
+                    color = MaterialTheme.colors.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )

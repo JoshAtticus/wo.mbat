@@ -26,7 +26,29 @@ class WearRepository(
     }
 
     suspend fun loadComments(session: AuthSession?, postId: String): List<Comment> =
-        api.getComments(postId = postId, token = session?.token).comments
+        loadCommentsWithReplies(session, postId)
+
+    suspend fun loadCommentReplies(session: AuthSession?, commentId: String, page: Int = 1): CommentResponse =
+        api.getCommentReplies(commentId, page, session?.token)
+
+    suspend fun loadCommentsWithReplies(session: AuthSession?, postId: String): List<Comment> {
+        val rootComments = api.getComments(postId = postId, token = session?.token).comments
+        return rootComments.map { loadRepliesRecursively(it, session) }
+    }
+
+    private suspend fun loadRepliesRecursively(comment: Comment, session: AuthSession?): Comment {
+        if (!comment.hasReplies) return comment.copy(replies = comment.replies ?: emptyList())
+        val allReplies = mutableListOf<Comment>()
+        var page = 1
+        while (true) {
+            val resp = runCatching { api.getCommentReplies(comment.id, page, session?.token) }.getOrNull() ?: break
+            allReplies.addAll(resp.comments)
+            if (resp.last) break
+            page++
+        }
+        val loaded = allReplies.map { loadRepliesRecursively(it, session) }
+        return comment.copy(replies = loaded)
+    }
 
     suspend fun toggleLove(session: AuthSession, postId: String): LoveToggleResponse =
         api.togglePostLove(postId = postId, token = session.token)

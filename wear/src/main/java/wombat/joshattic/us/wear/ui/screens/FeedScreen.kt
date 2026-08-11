@@ -44,7 +44,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Repeat
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import wombat.joshattic.us.wear.WearUiState
 import wombat.joshattic.us.wear.data.model.Post
 import java.text.DateFormat
@@ -68,15 +68,14 @@ fun FeedScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 32.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp)
         ) {
             // Header action buttons
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Notifications chip
                     val unreadCount = uiState.notifications.count { !it.read }
                     Chip(
                         onClick = onNotificationsClick,
@@ -89,23 +88,24 @@ fun FeedScreen(
                                 Icon(
                                     Icons.Filled.Notifications,
                                     contentDescription = "Notifications",
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (unreadCount > 0) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface
                                 )
                                 if (unreadCount > 0) {
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = unreadCount.toString(),
-                                        style = MaterialTheme.typography.body2,
-                                        fontWeight = FontWeight.Bold
+                                        style = MaterialTheme.typography.caption2,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colors.primary
                                     )
                                 }
                             }
                         },
                         colors = ChipDefaults.secondaryChipColors(),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).height(34.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    // Compose chip
+                    Spacer(modifier = Modifier.width(6.dp))
                     Chip(
                         onClick = onComposeClick,
                         label = {
@@ -117,29 +117,34 @@ fun FeedScreen(
                                 Icon(
                                     Icons.Filled.Add,
                                     contentDescription = "New post",
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         },
                         colors = ChipDefaults.primaryChipColors(),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).height(34.dp)
                     )
                 }
             }
 
             if (uiState.feedLoading && uiState.feed.isEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Box(
+                        Modifier.fillMaxWidth().padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp)
                     }
                 }
             } else if (uiState.feed.isEmpty()) {
                 item {
-                    Text(
-                        "Nothing here yet",
-                        style = MaterialTheme.typography.body2,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Nothing here yet",
+                            style = MaterialTheme.typography.body2,
+                            color = MaterialTheme.colors.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -158,7 +163,8 @@ fun FeedScreen(
                     Chip(
                         onClick = onLoadMore,
                         label = { Text("Load more", style = MaterialTheme.typography.body2) },
-                        colors = ChipDefaults.secondaryChipColors()
+                        colors = ChipDefaults.secondaryChipColors(),
+                        modifier = Modifier.padding(top = 4.dp).height(32.dp)
                     )
                 }
             }
@@ -183,20 +189,21 @@ fun WearPostCard(
     if (isPureRepost) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     Icons.Filled.Repeat,
                     contentDescription = "Repost",
-                    modifier = Modifier.size(12.dp),
-                    tint = androidx.wear.compose.material.MaterialTheme.colors.onSurfaceVariant
+                    modifier = Modifier.size(11.dp),
+                    tint = MaterialTheme.colors.primary
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    "@${post.poster.name} reposted this",
-                    style = androidx.wear.compose.material.MaterialTheme.typography.caption3,
-                    color = androidx.wear.compose.material.MaterialTheme.colors.onSurfaceVariant
+                    "@${post.poster.name} reposted",
+                    style = MaterialTheme.typography.caption3,
+                    color = MaterialTheme.colors.primary,
+                    fontWeight = FontWeight.Medium
                 )
             }
             WearPostCard(
@@ -218,35 +225,45 @@ fun WearPostCard(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        colors = ChipDefaults.secondaryChipColors(),
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        colors = ChipDefaults.chipColors(
+            backgroundColor = MaterialTheme.colors.surface
+        ),
         label = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 // Author row with avatar
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (showPfp) {
-                        AsyncImage(
+                        SubcomposeAsyncImage(
                             model = "https://wasteof-image-proxy.tnix.dev/${post.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                             contentDescription = post.poster.name,
+                            loading = {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(2.dp),
+                                    strokeWidth = 1.5.dp
+                                )
+                            },
                             modifier = Modifier
                                 .size(20.dp)
                                 .clip(CircleShape)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
                     Text(
                         text = post.poster.name,
                         style = MaterialTheme.typography.caption1,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colors.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                // Post content (HTML stripped to plain text)
+                // Post content
                 Text(
                     text = plainTextContent,
                     style = MaterialTheme.typography.body2,
+                    color = MaterialTheme.colors.onSurface,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -259,32 +276,60 @@ fun WearPostCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
                             .padding(6.dp)
                     ) {
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (showPfp) {
-                                    AsyncImage(
+                                    SubcomposeAsyncImage(
                                         model = "https://wasteof-image-proxy.tnix.dev/${post.repost.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                                         contentDescription = null,
+                                        loading = {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.padding(1.dp),
+                                                strokeWidth = 1.dp
+                                            )
+                                        },
                                         modifier = Modifier.size(14.dp).clip(CircleShape)
                                     )
                                     Spacer(Modifier.width(4.dp))
                                 }
-                                Text(post.repost.poster.name, style = MaterialTheme.typography.caption3, fontWeight = FontWeight.Bold)
+                                Text(
+                                    post.repost.poster.name,
+                                    style = MaterialTheme.typography.caption3,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colors.onSurface
+                                )
                             }
                             Spacer(Modifier.height(2.dp))
-                            Text(repostText, style = MaterialTheme.typography.caption3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                repostText,
+                                style = MaterialTheme.typography.caption3,
+                                color = MaterialTheme.colors.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 } else if (post.content?.contains("<img", ignoreCase = true) == true) {
                     val imageUrls = androidx.compose.runtime.remember(post.content) { extractImages(post.content) }
                     if (showImages && imageUrls.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
-                        AsyncImage(
+                        SubcomposeAsyncImage(
                             model = imageUrls.first(),
                             contentDescription = "Post image",
+                            loading = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(60.dp)
+                                        .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                }
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(60.dp)
@@ -294,7 +339,7 @@ fun WearPostCard(
                     } else {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Tap post to view images",
+                            text = "Tap to view media",
                             style = MaterialTheme.typography.caption3.copy(fontStyle = FontStyle.Italic),
                             color = MaterialTheme.colors.primary
                         )
@@ -302,7 +347,7 @@ fun WearPostCard(
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
-                // Love button row
+                // Love & Comment action buttons
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Button(
                         onClick = onLoveClick,
@@ -314,26 +359,27 @@ fun WearPostCard(
                         Icon(
                             imageVector = if (post.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = "Love",
-                            modifier = Modifier.size(14.dp),
-                            tint = if (post.isLoving == true) Color(0xFFEF4444) else MaterialTheme.colors.onSurface
+                            modifier = Modifier.size(13.dp),
+                            tint = if (post.isLoving == true) Color(0xFFEF4444) else MaterialTheme.colors.onSurfaceVariant
                         )
                     }
                     Text(
                         text = "${post.loves}",
-                        style = MaterialTheme.typography.caption2,
-                        modifier = Modifier.padding(start = 2.dp)
+                        style = MaterialTheme.typography.caption3,
+                        color = if (post.isLoving == true) Color(0xFFEF4444) else MaterialTheme.colors.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 1.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Comment,
                         contentDescription = "Comments",
                         modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                        tint = MaterialTheme.colors.onSurfaceVariant
                     )
                     Text(
                         text = "${post.comments}",
-                        style = MaterialTheme.typography.caption2,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.caption3,
+                        color = MaterialTheme.colors.onSurfaceVariant,
                         modifier = Modifier.padding(start = 2.dp)
                     )
                 }

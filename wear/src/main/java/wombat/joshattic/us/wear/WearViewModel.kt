@@ -68,6 +68,14 @@ class WearViewModel(
                             wombat.joshattic.us.wear.data.WearAuthPreferences(context).saveSession(token, username)
                         }
                     }
+                } else if (item.uri.path == wombat.joshattic.us.wear.data.WearAuthListenerService.PATH_SETTINGS) {
+                    val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
+                    val showImages = dataMap.getBoolean(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_SHOW_IMAGES, false)
+                    val showPfp = dataMap.getBoolean(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_SHOW_PFP, true)
+                    val feedType = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_FEED_TYPE, "Home")
+                    viewModelScope.launch {
+                        settingsPreferences.saveSettings(showImages, showPfp, feedType)
+                    }
                 }
             }
         }
@@ -117,15 +125,14 @@ class WearViewModel(
         viewModelScope.launch {
             val isExplore = _uiState.value.feedType == "Explore"
             val page = if (refresh) 1 else _uiState.value.feedPage
+            val session = _uiState.value.session
             _uiState.update { it.copy(feedLoading = true) }
             runCatching {
-                val posts = if (isExplore) {
-                    repository.loadTrendingFeed(_uiState.value.session)
+                if (isExplore) {
+                    repository.loadTrendingFeed(session)
                 } else {
-                    repository.loadFeed(_uiState.value.session, page)
+                    repository.loadFeed(session, page)
                 }
-                val session = _uiState.value.session
-                if (session != null) augmentLoveStatuses(posts, session) else posts
             }.onSuccess { posts ->
                 _uiState.update { state ->
                     val newFeed = if (refresh) posts else state.feed + posts
@@ -135,6 +142,17 @@ class WearViewModel(
                         feedPage = if (isExplore) 1 else page + 1,
                         feedHasMore = if (isExplore) false else posts.isNotEmpty()
                     )
+                }
+                // Augment love statuses asynchronously in background so feed loads instantly
+                if (session != null && posts.isNotEmpty()) {
+                    viewModelScope.launch {
+                        val augmentedPosts = augmentLoveStatuses(posts, session)
+                        _uiState.update { state ->
+                            val updatedMap = augmentedPosts.associateBy { it.id }
+                            val updatedFeed = state.feed.map { post -> updatedMap[post.id] ?: post }
+                            state.copy(feed = updatedFeed)
+                        }
+                    }
                 }
             }.onFailure { e ->
                 _uiState.update { it.copy(feedLoading = false, errorMessage = e.message) }

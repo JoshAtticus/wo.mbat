@@ -81,7 +81,7 @@ fun ComposeScreen(
                 Text(
                     "What's on your mind?",
                     style = MaterialTheme.typography.body2,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colors.onSurfaceVariant
                 )
                 Button(onClick = { launchInput() }) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Write post")
@@ -90,13 +90,14 @@ fun ComposeScreen(
                 Text(
                     text = draft,
                     style = MaterialTheme.typography.body2,
+                    color = MaterialTheme.colors.onSurface,
                     maxLines = 3,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
                 Text(
                     text = "${draft.length} chars",
                     style = MaterialTheme.typography.caption2,
-                    color = if (draft.length > 500) Color(0xFFEF4444) else MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                    color = if (draft.length > 500) Color(0xFFEF4444) else MaterialTheme.colors.onSurfaceVariant
                 )
                 
                 Chip(
