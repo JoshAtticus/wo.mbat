@@ -52,6 +52,8 @@ fun NotificationsScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
+            // Start at the top instead of centering the header mid-screen
+            autoCentering = null,
             contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp)
         ) {
             item {

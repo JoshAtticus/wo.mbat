@@ -22,25 +22,45 @@ import wombat.joshattic.us.wear.data.model.AuthSession
 import wombat.joshattic.us.wear.data.model.Comment
 import wombat.joshattic.us.wear.data.model.Notification
 import wombat.joshattic.us.wear.data.model.Post
+import wombat.joshattic.us.wear.data.model.User
 
 data class WearUiState(
     val session: AuthSession? = null,
     val isSessionLoaded: Boolean = false,
+    // ── Home feed ──────────────────────────────────────────────────────────
     val feed: List<Post> = emptyList(),
     val feedLoading: Boolean = false,
     val feedPage: Int = 1,
     val feedHasMore: Boolean = true,
+    // ── Explore / search ───────────────────────────────────────────────────
+    val exploreFeed: List<Post> = emptyList(),
+    val exploreLoading: Boolean = false,
+    val exploreHasMore: Boolean = false,
+    val searchQuery: String? = null,
+    val searchPage: Int = 1,
+    // ── Profile ────────────────────────────────────────────────────────────
+    val profileUsername: String? = null,
+    val profileUser: User? = null,
+    val profilePosts: List<Post> = emptyList(),
+    val profilePostsPage: Int = 1,
+    val profilePostsHasMore: Boolean = true,
+    val profileLoading: Boolean = false,
+    // ── Notifications ──────────────────────────────────────────────────────
     val notifications: List<Notification> = emptyList(),
     val notificationsLoading: Boolean = false,
+    // ── Post detail ────────────────────────────────────────────────────────
     val selectedPost: Post? = null,
     val comments: List<Comment> = emptyList(),
     val commentsLoading: Boolean = false,
-    val errorMessage: String? = null,
+    // ── Compose ────────────────────────────────────────────────────────────
     val postSuccess: Boolean = false,
+    val isPosting: Boolean = false,
     val composeQuotePostId: String? = null,
+    // ── Settings / misc ────────────────────────────────────────────────────
     val showImages: Boolean = false,
     val showPfp: Boolean = true,
     val feedType: String = "Home",
+    val errorMessage: String? = null,
     val isOnline: Boolean = true
 )
 
@@ -217,13 +237,22 @@ class WearViewModel(
 
     fun submitPost(text: String) {
         val session = _uiState.value.session ?: return
+        _uiState.update { it.copy(isPosting = true, errorMessage = null) }
         viewModelScope.launch {
             runCatching { repository.createPost(session, "<p>$text</p>") }
-                .onSuccess {
-                    _uiState.update { it.copy(postSuccess = true) }
+                .onSuccess { created ->
+                    _uiState.update {
+                        it.copy(
+                            isPosting = false,
+                            postSuccess = true,
+                            // Open the freshly created post in the detail screen
+                            selectedPost = created,
+                            comments = emptyList()
+                        )
+                    }
                     loadFeed(refresh = true)
                 }.onFailure { e ->
-                    _uiState.update { it.copy(errorMessage = e.message) }
+                    _uiState.update { it.copy(isPosting = false, errorMessage = e.message ?: "Couldn't post") }
                 }
         }
     }
@@ -243,13 +272,22 @@ class WearViewModel(
 
     fun submitQuote(postId: String, text: String) {
         val session = _uiState.value.session ?: return
+        _uiState.update { it.copy(isPosting = true, errorMessage = null) }
         viewModelScope.launch {
             runCatching { repository.createQuote(session, postId, "<p>$text</p>") }
-                .onSuccess {
-                    _uiState.update { it.copy(postSuccess = true) }
+                .onSuccess { created ->
+                    _uiState.update {
+                        it.copy(
+                            isPosting = false,
+                            postSuccess = true,
+                            // Open the freshly created quote post in the detail screen
+                            selectedPost = created,
+                            comments = emptyList()
+                        )
+                    }
                     loadFeed(refresh = true)
                 }.onFailure { e ->
-                    _uiState.update { it.copy(errorMessage = e.message) }
+                    _uiState.update { it.copy(isPosting = false, errorMessage = e.message ?: "Couldn't post") }
                 }
         }
     }
@@ -292,6 +330,146 @@ class WearViewModel(
     fun clearError() = _uiState.update { it.copy(errorMessage = null) }
     fun clearPostSuccess() = _uiState.update { it.copy(postSuccess = false) }
     fun setComposeQuote(postId: String?) = _uiState.update { it.copy(composeQuotePostId = postId) }
+
+    // ── Profile ───────────────────────────────────────────────────────────────
+
+    /**
+     * Load (or switch to) a user's profile. Pass [username] = null to load the
+     * current session's own profile.
+     */
+    fun loadProfile(username: String? = null) {
+        val session = _uiState.value.session
+        val target = username ?: session?.username ?: return
+        // Reset profile state for the new user
+        _uiState.update {
+            it.copy(
+                profileUsername = target,
+                profileUser = null,
+                profilePosts = emptyList(),
+                profilePostsPage = 1,
+                profilePostsHasMore = true,
+                profileLoading = true
+            )
+        }
+        viewModelScope.launch {
+            // Load user object and first page of posts in parallel
+            val userDeferred = async(Dispatchers.IO) {
+                runCatching { repository.loadUserProfile(session, target) }.getOrNull()
+            }
+            val postsDeferred = async(Dispatchers.IO) {
+                runCatching { repository.loadUserPosts(session, target, page = 1) }.getOrNull()
+            }
+            val user = userDeferred.await()
+            val postsResp = postsDeferred.await()
+
+            _uiState.update { state ->
+                // On page 1, prepend pinned posts then regular posts (de-duped)
+                val pinned = postsResp?.pinned?.filter { pinned ->
+                    postsResp.posts.none { it.id == pinned.id }
+                } ?: emptyList()
+                val posts = pinned + (postsResp?.posts ?: emptyList())
+                state.copy(
+                    profileUser = user,
+                    profilePosts = posts,
+                    profilePostsPage = 2,
+                    profilePostsHasMore = postsResp?.last == false,
+                    profileLoading = false,
+                    errorMessage = if (user == null) "Couldn't load profile" else state.errorMessage
+                )
+            }
+        }
+    }
+
+    fun loadMoreProfilePosts() {
+        val session = _uiState.value.session
+        val username = _uiState.value.profileUsername ?: return
+        if (!_uiState.value.profilePostsHasMore || _uiState.value.profileLoading) return
+        val page = _uiState.value.profilePostsPage
+        viewModelScope.launch {
+            runCatching { repository.loadUserPosts(session, username, page) }
+                .onSuccess { resp ->
+                    _uiState.update { state ->
+                        state.copy(
+                            profilePosts = state.profilePosts + resp.posts,
+                            profilePostsPage = page + 1,
+                            profilePostsHasMore = !resp.last
+                        )
+                    }
+                }
+        }
+    }
+
+    fun clearProfile() = _uiState.update {
+        it.copy(
+            profileUsername = null,
+            profileUser = null,
+            profilePosts = emptyList(),
+            profilePostsPage = 1,
+            profilePostsHasMore = true,
+            profileLoading = false
+        )
+    }
+
+    // ── Explore / Search ─────────────────────────────────────────────────────
+
+    fun loadExploreFeed(refresh: Boolean = false) {
+        viewModelScope.launch {
+            val session = _uiState.value.session
+            _uiState.update { it.copy(exploreLoading = true) }
+            runCatching { repository.loadTrendingFeed(session) }
+                .onSuccess { posts ->
+                    _uiState.update { state ->
+                        val newFeed = if (refresh) posts else (state.exploreFeed + posts).distinctBy { it.id }
+                        state.copy(
+                            exploreFeed = newFeed,
+                            exploreLoading = false,
+                            exploreHasMore = false   // trending endpoint returns a fixed 15, no pagination
+                        )
+                    }
+                }.onFailure { e ->
+                    _uiState.update { it.copy(exploreLoading = false, errorMessage = e.message) }
+                }
+        }
+    }
+
+    fun searchExplorePosts(query: String) {
+        viewModelScope.launch {
+            val session = _uiState.value.session
+            _uiState.update { it.copy(exploreLoading = true, searchQuery = query, exploreFeed = emptyList(), searchPage = 1) }
+            runCatching { repository.searchPosts(session, query, page = 1) }
+                .onSuccess { resp ->
+                    _uiState.update { it.copy(exploreFeed = resp.results, exploreLoading = false, exploreHasMore = !resp.last, searchPage = 2) }
+                }.onFailure { e ->
+                    _uiState.update { it.copy(exploreLoading = false, errorMessage = e.message) }
+                }
+        }
+    }
+
+    fun loadMoreSearchResults() {
+        val query = _uiState.value.searchQuery ?: return
+        if (!_uiState.value.exploreHasMore || _uiState.value.exploreLoading) return
+        val page = _uiState.value.searchPage
+        viewModelScope.launch {
+            val session = _uiState.value.session
+            runCatching { repository.searchPosts(session, query, page) }
+                .onSuccess { resp ->
+                    _uiState.update { state ->
+                        state.copy(
+                            exploreFeed = state.exploreFeed + resp.results,
+                            exploreHasMore = !resp.last,
+                            searchPage = page + 1
+                        )
+                    }
+                }
+        }
+    }
+
+    fun clearSearch() {
+        _uiState.update { it.copy(searchQuery = null, exploreFeed = emptyList(), searchPage = 1) }
+        loadExploreFeed(refresh = true)
+    }
+
+
 
     private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = kotlinx.coroutines.coroutineScope {
         posts.map { post ->

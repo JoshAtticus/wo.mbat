@@ -4,6 +4,8 @@ import com.google.gson.annotations.SerializedName
 
 data class AuthSession(val token: String, val username: String)
 
+data class UserHistory(val joined: Long)
+
 data class User(
     val id: String,
     val name: String,
@@ -11,12 +13,17 @@ data class User(
     val verified: Boolean,
     val color: String,
     val stats: UserStats?,
-    val online: Boolean
+    val online: Boolean,
+    val history: UserHistory? = null,
+    @SerializedName("custom_picture") val customPicture: Boolean? = null,
+    @SerializedName("custom_banner") val customBanner: Boolean? = null
 )
 
 data class UserStats(val followers: Int, val following: Int, val posts: Int)
 
 data class FeedResponse(val posts: List<Post>, val last: Boolean)
+data class UserPostsResponse(val posts: List<Post>, val pinned: List<Post>, val last: Boolean)
+data class SearchPostsResponse(val results: List<Post>, val last: Boolean)
 
 data class Post(
     @SerializedName("_id") val id: String,

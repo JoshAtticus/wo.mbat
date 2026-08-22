@@ -1,5 +1,6 @@
 package wombat.joshattic.us.wear.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Button
@@ -39,10 +41,8 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Repeat
 import coil.compose.SubcomposeAsyncImage
 import wombat.joshattic.us.wear.WearUiState
@@ -55,8 +55,6 @@ fun FeedScreen(
     uiState: WearUiState,
     onPostClick: (Post) -> Unit,
     onLoveClick: (Post) -> Unit,
-    onNotificationsClick: () -> Unit,
-    onComposeClick: () -> Unit,
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -65,108 +63,91 @@ fun FeedScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         TimeText()
 
-        ScalingLazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp)
-        ) {
-            // Header action buttons
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val unreadCount = uiState.notifications.count { !it.read }
-                    Chip(
-                        onClick = onNotificationsClick,
-                        label = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Filled.Notifications,
-                                    contentDescription = "Notifications",
-                                    modifier = Modifier.size(16.dp),
-                                    tint = if (unreadCount > 0) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface
-                                )
-                                if (unreadCount > 0) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = unreadCount.toString(),
-                                        style = MaterialTheme.typography.caption2,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colors.primary
-                                    )
-                                }
-                            }
-                        },
-                        colors = ChipDefaults.secondaryChipColors(),
-                        modifier = Modifier.weight(1f).height(34.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Chip(
-                        onClick = onComposeClick,
-                        label = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Filled.Add,
-                                    contentDescription = "New post",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        },
-                        colors = ChipDefaults.primaryChipColors(),
-                        modifier = Modifier.weight(1f).height(34.dp)
-                    )
-                }
-            }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            ScalingLazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                // Disable autoCentering so the first item starts near the top instead of the center
+                autoCentering = null,
+                // Add top padding so it doesn't overlap the clock and clears the sharp top curve
+                contentPadding = PaddingValues(top = 32.dp, bottom = 48.dp),
+                // Gentle scaling only — edgeScale = 0.4 crushed the first card into a
+                // sliver at the top bezel, which made the feed look pre-scrolled on open
+                scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 0.75f)
+            ) {
+                val distinctFeed = uiState.feed.distinctBy { it.id }
+                
+                distinctFeed.forEach { post ->
+                    val isPureRepost = post.repost != null &&
+                        (post.content?.replace(Regex("<.*?>"), "")?.trim()?.isBlank() ?: true) &&
+                        !(post.content?.contains("<img", ignoreCase = true) ?: false)
 
-            if (uiState.feedLoading && uiState.feed.isEmpty()) {
-                item {
-                    Box(
-                        Modifier.fillMaxWidth().padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp)
+                    if (isPureRepost) {
+                        item(key = "${post.id}_repost") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.Repeat,
+                                    contentDescription = "Repost",
+                                    modifier = Modifier.size(11.dp),
+                                    tint = MaterialTheme.colors.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "@${post.poster.name} reposted",
+                                    style = MaterialTheme.typography.caption3,
+                                    color = MaterialTheme.colors.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        item(key = post.repost!!.id) {
+                            WearPostCard(
+                                post = post.repost,
+                                showImages = uiState.showImages,
+                                showPfp = uiState.showPfp,
+                                onClick = { onPostClick(post) }, // click original post wrapper to open
+                                onLoveClick = { onLoveClick(post.repost) }
+                            )
+                        }
+                    } else {
+                        item(key = post.id) {
+                            WearPostCard(
+                                post = post,
+                                showImages = uiState.showImages,
+                                showPfp = uiState.showPfp,
+                                onClick = { onPostClick(post) },
+                                onLoveClick = { onLoveClick(post) }
+                            )
+                        }
                     }
                 }
-            } else if (uiState.feed.isEmpty()) {
-                item {
-                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            "Nothing here yet",
-                            style = MaterialTheme.typography.body2,
-                            color = MaterialTheme.colors.onSurfaceVariant
+
+                if (uiState.feedHasMore && uiState.feed.isNotEmpty()) {
+                    item {
+                        Chip(
+                            onClick = onLoadMore,
+                            label = { Text("Load more", style = MaterialTheme.typography.body2) },
+                            colors = ChipDefaults.secondaryChipColors(),
+                            modifier = Modifier.padding(top = 4.dp).height(32.dp)
                         )
                     }
                 }
             }
 
-            items(uiState.feed.distinctBy { it.id }, key = { it.id }) { post ->
-                WearPostCard(
-                    post = post,
-                    showImages = uiState.showImages,
-                    showPfp = uiState.showPfp,
-                    onClick = { onPostClick(post) },
-                    onLoveClick = { onLoveClick(post) }
+            // Layer loading/empty states over the list so they don't break scroll state
+            if (uiState.feedLoading && uiState.feed.isEmpty()) {
+                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp)
+            } else if (uiState.feed.isEmpty()) {
+                Text(
+                    "Nothing here yet",
+                    style = MaterialTheme.typography.body2,
+                    color = MaterialTheme.colors.onSurfaceVariant
                 )
-            }
-
-            if (uiState.feedHasMore && uiState.feed.isNotEmpty()) {
-                item {
-                    Chip(
-                        onClick = onLoadMore,
-                        label = { Text("Load more", style = MaterialTheme.typography.body2) },
-                        colors = ChipDefaults.secondaryChipColors(),
-                        modifier = Modifier.padding(top = 4.dp).height(32.dp)
-                    )
-                }
             }
         }
     }
@@ -178,45 +159,9 @@ fun WearPostCard(
     showImages: Boolean = false,
     showPfp: Boolean = true,
     onClick: () -> Unit,
-    onLoveClick: () -> Unit
+    onLoveClick: () -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null
 ) {
-    val isPureRepost = androidx.compose.runtime.remember(post) {
-        post.repost != null &&
-        (post.content?.replace(Regex("<.*?>"), "")?.trim()?.isBlank() ?: true) &&
-        !(post.content?.contains("<img", ignoreCase = true) ?: false)
-    }
-
-    if (isPureRepost) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Filled.Repeat,
-                    contentDescription = "Repost",
-                    modifier = Modifier.size(11.dp),
-                    tint = MaterialTheme.colors.primary
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    "@${post.poster.name} reposted",
-                    style = MaterialTheme.typography.caption3,
-                    color = MaterialTheme.colors.primary,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            WearPostCard(
-                post = post.repost!!,
-                showImages = showImages,
-                showPfp = showPfp,
-                onClick = onClick,
-                onLoveClick = onLoveClick
-            )
-        }
-        return
-    }
-
     val plainTextContent = androidx.compose.runtime.remember(post.content) {
         post.content?.stripHtml() ?: ""
     }
@@ -225,14 +170,20 @@ fun WearPostCard(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 2.dp, vertical = 2.dp),
+            // 20 dp each side ensures cards don't clip at the circular bezel edges
+            .padding(horizontal = 20.dp, vertical = 2.dp),
         colors = ChipDefaults.chipColors(
             backgroundColor = MaterialTheme.colors.surface
         ),
         label = {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 // Author row with avatar
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = if (onAuthorClick != null)
+                        Modifier.clickable { onAuthorClick(post.poster.name) }
+                    else Modifier
+                ) {
                     if (showPfp) {
                         SubcomposeAsyncImage(
                             model = "https://wasteof-image-proxy.tnix.dev/${post.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
@@ -280,7 +231,12 @@ fun WearPostCard(
                             .padding(6.dp)
                     ) {
                         Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = if (onAuthorClick != null)
+                                    Modifier.clickable { onAuthorClick(post.repost.poster.name) }
+                                else Modifier
+                            ) {
                                 if (showPfp) {
                                     SubcomposeAsyncImage(
                                         model = "https://wasteof-image-proxy.tnix.dev/${post.repost.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",

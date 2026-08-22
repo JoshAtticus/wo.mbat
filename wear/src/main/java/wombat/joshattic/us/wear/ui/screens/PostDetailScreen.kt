@@ -112,14 +112,23 @@ fun PostDetailScreen(
         ScalingLazyColumn(
             state = rememberScalingLazyListState(),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp)
+            // Start at the top instead of centering the post card mid-screen,
+            // which made the screen look pre-scrolled on open
+            autoCentering = null,
+            // 40dp top padding: clears the TimeText clock and the sharp part of the
+            // circular bezel curve so the first card isn't clipped at scroll position 0
+            contentPadding = PaddingValues(top = 40.dp, bottom = 28.dp),
+            scalingParams = androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 0.75f
+            )
         ) {
-            // Post content card
+            // Post content card — 20dp side padding keeps it inside the circular
+            // bezel while it sits in the narrower top region of the screen
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 20.dp, vertical = 4.dp)
                 ) {
                     // Author
                     Row(verticalAlignment = Alignment.CenterVertically) {

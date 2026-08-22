@@ -17,6 +17,7 @@ app/release/app-release.aab
 app/release/baselineProfiles/1/app-release.dm
 app/release/baselineProfiles/0/app-release.dm
 app/release/output-metadata.json
+/wear/release/*
 *.apk
 *.aab
 /wear/build/*

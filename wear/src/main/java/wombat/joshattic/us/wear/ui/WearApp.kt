@@ -18,17 +18,22 @@ import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import wombat.joshattic.us.wear.WearViewModel
 import wombat.joshattic.us.wear.ui.screens.ComposeScreen
+import wombat.joshattic.us.wear.ui.screens.ExploreScreen
 import wombat.joshattic.us.wear.ui.screens.FeedScreen
+import wombat.joshattic.us.wear.ui.screens.HomeScreen
 import wombat.joshattic.us.wear.ui.screens.NotificationsScreen
 import wombat.joshattic.us.wear.ui.screens.PostDetailScreen
+import wombat.joshattic.us.wear.ui.screens.ProfileScreen
 import wombat.joshattic.us.wear.ui.screens.WearOfflineScreen
-import wombat.joshattic.us.wear.data.model.Post
 
 object WearRoutes {
+    const val HOME = "home"
     const val FEED = "feed"
+    const val EXPLORE = "explore"
     const val POST_DETAIL = "post_detail"
     const val NOTIFICATIONS = "notifications"
     const val COMPOSE = "compose"
+    const val PROFILE = "profile"   // navigates to profileUsername already set in uiState
 }
 
 @Composable
@@ -56,79 +61,148 @@ fun WearApp(viewModel: WearViewModel) {
     } else {
         SwipeDismissableNavHost(
             navController = navController,
-            startDestination = WearRoutes.FEED
+            startDestination = WearRoutes.HOME
         ) {
-        composable(WearRoutes.FEED) {
-            FeedScreen(
-                uiState = uiState,
-                onPostClick = { post ->
-                    viewModel.openPost(post)
-                    navController.navigate(WearRoutes.POST_DETAIL)
-                },
-                onLoveClick = viewModel::toggleLove,
-                onNotificationsClick = {
-                    viewModel.loadNotifications()
-                    navController.navigate(WearRoutes.NOTIFICATIONS)
-                },
-                onComposeClick = { navController.navigate(WearRoutes.COMPOSE) },
-                onLoadMore = { viewModel.loadFeed() },
-                onRefresh = { viewModel.loadFeed(refresh = true) }
-            )
-        }
 
-        composable(WearRoutes.POST_DETAIL) {
-            PostDetailScreen(
-                uiState = uiState,
-                onLoveClick = { viewModel.toggleLove(uiState.selectedPost!!) },
-                onSubmitComment = { text, parentId ->
-                    uiState.selectedPost?.let { viewModel.submitComment(it.id, text, parentId) }
-                },
-                onRepostClick = { post ->
-                    viewModel.submitRepost(post.id)
-                    navController.popBackStack()
-                },
-                onQuoteClick = { post ->
-                    viewModel.setComposeQuote(post.id)
-                    navController.navigate(WearRoutes.COMPOSE)
-                },
-                onBack = {
-                    viewModel.closePost()
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        composable(WearRoutes.NOTIFICATIONS) {
-            NotificationsScreen(
-                uiState = uiState,
-                onNotificationClick = { notif ->
-                    notif.data.post?.let { post ->
-                        viewModel.openPost(post)
-                        viewModel.markNotificationRead(notif.id)
-                        navController.navigate(WearRoutes.POST_DETAIL)
-                    } ?: viewModel.markNotificationRead(notif.id)
-                }
-            )
-        }
-
-        composable(WearRoutes.COMPOSE) {
-            ComposeScreen(
-                uiState = uiState,
-                onSubmit = { text ->
-                    if (uiState.composeQuotePostId != null) {
-                        viewModel.submitQuote(uiState.composeQuotePostId!!, text)
-                        viewModel.setComposeQuote(null)
-                    } else {
-                        viewModel.submitPost(text)
+            // ── Home launcher ──────────────────────────────────────────────
+            composable(WearRoutes.HOME) {
+                HomeScreen(
+                    uiState = uiState,
+                    onProfileClick = {
+                        viewModel.loadProfile()              // own profile
+                        navController.navigate(WearRoutes.PROFILE)
+                    },
+                    onNotificationsClick = {
+                        viewModel.loadNotifications()
+                        navController.navigate(WearRoutes.NOTIFICATIONS)
+                    },
+                    onHomeClick = {
+                        viewModel.loadFeed(refresh = true)
+                        navController.navigate(WearRoutes.FEED)
+                    },
+                    onExploreClick = {
+                        viewModel.loadExploreFeed(refresh = true)
+                        navController.navigate(WearRoutes.EXPLORE)
+                    },
+                    onComposeClick = {
+                        // Clear any stale success flag (e.g. left over from a repost)
+                        // so ComposeScreen doesn't think a post just went through
+                        viewModel.clearPostSuccess()
+                        navController.navigate(WearRoutes.COMPOSE)
                     }
-                    navController.popBackStack()
-                },
-                onCancel = {
-                    viewModel.setComposeQuote(null)
-                    navController.popBackStack()
-                }
-            )
+                )
+            }
+
+            // ── Home feed ──────────────────────────────────────────────────
+            composable(WearRoutes.FEED) {
+                FeedScreen(
+                    uiState = uiState,
+                    onPostClick = { post ->
+                        viewModel.openPost(post)
+                        navController.navigate(WearRoutes.POST_DETAIL)
+                    },
+                    onLoveClick = viewModel::toggleLove,
+                    onLoadMore = { viewModel.loadFeed() },
+                    onRefresh = { viewModel.loadFeed(refresh = true) }
+                )
+            }
+
+            // ── Explore ────────────────────────────────────────────────────
+            composable(WearRoutes.EXPLORE) {
+                ExploreScreen(
+                    uiState = uiState,
+                    onPostClick = { post ->
+                        viewModel.openPost(post)
+                        navController.navigate(WearRoutes.POST_DETAIL)
+                    },
+                    onLoveClick = viewModel::toggleLove,
+                    onSearch = { query -> viewModel.searchExplorePosts(query) },
+                    onClearSearch = { viewModel.clearSearch() },
+                    onLoadMore = {
+                        if (uiState.searchQuery != null) viewModel.loadMoreSearchResults()
+                    },
+                    onRefresh = { viewModel.loadExploreFeed(refresh = true) }
+                )
+            }
+
+            // ── Post detail ────────────────────────────────────────────────
+            composable(WearRoutes.POST_DETAIL) {
+                PostDetailScreen(
+                    uiState = uiState,
+                    onLoveClick = { viewModel.toggleLove(uiState.selectedPost!!) },
+                    onSubmitComment = { text, parentId ->
+                        uiState.selectedPost?.let { viewModel.submitComment(it.id, text, parentId) }
+                    },
+                    onRepostClick = { post ->
+                        viewModel.submitRepost(post.id)
+                        navController.popBackStack()
+                    },
+                    onQuoteClick = { post ->
+                        viewModel.setComposeQuote(post.id)
+                        navController.navigate(WearRoutes.COMPOSE)
+                    },
+                    onBack = {
+                        viewModel.closePost()
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            // ── Notifications ──────────────────────────────────────────────
+            composable(WearRoutes.NOTIFICATIONS) {
+                NotificationsScreen(
+                    uiState = uiState,
+                    onNotificationClick = { notif ->
+                        notif.data.post?.let { post ->
+                            viewModel.openPost(post)
+                            viewModel.markNotificationRead(notif.id)
+                            navController.navigate(WearRoutes.POST_DETAIL)
+                        } ?: viewModel.markNotificationRead(notif.id)
+                    }
+                )
+            }
+
+            // ── Compose ────────────────────────────────────────────────────
+            composable(WearRoutes.COMPOSE) {
+                ComposeScreen(
+                    uiState = uiState,
+                    onSubmit = { text ->
+                        if (uiState.composeQuotePostId != null) {
+                            viewModel.submitQuote(uiState.composeQuotePostId!!, text)
+                            viewModel.setComposeQuote(null)
+                        } else {
+                            viewModel.submitPost(text)
+                        }
+                        // No popBackStack here — ComposeScreen waits for the request
+                        // to finish, then fires onPosted to open the new post
+                    },
+                    onPosted = {
+                        viewModel.clearPostSuccess()
+                        // Open the freshly created post (selectedPost is already set);
+                        // pop the composer off the stack so back goes home, not composer
+                        navController.navigate(WearRoutes.POST_DETAIL) {
+                            popUpTo(WearRoutes.HOME)
+                        }
+                    },
+                    onCancel = {
+                        viewModel.setComposeQuote(null)
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            // ── Profile ────────────────────────────────────────────────────
+            composable(WearRoutes.PROFILE) {
+                ProfileScreen(
+                    uiState = uiState,
+                    onPostClick = { post ->
+                        viewModel.openPost(post)
+                        navController.navigate(WearRoutes.POST_DETAIL)
+                    },
+                    onLoveClick = viewModel::toggleLove,
+                    onLoadMorePosts = { viewModel.loadMoreProfilePosts() }
+                )
+            }
         }
     }
-}
 }

@@ -4,6 +4,27 @@ import retrofit2.http.*
 import wombat.joshattic.us.wear.data.model.*
 
 interface ApiService {
+    @GET("users/{username}")
+    suspend fun getUser(
+        @Path("username") username: String,
+        @Query("includeHasMedia") includeHasMedia: String? = "",
+        @Header("authorization") token: String? = null
+    ): User
+
+    @GET("users/{username}/posts")
+    suspend fun getUserPosts(
+        @Path("username") username: String,
+        @Query("page") page: Int = 1,
+        @Header("authorization") token: String? = null
+    ): UserPostsResponse
+
+    @GET("search/posts")
+    suspend fun searchPosts(
+        @Query("q") query: String,
+        @Query("page") page: Int = 1,
+        @Header("authorization") token: String? = null
+    ): SearchPostsResponse
+
     @GET("users/{username}/following/posts")
     suspend fun getFeed(
         @Path("username") username: String,

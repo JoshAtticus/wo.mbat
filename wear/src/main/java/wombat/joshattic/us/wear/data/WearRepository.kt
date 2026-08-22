@@ -12,6 +12,18 @@ class WearRepository(
 ) {
     val sessionFlow = authPreferences.sessionFlow
 
+    /** Fetch a user's public profile (includes stats, history, and has-media flags). */
+    suspend fun loadUserProfile(session: AuthSession?, username: String): User =
+        api.getUser(username = username, includeHasMedia = "", token = session?.token)
+
+    /** Paginated posts for a given user. Pinned posts are prepended on page 1. */
+    suspend fun loadUserPosts(session: AuthSession?, username: String, page: Int = 1): UserPostsResponse =
+        api.getUserPosts(username = username, page = page, token = session?.token)
+
+    /** Full-text search over post content. */
+    suspend fun searchPosts(session: AuthSession?, query: String, page: Int = 1): SearchPostsResponse =
+        api.searchPosts(query = query, page = page, token = session?.token)
+
     /** Load feed page for the authenticated user, falling back to trending if guest. */
     suspend fun loadFeed(session: AuthSession?, page: Int = 1): List<Post> {
         return if (session != null) {
