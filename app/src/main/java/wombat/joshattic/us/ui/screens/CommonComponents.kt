@@ -209,6 +209,7 @@ import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 
 fun htmlToAnnotated(html: String): AnnotatedString {
     return buildAnnotatedString {
@@ -1824,20 +1825,98 @@ fun stripImages(html: String): String {
     return result
 }
 
+// Trailing characters stripped from the end of an auto-linked URL because they
+// most likely belong to the surrounding sentence rather than the URL itself.
+private const val AUTO_LINK_TRAILING_PUNCTUATION = ".,;:!?…»)]}>\"'"
+
+/**
+ * Linkifies plain URLs and @mentions in post HTML.
+ *
+ * This walks the HTML structure instead of running global regexes over the whole
+ * string, which fixes two bugs of the old implementation:
+ *  1. URLs directly after an opening tag (e.g. "<u>https://...</u>",
+ *     "<strong>https://...</strong>") are now linkified. The old regex used a
+ *     negative lookbehind that rejected anything preceded by '>' (the closing
+ *     angle bracket of the opening tag), so those links stayed dead.
+ *  2. URLs containing '@' (e.g. mastodon.social/@user/123) are no longer
+ *     corrupted by mention replacement, because mentions are only matched in
+ *     plain-text segments — never inside tags, hrefs or existing <a> elements.
+ */
 fun autoLinkAndMentions(html: String): String {
-    var result = html
-    // Plain http/https links (not already in href or quotes)
-    val urlRegex = """(?<!["'=/>])(https?://[^\s<>"']+)""".toRegex(RegexOption.IGNORE_CASE)
-    result = urlRegex.replace(result) { m ->
-        val url = m.value
-        """<a href="$url">$url</a>"""
+    if (!html.contains('<')) return linkifyPlainSegment(html, insideAnchor = false)
+
+    val sb = StringBuilder(html.length + 64)
+    var i = 0
+    var anchorDepth = 0
+    while (i < html.length) {
+        if (html[i] == '<') {
+            val tagEnd = html.indexOf('>', i)
+            if (tagEnd == -1) {
+                // Unterminated tag: emit the rest verbatim.
+                sb.append(html, i, html.length)
+                break
+            }
+            val tag = html.substring(i, tagEnd + 1)
+            val lower = tag.lowercase(Locale.ROOT)
+            val isOpenAnchor = lower.startsWith("<a") &&
+                (lower.length == 3 || !lower[2].isLetterOrDigit())
+            val isCloseAnchor = lower.startsWith("</a")
+            when {
+                isOpenAnchor -> anchorDepth++
+                isCloseAnchor -> anchorDepth = (anchorDepth - 1).coerceAtLeast(0)
+            }
+            sb.append(tag)
+            i = tagEnd + 1
+        } else {
+            val nextTag = html.indexOf('<', i)
+            val end = if (nextTag == -1) html.length else nextTag
+            sb.append(linkifyPlainSegment(html.substring(i, end), insideAnchor = anchorDepth > 0))
+            i = end
+        }
     }
-    // @mentions → special href for in-app handling
-    val mentionRegex = """@([A-Za-z0-9_]+)""".toRegex()
+    return sb.toString()
+}
+
+/**
+ * Linkifies a single plain-text (between-tags) HTML segment.
+ * Never called for tag internals, so attribute values cannot be corrupted here.
+ */
+private fun linkifyPlainSegment(text: String, insideAnchor: Boolean): String {
+    if (insideAnchor) return text
+    var result = text
+
+    // @mentions → special href for in-app handling.
+    // Guarded so emails (foo@bar.com) and '@' inside URL paths (/@user/123)
+    // are not treated as mentions.
+    val mentionRegex = Regex("""(^|[^A-Za-z0-9_.@/\-])@([A-Za-z0-9_]+)""")
     result = mentionRegex.replace(result) { m ->
-        val user = m.groupValues[1]
-        """<a href="wombat://user/$user">@$user</a>"""
+        val user = m.groupValues[2]
+        "${m.groupValues[1]}<a href=\"wombat://user/$user\">@$user</a>"
     }
+
+    // Plain http/https links. Tags are consumed separately by [autoLinkAndMentions],
+    // so a URL immediately following an opening tag is matched here too.
+    val urlRegex = Regex("""(https?://[^\s<>"']+)""", RegexOption.IGNORE_CASE)
+    result = urlRegex.replace(result) { m ->
+        val full = m.value
+        var url = full
+        // Don't swallow trailing punctuation that belongs to the sentence.
+        while (url.isNotEmpty() && url.last() in AUTO_LINK_TRAILING_PUNCTUATION) {
+            val closer = url.last()
+            val opener = when (closer) {
+                ')' -> '('
+                ']' -> '['
+                '}' -> '{'
+                else -> null
+            }
+            // Keep a closing bracket when it is balanced by an opening one in the URL.
+            if (opener != null && url.count { it == opener } >= url.count { it == closer }) break
+            url = url.dropLast(1)
+        }
+        val trailing = full.substring(url.length)
+        """<a href="$url">$url</a>$trailing"""
+    }
+
     return result
 }
 
