@@ -164,6 +164,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -207,6 +208,9 @@ import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.theme.applyGoogleSansFlexTypeface
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
+import wombat.joshattic.us.ui.components.BrandedQuoteSpan
+import wombat.joshattic.us.ui.components.QUOTE_GAP_WIDTH_DP
+import wombat.joshattic.us.ui.components.QUOTE_STRIPE_WIDTH_DP
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -630,6 +634,55 @@ fun PostActionsMenu(
     }
 }
 
+/** True when [post] is a bare repost wrapper with no added text or images of its own. */
+fun isPureRepost(post: Post): Boolean {
+    return post.repost != null &&
+        post.content.replace(Regex("<.*?>"), "").trim().isBlank() &&
+        extractImages(post.content).isEmpty()
+}
+
+/**
+ * One feed entry: [primary] is the wrapper post that gets rendered, and
+ * [reposters] lists every consecutive pure-repost wrapper of the same target
+ * (including [primary] itself) to be shown in the combined header.
+ */
+data class RepostGroup(val primary: Post, val reposters: List<Post>)
+
+/**
+ * Merges runs of *consecutive* pure reposts of the same post into a single
+ * [RepostGroup], so the feed can show "@a and @b reposted this" instead of
+ * repeating the target card once per reposter. Regular posts and quote reposts
+ * pass through as single-entry groups.
+ */
+fun groupConsecutiveReposts(posts: List<Post>): List<RepostGroup> {
+    val result = mutableListOf<RepostGroup>()
+    for (post in posts) {
+        val last = result.lastOrNull()
+        if (last != null && isPureRepost(post) && last.primary.repost?.id == post.repost?.id && last.reposters.isNotEmpty()) {
+            result[result.lastIndex] = last.copy(reposters = last.reposters + post)
+        } else {
+            result.add(
+                RepostGroup(
+                    primary = post,
+                    reposters = if (isPureRepost(post)) listOf(post) else emptyList()
+                )
+            )
+        }
+    }
+    return result
+}
+
+/** Combined header label for a group of consecutive reposts of the same post. */
+fun repostHeaderText(reposters: List<Post>): String {
+    val names = reposters.distinctBy { it.poster.name.lowercase() }
+        .map { "@${it.poster.name.lowercase()}" }
+    return when (names.size) {
+        1 -> "${names[0]} reposted this"
+        2 -> "${names[0]} and ${names[1]} reposted this"
+        else -> "${names[0]} and ${names.size - 1} others reposted this"
+    }
+}
+
 @Composable
 fun PostCard(
     post: Post,
@@ -657,7 +710,8 @@ fun PostCard(
     followLoading: Boolean = false,
     onFollowClick: (() -> Unit)? = null,
     blockedUsernames: Set<String> = emptySet(),
-    blockedQuoteHandling: String = "warning"
+    blockedQuoteHandling: String = "warning",
+    groupedReposters: List<Post> = emptyList()
 ) {
     if (blockedUsernames.contains(post.poster.name.lowercase())) {
         Spacer(modifier = Modifier.size(0.dp))
@@ -676,11 +730,7 @@ fun PostCard(
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
     var menuExpanded by remember { mutableStateOf(false) }
 
-    val isPureRepost = remember(post) {
-        post.repost != null &&
-        post.content.replace(Regex("<.*?>"), "").trim().isBlank() &&
-        imageUrls.isEmpty()
-    }
+    val isPureRepost = remember(post) { isPureRepost(post) }
 
     if (isPureRepost) {
         Column(modifier = modifier.fillMaxWidth()) {
@@ -698,7 +748,8 @@ fun PostCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    "@${post.poster.name.lowercase()} reposted this",
+                    if (groupedReposters.size > 1) repostHeaderText(groupedReposters)
+                    else "@${post.poster.name.lowercase()} reposted this",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -971,6 +1022,7 @@ fun PostCard(
                         )
                     }
                 }
+                PostShareButton(postId = post.id)
             }
         }
     }
@@ -1405,7 +1457,16 @@ fun HtmlText(
     val textColor = (color ?: MaterialTheme.colorScheme.onSurface).toArgb()
     val linkColor = (color ?: MaterialTheme.colorScheme.onBackground).toArgb()
 
-    val spannedText = remember(html, textColor, linkColor, onMentionClick, onPostClick, openLinksInApp) {
+    // Density-scaled blockquote stripe/gap sizes so quotes render consistently
+    // on every device instead of using raw pixel constants.
+    val density = LocalDensity.current
+    val quoteStripeWidthPx = with(density) { QUOTE_STRIPE_WIDTH_DP.dp.roundToPx().coerceAtLeast(1) }
+    val quoteGapWidthPx = with(density) { QUOTE_GAP_WIDTH_DP.dp.roundToPx() }
+
+    val spannedText = remember(
+        html, textColor, linkColor, onMentionClick, onPostClick, openLinksInApp,
+        quoteStripeWidthPx, quoteGapWidthPx
+    ) {
         val processedHtml = html.trim()
             .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
             .replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "</p>\n\n<p")
@@ -1488,24 +1549,24 @@ fun HtmlText(
             }
         }
 
-        // Replace default blockquote spans with branded ones
+        // Replace default blockquote spans with branded ones.
+        // The platform QuoteSpan only accepts custom stripe/gap widths on API 28+;
+        // below that it falls back to a hairline stripe with no gap. Drawing our own
+        // span keeps quotes looking correct on every supported Android version.
         val brandColor = 0xFF6366F1.toInt()
         spannable.getSpans(0, spannable.length, android.text.style.QuoteSpan::class.java).forEach { span ->
             val start = spannable.getSpanStart(span)
             val end = spannable.getSpanEnd(span)
             val flags = spannable.getSpanFlags(span)
             spannable.removeSpan(span)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                spannable.setSpan(
-                    android.text.style.QuoteSpan(brandColor, 6, 24),
-                    start, end, flags
-                )
-            } else {
-                spannable.setSpan(
-                    android.text.style.QuoteSpan(brandColor),
-                    start, end, flags
-                )
-            }
+            spannable.setSpan(
+                BrandedQuoteSpan(
+                    color = brandColor,
+                    stripeWidthPx = quoteStripeWidthPx,
+                    gapWidthPx = quoteGapWidthPx
+                ),
+                start, end, flags
+            )
         }
         var len = spannable.length
         while (len > 0 && (spannable[len - 1] == '\n' || spannable[len - 1] == '\r' || spannable[len - 1] == ' ')) {
@@ -1675,6 +1736,48 @@ fun PostMetric(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = contentColor
+            )
+        }
+    }
+}
+
+/** Opens the system share sheet for a post's wasteof.money URL. */
+fun sharePostUrl(context: Context, postId: String) {
+    val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        putExtra(android.content.Intent.EXTRA_TEXT, "https://wasteof.money/posts/$postId")
+        type = "text/plain"
+    }
+    context.startActivity(android.content.Intent.createChooser(sendIntent, null))
+}
+
+/**
+ * Icon-only share pill styled to match [PostMetric] buttons so it can sit
+ * alongside them in the post action row.
+ */
+@Composable
+fun PostShareButton(postId: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clickable {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            sharePostUrl(context, postId)
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .heightIn(min = 32.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Share,
+                contentDescription = "Share",
+                modifier = Modifier.size(16.dp)
             )
         }
     }
@@ -2316,6 +2419,25 @@ fun FullScreenImageViewer(
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
+                                        )
+                                    }
+
+                                    // Share Button
+                                    val shareContext = androidx.compose.ui.platform.LocalContext.current
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.18f))
+                                            .clickable { sharePostUrl(shareContext, p.id) }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Share,
+                                            contentDescription = "Share",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }

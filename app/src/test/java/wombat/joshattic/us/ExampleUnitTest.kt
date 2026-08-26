@@ -4,7 +4,122 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import wombat.joshattic.us.data.model.Poster
+import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.ui.screens.autoLinkAndMentions
+import wombat.joshattic.us.ui.screens.groupConsecutiveReposts
+import wombat.joshattic.us.ui.screens.repostHeaderText
+
+/**
+ * Tests for merging consecutive pure reposts of the same post into a single
+ * feed entry with a combined "@a and @b reposted this" header.
+ */
+class RepostGroupingTest {
+
+    private fun poster(name: String) = Poster(id = "id-$name", name = name, color = "indigo")
+
+    private fun regularPost(id: String, name: String) =
+        Post(id = id, poster = poster(name), content = "<p>hello</p>", time = 0L, comments = 0, loves = 0, reposts = 0)
+
+    private fun pureRepost(id: String, name: String, target: Post) =
+        Post(id = id, poster = poster(name), content = "", repost = target, time = 0L, comments = 0, loves = 0, reposts = 0)
+
+    private val target = regularPost("target", "engineerrunner")
+
+    @Test
+    fun consecutiveRepostsOfSamePost_areMerged() {
+        val feed = listOf(
+            pureRepost("r1", "joshatticus", target),
+            pureRepost("r2", "ethernet", target)
+        )
+        val groups = groupConsecutiveReposts(feed)
+        assertEquals(1, groups.size)
+        assertEquals(listOf("joshatticus", "ethernet"), groups[0].reposters.map { it.poster.name })
+        assertEquals("r1", groups[0].primary.id)
+    }
+
+    @Test
+    fun nonAdjacentRepostsOfSamePost_areNotMerged() {
+        val feed = listOf(
+            pureRepost("r1", "joshatticus", target),
+            regularPost("other", "someone"),
+            pureRepost("r2", "ethernet", target)
+        )
+        val groups = groupConsecutiveReposts(feed)
+        assertEquals(3, groups.size)
+        assertEquals(1, groups[0].reposters.size)
+        assertEquals(0, groups[1].reposters.size)
+        assertEquals(1, groups[2].reposters.size)
+    }
+
+    @Test
+    fun repostsOfDifferentPosts_areNotMerged() {
+        val otherTarget = regularPost("target2", "jeffalo")
+        val feed = listOf(
+            pureRepost("r1", "joshatticus", target),
+            pureRepost("r2", "ethernet", otherTarget)
+        )
+        val groups = groupConsecutiveReposts(feed)
+        assertEquals(2, groups.size)
+    }
+
+    @Test
+    fun quoteReposts_areNeverGrouped() {
+        val quoteRepost = Post(
+            id = "q1", poster = poster("joshatticus"),
+            content = "<p>look at this</p>", repost = target,
+            time = 0L, comments = 0, loves = 0, reposts = 0
+        )
+        val feed = listOf(pureRepost("r1", "ethernet", target), quoteRepost)
+        val groups = groupConsecutiveReposts(feed)
+        assertEquals(2, groups.size)
+        assertEquals(1, groups[0].reposters.size)
+        assertEquals(0, groups[1].reposters.size)
+    }
+
+    @Test
+    fun regularFeedPassesThroughUnchanged() {
+        val feed = listOf(regularPost("a", "u1"), regularPost("b", "u2"), regularPost("c", "u3"))
+        val groups = groupConsecutiveReposts(feed)
+        assertEquals(feed.map { it.id }, groups.map { it.primary.id })
+        assertTrue(groups.all { it.reposters.isEmpty() })
+    }
+
+    @Test
+    fun headerText_singleReposter() {
+        val text = repostHeaderText(listOf(pureRepost("r1", "joshatticus", target)))
+        assertEquals("@joshatticus reposted this", text)
+    }
+
+    @Test
+    fun headerText_twoReposters() {
+        val text = repostHeaderText(
+            listOf(pureRepost("r1", "joshatticus", target), pureRepost("r2", "ethernet", target))
+        )
+        assertEquals("@joshatticus and @ethernet reposted this", text)
+    }
+
+    @Test
+    fun headerText_duplicateNamesAreDeduplicated() {
+        // e.g. the same wrapper post appearing twice in the feed
+        val text = repostHeaderText(
+            listOf(pureRepost("r1", "ethernet", target), pureRepost("r2", "Ethernet", target))
+        )
+        assertEquals("@ethernet reposted this", text)
+    }
+
+    @Test
+    fun headerText_threePlusUsesOthers() {
+        val text = repostHeaderText(
+            listOf(
+                pureRepost("r1", "joshatticus", target),
+                pureRepost("r2", "ethernet", target),
+                pureRepost("r3", "jeffalo", target)
+            )
+        )
+        assertEquals("@joshatticus and 2 others reposted this", text)
+    }
+}
 
 /**
  * Regression tests for autoLinkAndMentions — links must be clickable on ALL posts,

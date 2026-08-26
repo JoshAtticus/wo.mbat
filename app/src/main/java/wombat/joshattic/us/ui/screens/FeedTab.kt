@@ -129,6 +129,8 @@ fun FeedTab(
             isRefreshing = loading,
             onRefresh = onRefresh
         ) {
+            // Merge consecutive pure reposts of the same post into one feed entry
+            val groupedPosts = remember(posts) { groupConsecutiveReposts(posts) }
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -141,7 +143,8 @@ fun FeedTab(
                     item { EmptyStateCard(title = "Nothing here yet", message = "Pull down to refresh.") }
                 }
 
-                items(posts.distinctBy { it.id }, key = { it.id }, contentType = { "post" }) { post ->
+                items(groupedPosts, key = { it.primary.id }, contentType = { "post" }) { group ->
+                    val post = group.primary
                     val isPosterFollowed = followedUsernames.contains(post.poster.name.lowercase())
                     val isFollowLoading = followLoadingUsernames.contains(post.poster.name.lowercase())
                     PostCard(
@@ -168,7 +171,8 @@ fun FeedTab(
                         followLoading = isFollowLoading,
                         onFollowClick = onFollowClick?.let { action -> { action(post.poster.name) } },
                         blockedUsernames = blockedUsernames,
-                        blockedQuoteHandling = blockedQuoteHandling
+                        blockedQuoteHandling = blockedQuoteHandling,
+                        groupedReposters = group.reposters
                     )
                 }
             }
