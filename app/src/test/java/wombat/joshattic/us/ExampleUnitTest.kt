@@ -1,9 +1,12 @@
 package wombat.joshattic.us
 
+import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import wombat.joshattic.us.data.model.OpenGraphResponse
 import wombat.joshattic.us.data.model.Poster
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.ui.screens.autoLinkAndMentions
@@ -239,5 +242,73 @@ class AutoLinkTest {
             )
         )
         assertFalse(result.contains("wombat://"))
+    }
+}
+
+/**
+ * Tests for first-link extraction used by OpenGraph previews: the earliest
+ * external link in a post wins, wasteof frontends are skipped.
+ */
+class OpenGraphLinkTest {
+
+    @Test
+    fun firstAnchorHrefWins() {
+        val html = "<p><a href=\"https://b.site\">x</a> and https://a.site later</p>"
+        assertEquals("https://b.site", wombat.joshattic.us.ui.screens.extractFirstLink(html))
+    }
+
+    @Test
+    fun bareUrlInTextIsFound() {
+        val html = "<p><u>https://blog.joshattic.us/posts/2026-08-19-post</u></p>"
+        assertEquals("https://blog.joshattic.us/posts/2026-08-19-post", wombat.joshattic.us.ui.screens.extractFirstLink(html))
+    }
+
+    @Test
+    fun skipsWasteofMoney() {
+        val html = "<p><a href=\"https://wasteof.money/posts/123\">post</a> see https://real.site/page</p>"
+        assertEquals("https://real.site/page", wombat.joshattic.us.ui.screens.extractFirstLink(html))
+    }
+
+    @Test
+    fun skipsAllWasteofFrontends() {
+        for (host in listOf("alpha.wasteof.money", "worm.eris.cafe", "wasteof.eris.cafe", "www.wasteof.money", "beta.wasteof.money")) {
+            val html = "<p><a href=\"https://$host/x\">y</a> https://ok.site</p>"
+            assertEquals(host, "https://ok.site", wombat.joshattic.us.ui.screens.extractFirstLink(html))
+        }
+    }
+
+    @Test
+    fun returnsNullWhenOnlySkippedHosts() {
+        assertNull(wombat.joshattic.us.ui.screens.extractFirstLink("<p><a href=\"https://wasteof.money/posts/1\">a</a></p>"))
+    }
+
+    @Test
+    fun returnsNullWhenNoLinks() {
+        assertNull(wombat.joshattic.us.ui.screens.extractFirstLink("<p>just text, no links</p>"))
+    }
+
+    @Test
+    fun trailingPunctuationIsTrimmed() {
+        assertEquals("https://example.com", wombat.joshattic.us.ui.screens.extractFirstLink("<p>see https://example.com.</p>"))
+    }
+
+    @Test
+    fun wombatSchemeIsIgnored() {
+        assertNull(wombat.joshattic.us.ui.screens.extractFirstLink("<p><a href=\"wombat://user/josh\">@josh</a></p>"))
+    }
+
+    @Test
+    fun ogApiResponseParses() {
+        val json = """
+            {"requested_url":"https://github.com","status_code":200,"fetched_at_unix":1797772800,
+             "metadata":{"title":"GitHub","description":"desc","image":"https://img","url":"https://github.com"},
+             "cached":false}
+        """.trimIndent()
+        val parsed = Gson().fromJson(json, OpenGraphResponse::class.java)
+        assertEquals("GitHub", parsed.metadata?.title)
+        assertEquals("desc", parsed.metadata?.description)
+        assertEquals("https://img", parsed.metadata?.image)
+        assertEquals(200, parsed.statusCode)
+        assertEquals(false, parsed.cached)
     }
 }

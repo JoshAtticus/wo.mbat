@@ -209,6 +209,7 @@ import wombat.joshattic.us.ui.theme.applyGoogleSansFlexTypeface
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import wombat.joshattic.us.ui.components.BrandedQuoteSpan
+import wombat.joshattic.us.ui.components.OpenGraphPreview
 import wombat.joshattic.us.ui.components.QUOTE_GAP_WIDTH_DP
 import wombat.joshattic.us.ui.components.QUOTE_STRIPE_WIDTH_DP
 import java.text.DateFormat
@@ -728,6 +729,7 @@ fun PostCard(
     }
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
+    val firstLink = remember(post.content) { extractFirstLink(post.content) }
     var menuExpanded by remember { mutableStateOf(false) }
 
     val isPureRepost = remember(post) { isPureRepost(post) }
@@ -893,6 +895,23 @@ fun PostCard(
                             .clickable { onClick() }
                     )
                 }
+                if (showImages && imageUrls.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    PostImageCarousel(
+                        images = imageUrls,
+                        onImageClick = { images, index -> onImageClick(images, index, post) },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        isDetailView = !truncated
+                    )
+                }
+                firstLink?.let { link ->
+                    OpenGraphPreview(
+                        url = link,
+                        hasPostImages = showImages && imageUrls.isNotEmpty(),
+                        openLinksInApp = openLinksInApp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
                 post.repost?.let { repostPost ->
                     val isRepostPosterBlocked = blockedUsernames.contains(repostPost.poster.name.lowercase())
                     if (isRepostPosterBlocked) {
@@ -963,15 +982,6 @@ fun PostCard(
                         }
                     }
                 }
-            }
-            if (showImages && imageUrls.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                PostImageCarousel(
-                    images = imageUrls,
-                    onImageClick = { images, index -> onImageClick(images, index, post) },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    isDetailView = !truncated
-                )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -1926,6 +1936,96 @@ fun stripImages(html: String): String {
         if (isAllowedImageHost(url)) "" else url
     }
     return result
+}
+
+// ---------------------------------------------------------------------
+// OpenGraph link previews
+// ---------------------------------------------------------------------
+
+/** Hosts that are wasteof frontends or otherwise handled by in-app navigation; never link-preview these. */
+private val OPEN_GRAPH_SKIPPED_HOSTS = setOf(
+    "wasteof.money",
+    "beta.wasteof.money",
+    "alpha.wasteof.money",
+    "worm.eris.cafe",
+    "wasteof.eris.cafe"
+)
+
+/** Extracts the lowercase host (without "www.") from an absolute http(s) URL, or null. */
+fun urlHost(url: String): String? {
+    val withoutScheme = url.substringAfter("://", "")
+    if (withoutScheme.isEmpty()) return null
+    val hostPort = withoutScheme
+        .substringBefore('/')
+        .substringBefore('?')
+        .substringBefore('#')
+    val host = hostPort.substringAfterLast('@', hostPort).substringBefore(':')
+    return host.lowercase(Locale.ROOT).removePrefix("www.").ifEmpty { null }
+}
+
+/** True when [url] is an absolute http(s) URL on a previewable (non-wasteof) host. */
+fun isOpenGraphEligibleUrl(url: String): Boolean {
+    if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) return false
+    val host = urlHost(url) ?: return false
+    return host !in OPEN_GRAPH_SKIPPED_HOSTS
+}
+
+/** Strips trailing sentence punctuation and unbalanced closing brackets from a bare URL. */
+private fun trimTrailingUrlPunctuation(url: String): String {
+    var result = url
+    while (result.isNotEmpty() && result.last() in ".,;:!?…»\"'") {
+        result = result.dropLast(1)
+    }
+    while (result.isNotEmpty() && (result.last() == ')' || result.last() == ']' || result.last() == '}')) {
+        val closer = result.last()
+        val opener = when (closer) {
+            ')' -> '('
+            ']' -> '['
+            else -> '{'
+        }
+        if (result.count { it == opener } >= result.count { it == closer }) break
+        result = result.dropLast(1)
+    }
+    return result
+}
+
+/**
+ * Returns the first previewable link in [html] in document order — either an
+ * <a href> target or a bare URL in visible text — skipping wasteof frontends,
+ * which are handled by in-app navigation instead.
+ */
+fun extractFirstLink(html: String): String? {
+    val candidates = mutableListOf<Pair<Int, String>>()
+    val hrefRegex = Regex("""href\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+    val bareUrlRegex = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)
+
+    var i = 0
+    while (i < html.length) {
+        if (html[i] == '<') {
+            val tagEnd = html.indexOf('>', i)
+            if (tagEnd == -1) break
+            val tag = html.substring(i, tagEnd + 1)
+            val tagName = tag.substringBefore(' ').substringBefore('>').drop(1).lowercase(Locale.ROOT)
+            if (tagName == "a") {
+                hrefRegex.find(tag)?.let { match ->
+                    candidates.add(i to match.groupValues[1])
+                }
+            }
+            i = tagEnd + 1
+        } else {
+            val nextTag = html.indexOf('<', i)
+            val end = if (nextTag == -1) html.length else nextTag
+            bareUrlRegex.findAll(html.substring(i, end)).forEach { match ->
+                candidates.add((i + match.range.first) to match.value)
+            }
+            i = end
+        }
+    }
+
+    return candidates
+        .sortedBy { it.first }
+        .map { trimTrailingUrlPunctuation(it.second) }
+        .firstOrNull { isOpenGraphEligibleUrl(it) }
 }
 
 // Trailing characters stripped from the end of an auto-linked URL because they

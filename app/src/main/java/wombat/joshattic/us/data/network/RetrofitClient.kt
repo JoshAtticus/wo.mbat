@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL = "https://api.wasteof.money/"
+    private const val OPEN_GRAPH_BASE_URL = "https://og.joshattic.us/"
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(
@@ -26,9 +27,22 @@ object RetrofitClient {
         .callTimeout(5, TimeUnit.MINUTES)
         .build()
 
+    // Link previews must fail fast so a slow origin site never stalls feed scrolling.
+    private val openGraphOkHttpClient = okHttpClient.newBuilder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(10, TimeUnit.SECONDS)
+        .build()
+
     private val retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
         .client(okHttpClient)
+        .addConverterFactory(GsonConverterFactory.create(GsonBuilder().create()))
+        .build()
+
+    private val openGraphRetrofit = Retrofit.Builder()
+        .baseUrl(OPEN_GRAPH_BASE_URL)
+        .client(openGraphOkHttpClient)
         .addConverterFactory(GsonConverterFactory.create(GsonBuilder().create()))
         .build()
 
@@ -40,4 +54,5 @@ object RetrofitClient {
 
     val apiService: ApiService = retrofit.create(ApiService::class.java)
     val uploadApiService: ApiService = uploadRetrofit.create(ApiService::class.java)
+    val openGraphApiService: OpenGraphApiService = openGraphRetrofit.create(OpenGraphApiService::class.java)
 }

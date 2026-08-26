@@ -47,6 +47,23 @@ data class Poster(
     val color: String
 )
 
+@Immutable
+data class OpenGraphMetadata(
+    val title: String? = null,
+    val description: String? = null,
+    val image: String? = null,
+    val url: String? = null
+)
+
+@Immutable
+data class OpenGraphResponse(
+    @SerializedName("requested_url") val requestedUrl: String? = null,
+    @SerializedName("status_code") val statusCode: Int? = null,
+    @SerializedName("fetched_at_unix") val fetchedAtUnix: Long? = null,
+    val metadata: OpenGraphMetadata? = null,
+    val cached: Boolean? = null
+)
+
 data class NotificationResponse(
     val unread: List<Notification>?,
     val read: List<Notification>?,
