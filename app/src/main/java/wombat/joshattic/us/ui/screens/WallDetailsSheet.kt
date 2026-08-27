@@ -86,6 +86,7 @@ fun WallDetailsContent(
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
+    errorMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -256,6 +257,14 @@ fun WallDetailsContent(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
+                        if (errorMessage != null) {
+                            Text(
+                                text = errorMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         if (replyingTo != null) {
                             Row(
                                 modifier = Modifier
@@ -332,7 +341,8 @@ fun WallDetailsSheet(
     onPostClickById: ((String) -> Unit)? = null,
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
-    onClearFocusComment: () -> Unit = {}
+    onClearFocusComment: () -> Unit = {},
+    errorMessage: String? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val coroutineScope = rememberCoroutineScope()
@@ -366,7 +376,8 @@ fun WallDetailsSheet(
             onPostClickById = onPostClickById,
             focusedComment = focusedComment,
             onFocusComment = onFocusComment,
-            onClearFocusComment = onClearFocusComment
+            onClearFocusComment = onClearFocusComment,
+            errorMessage = errorMessage
         )
     }
 }

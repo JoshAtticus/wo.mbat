@@ -103,6 +103,7 @@ fun PostDetailsContent(
     onClearFocusComment: () -> Unit = {},
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
+    errorMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -298,6 +299,14 @@ fun PostDetailsContent(
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (errorMessage != null) {
+                            Text(
+                                text = errorMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         AnimatedVisibility(visible = replyingTo != null) {
                             Row(
                                 modifier = Modifier
@@ -403,7 +412,8 @@ fun PostDetailsSheet(
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
     blockedUsernames: Set<String> = emptySet(),
-    blockedQuoteHandling: String = "warning"
+    blockedQuoteHandling: String = "warning",
+    errorMessage: String? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
@@ -457,7 +467,8 @@ fun PostDetailsSheet(
             onFocusComment = onFocusComment,
             onClearFocusComment = onClearFocusComment,
             blockedUsernames = blockedUsernames,
-            blockedQuoteHandling = blockedQuoteHandling
+            blockedQuoteHandling = blockedQuoteHandling,
+            errorMessage = errorMessage
         )
     }
 }

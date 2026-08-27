@@ -122,7 +122,8 @@ fun ComposerSheet(
     isEditing: Boolean = false,
     viewModel: HomeViewModel? = null,
     savedAccounts: List<AuthSession> = emptyList(),
-    onSwitchAccount: ((AuthSession) -> Unit)? = null
+    onSwitchAccount: ((AuthSession) -> Unit)? = null,
+    errorMessage: String? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var accountMenuExpanded by remember { mutableStateOf(false) }
@@ -712,6 +713,14 @@ fun ComposerSheet(
                     .fillMaxWidth()
                     .imePadding()
             ) {
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
                 Button(
                     onClick = {
                         onSubmit(draft)

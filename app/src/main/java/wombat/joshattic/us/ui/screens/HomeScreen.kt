@@ -143,8 +143,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearError()
+            // Sheets (composer, post/wall details) live in their own windows
+            // above this Scaffold, which would bury a snackbar. While one is
+            // open the message renders inline inside it instead.
+            val coveredBySheet = uiState.showComposer ||
+                uiState.selectedPost != null ||
+                uiState.viewingWallUsername != null
+            if (!coveredBySheet) {
+                snackbarHostState.showSnackbar(it)
+                viewModel.clearError()
+            }
         }
     }
 
@@ -589,9 +597,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             draft = uiState.commentDraft,
                                             isBanned = uiState.isBanned,
                                             onDraftChange = viewModel::setCommentDraft,
-                                            onSubmit = viewModel::submitComment,
-                                            onDismiss = viewModel::closePost,
-                                            onExpandComments = viewModel::loadCommentsForCurrentPost,
+                         onSubmit = viewModel::submitComment,
+                         onDismiss = { viewModel.closePost(); viewModel.clearError() },
+                         onExpandComments = viewModel::loadCommentsForCurrentPost,
                                             onCollapseComments = viewModel::clearComments,
                                             onMentionClick = { username ->
                                                 viewModel.openProfile(username)
@@ -625,7 +633,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onFocusComment = viewModel::focusComment,
                                             onClearFocusComment = viewModel::clearFocusComment,
                                             blockedUsernames = uiState.blockedUsernames,
-                                            blockedQuoteHandling = uiState.blockedQuoteHandling
+                                            blockedQuoteHandling = uiState.blockedQuoteHandling,
+                                            errorMessage = uiState.errorMessage
                                         )
                                     }
                                     uiState.viewingWallUsername != null -> {
@@ -636,18 +645,19 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             draft = uiState.wallCommentDraft,
                                             isBanned = uiState.isBanned,
                                             onDraftChange = viewModel::setWallCommentDraft,
-                                            onSubmit = viewModel::submitWallComment,
-                                            onDismiss = viewModel::closeWall,
-                                            onLoadNextPage = viewModel::loadNextWallCommentsPage,
+                         onSubmit = viewModel::submitWallComment,
+                         onDismiss = { viewModel.closeWall(); viewModel.clearError() },
+                         onLoadNextPage = viewModel::loadNextWallCommentsPage,
                                             replyingTo = uiState.wallCommentReplyParent,
                                             onCancelReply = { viewModel.setWallCommentReplyParent(null) },
                                             onReplyToComment = viewModel::setWallCommentReplyParent,
                                             onProfileClick = viewModel::openProfile,
                                             openLinksInApp = uiState.openLinksInApp,
                                             onPostClickById = viewModel::openPostById,
-                                            focusedComment = uiState.focusedComment,
-                                            onFocusComment = viewModel::focusComment,
-                                            onClearFocusComment = viewModel::clearFocusComment
+                                             focusedComment = uiState.focusedComment,
+                                             onFocusComment = viewModel::focusComment,
+                                             onClearFocusComment = viewModel::clearFocusComment,
+                                             errorMessage = uiState.errorMessage
                                         )
                                     }
                                     uiState.viewingProfileUsername != null -> {
@@ -1030,6 +1040,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         viewModel.saveCurrentDraft()
                         viewModel.setComposeDraft("")
                         viewModel.clearEditPostId()
+                        viewModel.clearError()
                         viewModel.toggleComposer()
                     },
                     drafts = uiState.composerDrafts,
@@ -1038,11 +1049,12 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     currentUsername = uiState.composeEditPostAuthor ?: uiState.session?.username,
                     onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                     isEditing = uiState.composeEditPostId != null,
-                    viewModel = viewModel,
-                    savedAccounts = uiState.savedAccounts,
-                    onSwitchAccount = { session -> viewModel.switchAccount(session.username) }
-                )
-            }
+                     viewModel = viewModel,
+                     savedAccounts = uiState.savedAccounts,
+                     onSwitchAccount = { session -> viewModel.switchAccount(session.username) },
+                     errorMessage = uiState.errorMessage
+                 )
+             }
 
             if (!isTablet) {
                 uiState.selectedPost?.let { post ->
@@ -1087,14 +1099,15 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onPostClickById = viewModel::openPostById,
                         focusedComment = uiState.focusedComment,
                         onFocusComment = viewModel::focusComment,
-                        onClearFocusComment = viewModel::clearFocusComment,
-                        blockedUsernames = uiState.blockedUsernames,
-                        blockedQuoteHandling = uiState.blockedQuoteHandling
-                    )
-                }
+                         onClearFocusComment = viewModel::clearFocusComment,
+                         blockedUsernames = uiState.blockedUsernames,
+                         blockedQuoteHandling = uiState.blockedQuoteHandling,
+                         errorMessage = uiState.errorMessage
+                     )
+                 }
 
-                uiState.viewingWallUsername?.let { username ->
-                    WallDetailsSheet(
+                 uiState.viewingWallUsername?.let { username ->
+                     WallDetailsSheet(
                         username = username,
                         comments = uiState.wallComments,
                         loading = uiState.wallCommentsLoading,
@@ -1110,12 +1123,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onProfileClick = viewModel::openProfile,
                         openLinksInApp = uiState.openLinksInApp,
                         onPostClickById = viewModel::openPostById,
-                        focusedComment = uiState.focusedComment,
-                        onFocusComment = viewModel::focusComment,
-                        onClearFocusComment = viewModel::clearFocusComment
-                    )
-                }
-            }
+                         focusedComment = uiState.focusedComment,
+                         onFocusComment = viewModel::focusComment,
+                         onClearFocusComment = viewModel::clearFocusComment,
+                         errorMessage = uiState.errorMessage
+                     )
+                 }
+             }
         }
     }
 
