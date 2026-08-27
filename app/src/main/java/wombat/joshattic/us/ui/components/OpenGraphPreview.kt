@@ -6,12 +6,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -251,18 +255,23 @@ private fun renderPreview(
                 .clip(RoundedCornerShape(14.dp))
                 .clickable(onClick = openLink)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.height(IntrinsicSize.Min),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 if (imageUrl != null) {
-                    // Fixed-size clipped container: the image always fills and
-                    // center-crops inside it instead of measuring itself.
+                    // Full-height flush thumbnail: no gutter on any side, so
+                    // tall text blocks can't pool empty space around it.
+                    // AsyncImage (not Subcompose) because IntrinsicSize.Min
+                    // queries crash subcompose-based layouts at measure time.
                     Box(
                         modifier = Modifier
-                            .padding(8.dp)
-                            .size(84.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .width(92.dp)
+                            .fillMaxHeight()
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     ) {
-                        SubcomposeAsyncImage(
+                        AsyncImage(
                             model = imageUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
