@@ -210,6 +210,7 @@ import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import wombat.joshattic.us.ui.components.BrandedQuoteSpan
 import wombat.joshattic.us.ui.components.OpenGraphPreview
+import wombat.joshattic.us.ui.components.isOpenGraphPriority
 import wombat.joshattic.us.ui.components.QUOTE_GAP_WIDTH_DP
 import wombat.joshattic.us.ui.components.QUOTE_STRIPE_WIDTH_DP
 import java.text.DateFormat
@@ -706,6 +707,7 @@ fun PostCard(
     onEditPost: ((Post) -> Unit)? = null,
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
+    linkPreviewPriority: String = "images",
     onPostClickById: ((String) -> Unit)? = null,
     isFollowing: Boolean? = null,
     followLoading: Boolean = false,
@@ -779,6 +781,7 @@ fun PostCard(
                 onEditPost = onEditPost,
                 showImages = showImages,
                 openLinksInApp = openLinksInApp,
+                linkPreviewPriority = linkPreviewPriority,
                 onPostClickById = onPostClickById,
                 isFollowing = isFollowing,
                 followLoading = followLoading,
@@ -895,22 +898,46 @@ fun PostCard(
                             .clickable { onClick() }
                     )
                 }
-                if (showImages && imageUrls.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    PostImageCarousel(
-                        images = imageUrls,
-                        onImageClick = { images, index -> onImageClick(images, index, post) },
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        isDetailView = !truncated
-                    )
-                }
-                firstLink?.let { link ->
-                    OpenGraphPreview(
-                        url = link,
-                        hasPostImages = showImages && imageUrls.isNotEmpty(),
-                        openLinksInApp = openLinksInApp,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                val hasPostImages = showImages && imageUrls.isNotEmpty()
+                val openGraphFirst = isOpenGraphPriority(linkPreviewPriority)
+                if (openGraphFirst) {
+                    // OpenGraph priority: large preview above, any post images
+                    // demoted to small tappable squares underneath it.
+                    firstLink?.let { link ->
+                        OpenGraphPreview(
+                            url = link,
+                            hasPostImages = hasPostImages,
+                            openGraphFirst = true,
+                            openLinksInApp = openLinksInApp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    if (hasPostImages) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        PostImageSquares(
+                            images = imageUrls,
+                            onImageClick = { images, index -> onImageClick(images, index, post) },
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                } else {
+                    if (hasPostImages) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        PostImageCarousel(
+                            images = imageUrls,
+                            onImageClick = { images, index -> onImageClick(images, index, post) },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            isDetailView = !truncated
+                        )
+                    }
+                    firstLink?.let { link ->
+                        OpenGraphPreview(
+                            url = link,
+                            hasPostImages = hasPostImages,
+                            openLinksInApp = openLinksInApp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                 }
                 post.repost?.let { repostPost ->
                     val isRepostPosterBlocked = blockedUsernames.contains(repostPost.poster.name.lowercase())
@@ -2202,6 +2229,50 @@ fun PostImageCarousel(
                     "${pagerState.currentPage + 1} / ${images.size}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Compact tappable square thumbnails for post images, shown when OpenGraph
+ * previews are prioritised over the full-size image carousel.
+ */
+@Composable
+fun PostImageSquares(
+    images: List<String>,
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier
+) {
+    if (images.isEmpty()) return
+    val context = LocalContext.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        images.forEachIndexed { index, url ->
+            val imageRequest = remember(url) {
+                ImageRequest.Builder(context)
+                    .data(url)
+                    .crossfade(true)
+                    .precision(Precision.INEXACT)
+                    .build()
+            }
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable { onImageClick(images, index) }
+            ) {
+                SubcomposeAsyncImage(
+                    model = imageRequest,
+                    contentDescription = "Post image ${index + 1}",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }

@@ -312,3 +312,69 @@ class OpenGraphLinkTest {
         assertEquals(false, parsed.cached)
     }
 }
+
+/**
+ * Tests for the link preview priority helpers that decide whether OpenGraph
+ * previews render large above post images.
+ */
+class LinkPreviewPriorityTest {
+
+    @Test
+    fun openGraphPriorityOnlyForOpengraphValue() {
+        assertTrue(wombat.joshattic.us.ui.components.isOpenGraphPriority("opengraph"))
+        assertFalse(wombat.joshattic.us.ui.components.isOpenGraphPriority("images"))
+        assertFalse(wombat.joshattic.us.ui.components.isOpenGraphPriority(""))
+        assertFalse(wombat.joshattic.us.ui.components.isOpenGraphPriority(null))
+    }
+
+    @Test
+    fun openGraphPriorityIsCaseInsensitive() {
+        assertTrue(wombat.joshattic.us.ui.components.isOpenGraphPriority("OpenGraph"))
+        assertTrue(wombat.joshattic.us.ui.components.isOpenGraphPriority("OPENGRAPH"))
+    }
+
+    @Test
+    fun largePreviewNeedsPreviewImage() {
+        assertFalse(
+            wombat.joshattic.us.ui.components.shouldUseLargePreview(
+                hasPreviewImage = false, hasPostImages = false, openGraphFirst = true
+            )
+        )
+        assertFalse(
+            wombat.joshattic.us.ui.components.shouldUseLargePreview(
+                hasPreviewImage = false, hasPostImages = true, openGraphFirst = true
+            )
+        )
+    }
+
+    @Test
+    fun largePreviewWithoutPostImagesIsDefault() {
+        // A lone link preview is always rendered large, regardless of setting.
+        assertTrue(
+            wombat.joshattic.us.ui.components.shouldUseLargePreview(
+                hasPreviewImage = true, hasPostImages = false, openGraphFirst = false
+            )
+        )
+        assertTrue(
+            wombat.joshattic.us.ui.components.shouldUseLargePreview(
+                hasPreviewImage = true, hasPostImages = false, openGraphFirst = true
+            )
+        )
+    }
+
+    @Test
+    fun postImagesBeatPreviewUnlessOpengraphFirst() {
+        // Default "images" priority keeps post images dominant.
+        assertFalse(
+            wombat.joshattic.us.ui.components.shouldUseLargePreview(
+                hasPreviewImage = true, hasPostImages = true, openGraphFirst = false
+            )
+        )
+        // "opengraph" priority promotes the preview over post images.
+        assertTrue(
+            wombat.joshattic.us.ui.components.shouldUseLargePreview(
+                hasPreviewImage = true, hasPostImages = true, openGraphFirst = true
+            )
+        )
+    }
+}

@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -79,6 +82,7 @@ fun FeedTab(
     showImages: Boolean = true,
     showNewPosts: Boolean = true,
     openLinksInApp: Boolean = true,
+    linkPreviewPriority: String = "images",
     onPostClickById: ((String) -> Unit)? = null,
     followedUsernames: Set<String> = emptySet(),
     followLoadingUsernames: Set<String> = emptySet(),
@@ -136,7 +140,12 @@ fun FeedTab(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 12.dp),
-                contentPadding = PaddingValues(top = if (showNewPosts && newPostsUsernames.isNotEmpty()) 48.dp else 12.dp, bottom = 96.dp),
+                // Clear the floating bottom bar (96dp) plus the system navigation
+                // bar inset, otherwise the bar covers part of the last post.
+                contentPadding = PaddingValues(
+                    top = if (showNewPosts && newPostsUsernames.isNotEmpty()) 48.dp else 12.dp,
+                    bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (!loading && posts.isEmpty()) {
@@ -166,6 +175,7 @@ fun FeedTab(
                         onEditPost = onEditPost,
                         showImages = showImages,
                         openLinksInApp = openLinksInApp,
+                        linkPreviewPriority = linkPreviewPriority,
                         onPostClickById = onPostClickById,
                         isFollowing = isPosterFollowed,
                         followLoading = isFollowLoading,

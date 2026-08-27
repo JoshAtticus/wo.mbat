@@ -78,6 +78,8 @@ fun SettingsScreen(
     onMarkReadWhenOpenedChange: (Boolean) -> Unit,
     onMarkReadWhenTabOpenedChange: (Boolean) -> Unit,
     onOpenLinksInAppChange: (Boolean) -> Unit,
+    linkPreviewPriority: String,
+    onLinkPreviewPriorityChange: (String) -> Unit,
     onWearAccountChange: (String) -> Unit,
     onWearShowImagesChange: (Boolean) -> Unit,
     onWearShowProfilePicturesChange: (Boolean) -> Unit,
@@ -218,7 +220,9 @@ fun SettingsScreen(
                                     )
                                     SettingsCategory.LINKS -> LinkSettings(
                                         openInApp = uiState.openLinksInApp,
-                                        onOpenInAppChange = onOpenLinksInAppChange
+                                        onOpenInAppChange = onOpenLinksInAppChange,
+                                        linkPreviewPriority = uiState.linkPreviewPriority,
+                                        onLinkPreviewPriorityChange = onLinkPreviewPriorityChange
                                     )
                                     SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
                                         blockedUsers = uiState.blockedUsernames.toList().sorted(),
@@ -276,7 +280,9 @@ fun SettingsScreen(
                         )
                         SettingsCategory.LINKS -> LinkSettings(
                             openInApp = uiState.openLinksInApp,
-                            onOpenInAppChange = onOpenLinksInAppChange
+                            onOpenInAppChange = onOpenLinksInAppChange,
+                            linkPreviewPriority = uiState.linkPreviewPriority,
+                            onLinkPreviewPriorityChange = onLinkPreviewPriorityChange
                         )
                         SettingsCategory.BLOCKED_USERS -> BlockedUsersSettings(
                             blockedUsers = uiState.blockedUsernames.toList().sorted(),
@@ -511,7 +517,9 @@ private fun NotificationSettings(
 @Composable
 private fun LinkSettings(
     openInApp: Boolean,
-    onOpenInAppChange: (Boolean) -> Unit
+    onOpenInAppChange: (Boolean) -> Unit,
+    linkPreviewPriority: String,
+    onLinkPreviewPriorityChange: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -555,6 +563,46 @@ private fun LinkSettings(
                     Column {
                         Text("Default web browser", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                         Text("Opens links in you default browser", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                    }
+                }
+            }
+        }
+        Text("Prioritise in post cards", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 4.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
+        ) {
+            Column(modifier = Modifier.padding(4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onLinkPreviewPriorityChange("images") }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = linkPreviewPriority != "opengraph", onClick = { onLinkPreviewPriorityChange("images") })
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Images", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Show attached images first; link previews stay compact", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onLinkPreviewPriorityChange("opengraph") }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = linkPreviewPriority == "opengraph", onClick = { onLinkPreviewPriorityChange("opengraph") })
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Link previews", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Show large Open Graph previews first; images become thumbnails", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                     }
                 }
             }

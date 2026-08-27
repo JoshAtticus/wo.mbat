@@ -1909,6 +1909,11 @@ class HomeViewModel(
             }
         }
         viewModelScope.launch {
+            prefs.linkPreviewPriority.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(linkPreviewPriority = value)
+            }
+        }
+        viewModelScope.launch {
             prefs.wearAccount.collectLatest { value ->
                 _uiState.value = _uiState.value.copy(wearAccount = value)
             }
@@ -1956,6 +1961,10 @@ class HomeViewModel(
 
     fun setShowImagesInFeed(value: Boolean) {
         viewModelScope.launch { repository.settingsPreferences.setShowImagesInFeed(value) }
+    }
+
+    fun setLinkPreviewPriority(value: String) {
+        viewModelScope.launch { repository.settingsPreferences.setLinkPreviewPriority(value) }
     }
 
     fun setShowNewPostsPopup(value: Boolean) {

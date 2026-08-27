@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -130,6 +133,7 @@ fun ProfileScreen(
     onWallClick: (String) -> Unit = {},
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
+    linkPreviewPriority: String = "images",
     onPostClickById: ((String) -> Unit)? = null,
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning"
@@ -186,7 +190,11 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(bottom = 96.dp),
+            contentPadding = PaddingValues(
+                // 96dp clears the floating bottom bar; the inset keeps it clear of
+                // the system navigation bar too.
+                bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -452,6 +460,7 @@ fun ProfileScreen(
                         onEditPost = onEditPost,
                         showImages = showImages,
                         openLinksInApp = openLinksInApp,
+                        linkPreviewPriority = linkPreviewPriority,
                         onPostClickById = onPostClickById,
                         blockedUsernames = blockedUsernames,
                         blockedQuoteHandling = blockedQuoteHandling

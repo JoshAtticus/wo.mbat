@@ -119,6 +119,7 @@ data class HomeUiState(
     val markReadWhenOpened: Boolean = true,
     val markReadWhenTabOpened: Boolean = false,
     val openLinksInApp: Boolean = true,
+    val linkPreviewPriority: String = "images",
     val wearAccount: String = "Last used on phone",
     val wearShowImages: Boolean = false,
     val wearShowProfilePictures: Boolean = true,

@@ -18,7 +18,8 @@ class SettingsPreferences(private val context: Context) {
         val MarkReadWhenOpened = booleanPreferencesKey("mark_read_when_opened")
         val MarkReadWhenTabOpened = booleanPreferencesKey("mark_read_when_tab_opened")
         val OpenLinksInApp = booleanPreferencesKey("open_links_in_app")
-        
+        val LinkPreviewPriority = stringPreferencesKey("link_preview_priority")
+
         val WearAccount = stringPreferencesKey("wear_account")
         val WearShowImages = booleanPreferencesKey("wear_show_images")
         val WearShowProfilePictures = booleanPreferencesKey("wear_show_profile_pictures")
@@ -32,6 +33,7 @@ class SettingsPreferences(private val context: Context) {
     val markReadWhenOpened: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.MarkReadWhenOpened] ?: true }
     val markReadWhenTabOpened: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.MarkReadWhenTabOpened] ?: false }
     val openLinksInApp: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.OpenLinksInApp] ?: true }
+    val linkPreviewPriority: Flow<String> = context.settingsDataStore.data.map { it[Keys.LinkPreviewPriority] ?: "images" }
 
     val wearAccount: Flow<String> = context.settingsDataStore.data.map { it[Keys.WearAccount] ?: "Last used on phone" }
     val wearShowImages: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.WearShowImages] ?: false }
@@ -61,6 +63,10 @@ class SettingsPreferences(private val context: Context) {
 
     suspend fun setOpenLinksInApp(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.OpenLinksInApp] = value }
+    }
+
+    suspend fun setLinkPreviewPriority(value: String) {
+        context.settingsDataStore.edit { it[Keys.LinkPreviewPriority] = value }
     }
 
     suspend fun setWearAccount(value: String) {

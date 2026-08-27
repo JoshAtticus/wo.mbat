@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -31,8 +32,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import wombat.joshattic.us.data.model.OpenGraphResponse
 import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.ui.screens.urlHost
@@ -44,8 +48,13 @@ import wombat.joshattic.us.ui.screens.urlHost
  */
 object OpenGraphPreviewCache {
     private const val MAX_ENTRIES = 128
+
+    // Shared IO scope so in-flight fetches complete and cache their result even
+    // when the card that started them leaves composition during a scroll.
+    private val fetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val cache = LinkedHashMap<String, OpenGraphResponse>()
     private val failures = LinkedHashSet<String>()
+    private val inFlight = mutableMapOf<String, Deferred<Result<OpenGraphResponse>>>()
 
     @Synchronized
     fun get(url: String): OpenGraphResponse? = cache[url]
@@ -71,7 +80,52 @@ object OpenGraphPreviewCache {
 
     @Synchronized
     fun isKnownFailure(url: String): Boolean = url in failures
+
+    /**
+     * Returns cached metadata, or fetches it on the shared IO scope. Concurrent
+     * requests for the same URL share one in-flight call instead of doubling up,
+     * and every caller observes the outcome once the request settles.
+     */
+    suspend fun getOrFetch(url: String): OpenGraphResponse? {
+        cache[url]?.let { return it }
+        if (isKnownFailure(url)) return null
+        val deferred: Deferred<Result<OpenGraphResponse>> = synchronized(this) {
+            inFlight.getOrPut(url) {
+                fetchScope.async {
+                    runCatching { RetrofitClient.openGraphApiService.fetchOpenGraph(url) }
+                }
+            }
+        }
+        val result = deferred.await()
+        synchronized(this) { inFlight.remove(url) }
+        return result.getOrNull()?.also { fetched ->
+            if (isUsable(fetched)) remember(url, fetched) else rememberFailure(url)
+        }
+    }
+
+    /** A response is usable when the fetch succeeded and any metadata came back. */
+    fun isUsable(fetched: OpenGraphResponse): Boolean {
+        val metadata = fetched.metadata ?: return false
+        val statusOk = fetched.statusCode == null || fetched.statusCode in 200..299
+        return statusOk &&
+            (!metadata.title.isNullOrBlank() ||
+                !metadata.description.isNullOrBlank() ||
+                !metadata.image.isNullOrBlank())
+    }
 }
+
+/**
+ * True when the preview should render as the large banner: requires a preview
+ * image, and either the post has no images of its own or OpenGraph is
+ * prioritised over post images.
+ */
+fun shouldUseLargePreview(hasPreviewImage: Boolean, hasPostImages: Boolean, openGraphFirst: Boolean): Boolean =
+    hasPreviewImage && (!hasPostImages || openGraphFirst)
+
+/** True when the "prioritise OpenGraph" link preview setting is active. */
+fun isOpenGraphPriority(linkPreviewPriority: String?): Boolean =
+    linkPreviewPriority.equals("opengraph", ignoreCase = true)
+
 
 /**
  * Link preview card for the first external URL in a post, fetched from
@@ -87,35 +141,20 @@ fun OpenGraphPreview(
     url: String,
     hasPostImages: Boolean,
     openLinksInApp: Boolean = true,
+    openGraphFirst: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var response by remember(url) { mutableStateOf(OpenGraphPreviewCache.get(url)) }
     var unavailable by remember(url) { mutableStateOf(OpenGraphPreviewCache.isKnownFailure(url)) }
     val context = LocalContext.current
 
+    // Fully asynchronous: the request runs on the cache's IO scope (never the
+    // UI thread and never blocking composition); the card simply appears when
+    // the result lands.
     LaunchedEffect(url) {
         if (response == null && !unavailable) {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { RetrofitClient.openGraphApiService.fetchOpenGraph(url) }
-            }
-            result.onSuccess { fetched ->
-                val metadata = fetched.metadata
-                val usable = metadata != null &&
-                    (fetched.statusCode == null || fetched.statusCode in 200..299) &&
-                    (!metadata.title.isNullOrBlank() ||
-                        !metadata.description.isNullOrBlank() ||
-                        !metadata.image.isNullOrBlank())
-                if (usable && metadata != null) {
-                    OpenGraphPreviewCache.remember(url, fetched)
-                    response = fetched
-                } else {
-                    OpenGraphPreviewCache.rememberFailure(url)
-                    unavailable = true
-                }
-            }.onFailure {
-                OpenGraphPreviewCache.rememberFailure(url)
-                unavailable = true
-            }
+            val fetched = OpenGraphPreviewCache.getOrFetch(url)
+            if (fetched != null) response = fetched else unavailable = true
         }
     }
 
@@ -126,7 +165,7 @@ fun OpenGraphPreview(
     val description = metadata.description?.trim()?.takeIf { it.isNotEmpty() }
     val imageUrl = metadata.image?.trim()?.takeIf { it.isNotEmpty() }
     if (title == null && description == null && imageUrl == null) return
-    renderPreview(url, domain, title, description, imageUrl, hasPostImages, openLinksInApp, context, modifier)
+    renderPreview(url, domain, title, description, imageUrl, hasPostImages, openGraphFirst, openLinksInApp, context, modifier)
 }
 
 @Composable
@@ -137,6 +176,7 @@ private fun renderPreview(
     description: String?,
     imageUrl: String?,
     hasPostImages: Boolean,
+    openGraphFirst: Boolean,
     openLinksInApp: Boolean,
     context: android.content.Context,
     modifier: Modifier
@@ -154,7 +194,7 @@ private fun renderPreview(
         }
     }
 
-    if (!hasPostImages && imageUrl != null) {
+    if (shouldUseLargePreview(imageUrl != null, hasPostImages, openGraphFirst)) {
         // Large banner style: full-width preview image with the title overlaid at the bottom.
         Column(modifier = modifier) {
             Box(
@@ -211,14 +251,24 @@ private fun renderPreview(
                 .clip(RoundedCornerShape(14.dp))
                 .clickable(onClick = openLink)
         ) {
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (imageUrl != null) {
-                    SubcomposeAsyncImage(
-                        model = imageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(width = 92.dp, height = 92.dp)
-                    )
+                    // Fixed-size clipped container: the image always fills and
+                    // center-crops inside it instead of measuring itself.
+                    Box(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(84.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    ) {
+                        SubcomposeAsyncImage(
+                            model = imageUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
                 Column(
                     modifier = Modifier

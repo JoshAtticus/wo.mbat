@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -115,6 +118,7 @@ fun AccountTab(
     profileCacheBuster: Long = 0L,
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
+    linkPreviewPriority: String = "images",
     onPostClickById: ((String) -> Unit)? = null,
     followedUsernames: Set<String> = emptySet(),
     followLoadingUsernames: Set<String> = emptySet(),
@@ -145,7 +149,12 @@ fun AccountTab(
             state = listState,
             modifier = Modifier.fillMaxSize()
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(
+                top = 12.dp,
+                // 96dp clears the floating bottom bar; the inset keeps it clear of
+                // the system navigation bar too.
+                bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (session != null && !isAddingAccount) {
@@ -417,6 +426,7 @@ fun AccountTab(
                             onEditPost = onEditPost,
                             showImages = showImages,
                             openLinksInApp = openLinksInApp,
+                            linkPreviewPriority = linkPreviewPriority,
                             onPostClickById = onPostClickById,
                             blockedUsernames = blockedUsernames,
                             blockedQuoteHandling = blockedQuoteHandling

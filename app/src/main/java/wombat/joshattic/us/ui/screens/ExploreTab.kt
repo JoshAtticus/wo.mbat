@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -79,6 +81,7 @@ fun ExploreTab(
     onEditPost: ((Post) -> Unit)? = null,
     showImages: Boolean = true,
     openLinksInApp: Boolean = true,
+    linkPreviewPriority: String = "images",
     onPostClickById: ((String) -> Unit)? = null,
     followedUsernames: Set<String> = emptySet(),
     followLoadingUsernames: Set<String> = emptySet(),
@@ -138,7 +141,7 @@ fun ExploreTab(
                     CircularProgressIndicator()
                 }
             } else if (searchQuery.isNotBlank()) {
-                LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+                LazyColumn(contentPadding = PaddingValues(bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) {
                     // User results row
                     if (searchUserResults.isNotEmpty()) {
                         item {
@@ -223,6 +226,7 @@ fun ExploreTab(
                                     onEditPost = onEditPost,
                                     showImages = showImages,
                                     openLinksInApp = openLinksInApp,
+                                    linkPreviewPriority = linkPreviewPriority,
                                     onPostClickById = onPostClickById,
                                     isFollowing = isFollowing,
                                     followLoading = followLoading,
@@ -282,7 +286,10 @@ fun ExploreTab(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp),
+                        contentPadding = PaddingValues(
+                            top = 4.dp,
+                            bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         item {
@@ -330,6 +337,7 @@ fun ExploreTab(
                                 onEditPost = onEditPost,
                                 showImages = showImages,
                                 openLinksInApp = openLinksInApp,
+                                linkPreviewPriority = linkPreviewPriority,
                                 onPostClickById = onPostClickById,
                                 isFollowing = isFollowing,
                                 followLoading = followLoading,
