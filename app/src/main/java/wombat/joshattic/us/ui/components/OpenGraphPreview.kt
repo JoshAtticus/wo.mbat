@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -257,18 +257,18 @@ private fun renderPreview(
         ) {
             Row(
                 modifier = Modifier.height(IntrinsicSize.Min),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 if (imageUrl != null) {
-                    // Full-height flush thumbnail: no gutter on any side, so
-                    // tall text blocks can't pool empty space around it.
+                    // Full-height flush thumbnail locked to a 1:1 aspect
+                    // ratio, so it sizes itself off the card height instead
+                    // of a hardcoded width.
                     // AsyncImage (not Subcompose) because IntrinsicSize.Min
                     // queries crash subcompose-based layouts at measure time.
                     Box(
                         modifier = Modifier
-                            .width(92.dp)
                             .fillMaxHeight()
+                            .aspectRatio(1f)
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     ) {
                         AsyncImage(
@@ -282,7 +282,7 @@ private fun renderPreview(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     if (domain != null) {
