@@ -299,7 +299,15 @@ class HomeViewModel(
                         refreshAccount()
                     }
                     .onFailure { throwable ->
-                        _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
+                        // Never let a failed send destroy the content: stash it
+                        // in drafts so the user can restore and retry later.
+                        val currentDrafts = _uiState.value.composerDrafts
+                        _uiState.value = _uiState.value.copy(
+                            composerDrafts = if (!draft.isBlank() && !currentDrafts.contains(draft)) {
+                                listOf(draft) + currentDrafts
+                            } else currentDrafts,
+                            errorMessage = "Couldn't post${throwable.message?.let { m -> ": $m" } ?: ""} — saved to drafts"
+                        )
                     }
             }
         }
@@ -333,7 +341,11 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(composerDrafts = emptyList(), toastMessage = "All drafts cleared")
     }
 
+    /** True while connectivity is lost; used to skip futile network loads. */
+    private fun isOffline(): Boolean = !_uiState.value.isOnline
+
     fun refreshFeed() {
+        if (isOffline()) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(feedPage = 1, feedLast = false)
             loadFeedForCurrentSession(_uiState.value.session)
@@ -349,7 +361,7 @@ class HomeViewModel(
 
     fun loadNextFeedPage() {
         val current = _uiState.value
-        if (current.feedLoading || current.feedLast) return
+        if (isOffline() || current.feedLoading || current.feedLast) return
         viewModelScope.launch {
             val nextPage = current.feedPage + 1
             _uiState.value = current.copy(feedLoading = true)
@@ -421,6 +433,7 @@ class HomeViewModel(
     }
 
     fun loadExploreTrending() {
+        if (isOffline()) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(exploreTrendingLoading = true, errorMessage = null)
             val currentSession = _uiState.value.session
@@ -931,6 +944,7 @@ class HomeViewModel(
     }
 
     fun refreshNotifications() {
+        if (isOffline()) return
         viewModelScope.launch {
             loadNotifications(_uiState.value.session)
         }
@@ -1007,6 +1021,7 @@ class HomeViewModel(
     }
 
     fun refreshAccount() {
+        if (isOffline()) return
         viewModelScope.launch {
             loadAccountProfile(_uiState.value.session)
         }

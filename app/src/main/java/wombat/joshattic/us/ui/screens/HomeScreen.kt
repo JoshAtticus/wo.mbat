@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PostAdd
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
@@ -215,10 +216,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (!uiState.isOnline) {
-            OfflineScreen(onRetry = { viewModel.refreshFeedAndExplore() })
-        } else {
-            Scaffold(
+        Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = MaterialTheme.colorScheme.background,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -266,6 +264,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 }
                             },
                             actions = {
+                                if (!uiState.isOnline) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CloudOff,
+                                        contentDescription = "Offline",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 12.dp)
+                                    )
+                                }
                                 if (viewingUser == null && uiState.selectedTab == BottomTab.Account) {
                                     IconButton(onClick = viewModel::openSettings) {
                                         Icon(
@@ -349,6 +355,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             }
                                         },
                                         actions = {
+                                            if (!uiState.isOnline) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.CloudOff,
+                                                    contentDescription = "Offline",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                                )
+                                            }
                                             IconButton(onClick = viewModel::openSettings) {
                                                 Icon(
                                                     imageVector = Icons.Filled.Settings,
@@ -1104,7 +1118,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
             }
         }
     }
-}
 
     if (uiState.showEditProfile && uiState.accountProfile != null) {
         EditProfileSheet(
