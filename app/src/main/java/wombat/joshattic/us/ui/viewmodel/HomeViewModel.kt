@@ -881,6 +881,21 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(wallCommentReplyParent = comment)
     }
 
+    // Routes wasteof.money links shared from other apps into the matching in-app view.
+    // Supported: /posts/{id} plus /users/{name} and its /followers, /following, /wall subpaths.
+    fun handleDeepLink(uri: android.net.Uri) {
+        val segments = uri.pathSegments
+        when {
+            segments.size == 2 && segments[0] == "posts" -> openPostById(segments[1])
+            segments.size == 2 && segments[0] == "users" -> openProfile(segments[1])
+            segments.size == 3 && segments[0] == "users" -> when (segments[2]) {
+                "followers" -> showFollowers(segments[1])
+                "following" -> showFollowing(segments[1])
+                "wall" -> openWall(segments[1])
+            }
+        }
+    }
+
     private fun loadWallCommentsPage(username: String, page: Int) {
         val session = _uiState.value.session
         viewModelScope.launch {
