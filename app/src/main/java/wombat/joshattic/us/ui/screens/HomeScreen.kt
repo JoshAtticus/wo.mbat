@@ -148,6 +148,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             // open the message renders inline inside it instead.
             val coveredBySheet = uiState.showComposer ||
                 uiState.selectedPost != null ||
+                uiState.viewRepostsPost != null ||
                 uiState.viewingWallUsername != null
             if (!coveredBySheet) {
                 snackbarHostState.showSnackbar(it)
@@ -1133,6 +1134,31 @@ fun HomeScreen(viewModel: HomeViewModel) {
         }
     }
 
+    uiState.viewRepostsPost?.let { repostPost ->
+        RepostsSheet(
+            post = repostPost,
+            reposts = uiState.reposts,
+            loading = uiState.repostsLoading,
+            errorMessage = uiState.repostsError,
+            onDismiss = viewModel::closeReposts,
+            // Sheets stack: tapping a post opens details on top (one animation)
+            // and dismissing it drops the user back into this list.
+            onOpenPost = viewModel::openPost,
+            onProfileClick = viewModel::openProfile,
+            onMentionClick = viewModel::openProfile,
+            onLoveClick = viewModel::togglePostLove,
+            onRepostClick = { viewModel.submitRepost(it.id) },
+            onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+            currentUsername = uiState.session?.username,
+            savedAccounts = uiState.savedAccounts,
+            onImageClick = viewModel::openFullScreenImages,
+            showImages = uiState.showImagesInFeed,
+            openLinksInApp = uiState.openLinksInApp,
+            linkPreviewPriority = uiState.linkPreviewPriority,
+            blockedUsernames = uiState.blockedUsernames
+        )
+    }
+
     if (uiState.showEditProfile && uiState.accountProfile != null) {
         EditProfileSheet(
             profile = uiState.accountProfile!!,
@@ -1247,6 +1273,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onUnblockUser = viewModel::unblockUser,
             onFollowJosh = viewModel::followJoshAtticus,
             onBlockedQuoteHandlingChange = viewModel::setBlockedQuoteHandling,
+            onShowBlockedRevealButtonChange = viewModel::setShowBlockedRevealButton,
             frogMessage = uiState.exploreFrogMessage
         )
     }

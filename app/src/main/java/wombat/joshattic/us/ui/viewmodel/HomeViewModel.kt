@@ -337,6 +337,59 @@ class HomeViewModel(
         )
     }
 
+    fun openReposts(post: Post) {
+        _uiState.value = _uiState.value.copy(
+            viewRepostsPost = post,
+            reposts = emptyList(),
+            repostsLoading = true,
+            repostsError = null
+        )
+        viewModelScope.launch {
+            runCatching { repository.loadReposts(post.id) }
+                .onSuccess { reposts ->
+                    // Ignore the result if the user closed the sheet already
+                    if (_uiState.value.viewRepostsPost?.id == post.id) {
+                        _uiState.value = _uiState.value.copy(reposts = reposts, repostsLoading = false)
+                        val session = _uiState.value.session
+                        if (session != null) {
+                            // Fill in isLoving so the heart buttons reflect real state
+                            runCatching { augmentLoveStatuses(reposts, session) }.onSuccess { augmented ->
+                                if (_uiState.value.viewRepostsPost?.id == post.id) {
+                                    _uiState.value = _uiState.value.copy(reposts = augmented)
+                                }
+                            }
+                            runCatching {
+                                repository.getPostLoveStatus(session, post.id, session.username)
+                            }.onSuccess { loved ->
+                                if (_uiState.value.viewRepostsPost?.id == post.id) {
+                                    _uiState.value = _uiState.value.copy(
+                                        viewRepostsPost = _uiState.value.viewRepostsPost?.copy(isLoving = loved)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .onFailure { throwable ->
+                    if (_uiState.value.viewRepostsPost?.id == post.id) {
+                        _uiState.value = _uiState.value.copy(
+                            repostsLoading = false,
+                            repostsError = throwable.message ?: "Couldn't load reposts"
+                        )
+                    }
+                }
+        }
+    }
+
+    fun closeReposts() {
+        _uiState.value = _uiState.value.copy(
+            viewRepostsPost = null,
+            reposts = emptyList(),
+            repostsLoading = false,
+            repostsError = null
+        )
+    }
+
     fun clearAllDrafts() {
         _uiState.value = _uiState.value.copy(composerDrafts = emptyList(), toastMessage = "All drafts cleared")
     }
@@ -1519,6 +1572,9 @@ class HomeViewModel(
             exploreTrendingPosts = current.exploreTrendingPosts.map(::transform),
             accountPosts = current.accountPosts.map(::transform),
             viewingProfilePosts = current.viewingProfilePosts.map(::transform),
+            // Keep the reposts sheet in sync so likes toggle live inside it
+            reposts = current.reposts.map(::transform),
+            viewRepostsPost = current.viewRepostsPost?.let { transform(it) },
             // Always apply transform to selectedPost so that liking an embedded repost
             // (where selectedPost.id != postId but selectedPost.repost.id == postId) also
             // updates the love state shown in the details sheet.
@@ -1846,10 +1902,9 @@ class HomeViewModel(
             val filteredReplies = filterBlockedComments(comment.replies ?: emptyList(), blockedUsernames)
             if (isBlocked) {
                 if (filteredReplies.isNotEmpty()) {
-                    comment.copy(
-                        content = "This comment is from a user you blocked",
-                        replies = filteredReplies
-                    )
+                    // Keep the real content so an explicit per-comment "Show"
+                    // can reveal it; the UI renders the placeholder from the flag.
+                    comment.copy(blocked = true, replies = filteredReplies)
                 } else {
                     null
                 }
@@ -1975,6 +2030,11 @@ class HomeViewModel(
                 )
             }
         }
+        viewModelScope.launch {
+            prefs.showBlockedRevealButton.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(showBlockedRevealButton = value)
+            }
+        }
     }
 
     fun openSettings() {
@@ -2035,6 +2095,10 @@ class HomeViewModel(
 
     fun setBlockedQuoteHandling(value: String) {
         viewModelScope.launch { repository.settingsPreferences.setBlockedQuoteHandling(value) }
+    }
+
+    fun setShowBlockedRevealButton(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setShowBlockedRevealButton(value) }
     }
 
     suspend fun uploadImage(context: Context, uri: Uri): String {

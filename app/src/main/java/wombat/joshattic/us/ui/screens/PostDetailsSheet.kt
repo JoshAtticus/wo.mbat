@@ -210,7 +210,9 @@ fun PostDetailsContent(
                     linkPreviewPriority = linkPreviewPriority,
                     onPostClickById = onPostClickById,
                     blockedUsernames = blockedUsernames,
-                    blockedQuoteHandling = blockedQuoteHandling
+                    blockedQuoteHandling = blockedQuoteHandling,
+                    // The user explicitly bypassed the block warning to open this post
+                    ignoreBlockedPoster = true
                 )
             }
 

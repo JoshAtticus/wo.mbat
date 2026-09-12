@@ -1,8 +1,9 @@
 package wombat.joshattic.us.data.repository
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -33,6 +34,7 @@ import wombat.joshattic.us.data.model.SearchUsersResponse
 import wombat.joshattic.us.data.model.FrogResponse
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.network.ApiService
+import wombat.joshattic.us.data.network.DevalueParser
 import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.data.storage.AuthPreferences
 import wombat.joshattic.us.data.storage.BlockedUsersDatabase
@@ -87,6 +89,15 @@ class WombatRepository(
 
     suspend fun loadPost(session: AuthSession?, postId: String): Post {
         return apiService.getPost(postId = postId, token = session?.token)
+    }
+
+    /**
+     * Fetches who reposted a post via the Alpha API. The request must remain
+     * unauthenticated or non-alpha accounts receive a 401.
+     */
+    suspend fun loadReposts(postId: String): List<Post> = withContext(Dispatchers.IO) {
+        val body = RetrofitClient.alphaApiService.getReposts(postId)
+        body.use { response -> DevalueParser.parseReposts(response.string()) }
     }
 
     suspend fun loadComments(session: AuthSession?, postId: String) =

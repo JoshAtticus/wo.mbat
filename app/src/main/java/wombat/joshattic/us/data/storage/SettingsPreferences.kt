@@ -25,6 +25,7 @@ class SettingsPreferences(private val context: Context) {
         val WearShowProfilePictures = booleanPreferencesKey("wear_show_profile_pictures")
         val WearFeedType = stringPreferencesKey("wear_feed_type")
         val BlockedQuoteHandling = stringPreferencesKey("blocked_quote_handling")
+        val ShowBlockedRevealButton = booleanPreferencesKey("show_blocked_reveal_button")
     }
 
     val showImagesInFeed: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.ShowImagesInFeed] ?: true }
@@ -40,6 +41,7 @@ class SettingsPreferences(private val context: Context) {
     val wearShowProfilePictures: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.WearShowProfilePictures] ?: true }
     val wearFeedType: Flow<String> = context.settingsDataStore.data.map { it[Keys.WearFeedType] ?: "Home" }
     val blockedQuoteHandling: Flow<String> = context.settingsDataStore.data.map { it[Keys.BlockedQuoteHandling] ?: "warning" }
+    val showBlockedRevealButton: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.ShowBlockedRevealButton] ?: false }
 
     suspend fun setShowImagesInFeed(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.ShowImagesInFeed] = value }
@@ -87,5 +89,9 @@ class SettingsPreferences(private val context: Context) {
 
     suspend fun setBlockedQuoteHandling(value: String) {
         context.settingsDataStore.edit { it[Keys.BlockedQuoteHandling] = value }
+    }
+
+    suspend fun setShowBlockedRevealButton(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.ShowBlockedRevealButton] = value }
     }
 }

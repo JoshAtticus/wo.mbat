@@ -87,6 +87,7 @@ fun SettingsScreen(
     onUnblockUser: (String) -> Unit,
     onFollowJosh: () -> Unit,
     onBlockedQuoteHandlingChange: (String) -> Unit,
+    onShowBlockedRevealButtonChange: (Boolean) -> Unit,
     frogMessage: String? = null
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -228,7 +229,9 @@ fun SettingsScreen(
                                         blockedUsers = uiState.blockedUsernames.toList().sorted(),
                                         onUnblockUser = onUnblockUser,
                                         blockedQuoteHandling = uiState.blockedQuoteHandling,
-                                        onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange
+                                        onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange,
+                                        showRevealButton = uiState.showBlockedRevealButton,
+                                        onShowRevealButtonChange = onShowBlockedRevealButtonChange
                                     )
                                     SettingsCategory.WEAR_OS -> WearSettings(
                                         currentAccount = uiState.wearAccount,
@@ -288,7 +291,9 @@ fun SettingsScreen(
                             blockedUsers = uiState.blockedUsernames.toList().sorted(),
                             onUnblockUser = onUnblockUser,
                             blockedQuoteHandling = uiState.blockedQuoteHandling,
-                            onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange
+                            onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange,
+                            showRevealButton = uiState.showBlockedRevealButton,
+                            onShowRevealButtonChange = onShowBlockedRevealButtonChange
                         )
                         SettingsCategory.WEAR_OS -> WearSettings(
                             currentAccount = uiState.wearAccount,
@@ -615,7 +620,9 @@ private fun BlockedUsersSettings(
     blockedUsers: List<String>,
     onUnblockUser: (String) -> Unit,
     blockedQuoteHandling: String,
-    onBlockedQuoteHandlingChange: (String) -> Unit
+    onBlockedQuoteHandlingChange: (String) -> Unit,
+    showRevealButton: Boolean,
+    onShowRevealButtonChange: (Boolean) -> Unit
 ) {
     var showBlockHandlingSettings by remember { mutableStateOf(false) }
 
@@ -654,6 +661,28 @@ private fun BlockedUsersSettings(
                     Text("Replace with warning (Default)", style = MaterialTheme.typography.bodyLarge)
                     Text("Show a warning placeholder instead of the quoted post content", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+            if (blockedQuoteHandling == "warning") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp)
+                ) {
+                    Text(
+                        "Add a Show button to reveal blocked content",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = showRevealButton,
+                        onCheckedChange = onShowRevealButtonChange
+                    )
+                }
+                Text(
+                    "Adds a one-time Show button to blocked quotes and comments. It must be pressed again for each item and never unblocks anyone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(

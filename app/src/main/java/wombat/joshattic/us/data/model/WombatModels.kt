@@ -101,7 +101,10 @@ data class Comment(
     val time: Long,
     val hasReplies: Boolean,
     val top: String? = null,
-    val replies: List<Comment> = emptyList()
+    val replies: List<Comment> = emptyList(),
+    // In-memory flag: the poster is blocked. Real content is kept so an
+    // explicit "Show" can reveal it; never persisted.
+    val blocked: Boolean = false
 )
 
 data class LoginRequest(val username: String, val password: String)

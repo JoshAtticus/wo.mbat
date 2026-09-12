@@ -44,6 +44,10 @@ data class HomeUiState(
     val blockedUsernames: Set<String> = emptySet(),
     val comments: List<Comment> = emptyList(),
     val selectedPost: Post? = null,
+    val viewRepostsPost: Post? = null,
+    val reposts: List<Post> = emptyList(),
+    val repostsLoading: Boolean = false,
+    val repostsError: String? = null,
     val isLoading: Boolean = false,
     val feedLoading: Boolean = false,
     val commentsLoading: Boolean = false,
@@ -128,6 +132,7 @@ data class HomeUiState(
     val followedUsernames: Set<String> = emptySet(),
     val followLoadingUsernames: Set<String> = emptySet(),
     val blockedQuoteHandling: String = "warning",
+    val showBlockedRevealButton: Boolean = false,
     val blockedWarningTarget: BlockedWarningTarget? = null
 ) {
     val accountLabel: String = session?.username ?: "Account"

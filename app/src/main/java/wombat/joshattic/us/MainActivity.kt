@@ -87,8 +87,15 @@ class MainActivity : ComponentActivity() {
             }
 
             WombatTheme(userColor = uiState.accountProfile?.color) {
-                SplashOverlay {
-                    HomeScreen(viewModel = homeViewModel)
+                androidx.compose.runtime.CompositionLocalProvider(
+                    wombat.joshattic.us.ui.screens.LocalOnViewReposts provides { post ->
+                        homeViewModel.openReposts(post)
+                    },
+                    wombat.joshattic.us.ui.screens.LocalShowBlockedRevealButton provides uiState.showBlockedRevealButton
+                ) {
+                    SplashOverlay {
+                        HomeScreen(viewModel = homeViewModel)
+                    }
                 }
             }
         }

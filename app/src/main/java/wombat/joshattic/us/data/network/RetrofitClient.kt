@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL = "https://api.wasteof.money/"
+    private const val ALPHA_BASE_URL = "https://alpha.wasteof.money/"
     private const val OPEN_GRAPH_BASE_URL = "https://og.joshattic.us/"
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -40,6 +41,14 @@ object RetrofitClient {
         .addConverterFactory(GsonConverterFactory.create(GsonBuilder().create()))
         .build()
 
+    // Alpha endpoints must stay unauthenticated (see AlphaApiService), so this
+    // instance deliberately shares the plain okHttpClient with no auth header.
+    private val alphaRetrofit = Retrofit.Builder()
+        .baseUrl(ALPHA_BASE_URL)
+        .client(okHttpClient)
+        .addConverterFactory(GsonConverterFactory.create(GsonBuilder().create()))
+        .build()
+
     private val openGraphRetrofit = Retrofit.Builder()
         .baseUrl(OPEN_GRAPH_BASE_URL)
         .client(openGraphOkHttpClient)
@@ -53,6 +62,7 @@ object RetrofitClient {
         .build()
 
     val apiService: ApiService = retrofit.create(ApiService::class.java)
+    val alphaApiService: AlphaApiService = alphaRetrofit.create(AlphaApiService::class.java)
     val uploadApiService: ApiService = uploadRetrofit.create(ApiService::class.java)
     val openGraphApiService: OpenGraphApiService = openGraphRetrofit.create(OpenGraphApiService::class.java)
 }

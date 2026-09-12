@@ -72,11 +72,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
@@ -636,6 +638,12 @@ fun PostActionsMenu(
     }
 }
 
+/** Opens the "who reposted this" sheet; provided app-wide so every PostCard can use it. */
+val LocalOnViewReposts = compositionLocalOf<((Post) -> Unit)?> { null }
+
+/** When true, blocked quote/comment warnings gain a one-time "Show" button. */
+val LocalShowBlockedRevealButton = compositionLocalOf { false }
+
 /** True when [post] is a bare repost wrapper with no added text or images of its own. */
 fun isPureRepost(post: Post): Boolean {
     return post.repost != null &&
@@ -714,9 +722,13 @@ fun PostCard(
     onFollowClick: (() -> Unit)? = null,
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
-    groupedReposters: List<Post> = emptyList()
+    groupedReposters: List<Post> = emptyList(),
+    // Skips the blocked-poster check for the post itself. Used by the details
+    // sheet, where reaching this screen means the user already pressed
+    // "View anyways" — without this the sheet renders nothing at all.
+    ignoreBlockedPoster: Boolean = false
 ) {
-    if (blockedUsernames.contains(post.poster.name.lowercase())) {
+    if (!ignoreBlockedPoster && blockedUsernames.contains(post.poster.name.lowercase())) {
         Spacer(modifier = Modifier.size(0.dp))
         return
     }
@@ -941,7 +953,10 @@ fun PostCard(
                 }
                 post.repost?.let { repostPost ->
                     val isRepostPosterBlocked = blockedUsernames.contains(repostPost.poster.name.lowercase())
-                    if (isRepostPosterBlocked) {
+                    // One-time reveal: pressing Show is per post instance and resets
+                    // when the card leaves composition. It never unblocks the user.
+                    var quoteRevealed by remember(repostPost.id) { mutableStateOf(false) }
+                    if (isRepostPosterBlocked && !quoteRevealed) {
                         if (blockedQuoteHandling == "warning") {
                             Card(
                                 shape = RoundedCornerShape(12.dp),
@@ -966,8 +981,14 @@ fun PostCard(
                                     Text(
                                         text = "This post is from a user you blocked.",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    if (LocalShowBlockedRevealButton.current) {
+                                        TextButton(onClick = { quoteRevealed = true }) {
+                                            Text("Show")
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1057,6 +1078,22 @@ fun PostCard(
                                 onQuoteClick?.invoke(post)
                             }
                         )
+                        // Only offer viewing reposts when the post actually has some
+                        val onViewReposts = LocalOnViewReposts.current.takeIf { post.reposts > 0 }
+                        if (onViewReposts != null) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                            DropdownMenuItem(
+                                text = { Text("View reposts") },
+                                leadingIcon = { Icon(Icons.Filled.Groups, contentDescription = null) },
+                                onClick = {
+                                    repostMenuExpanded = false
+                                    onViewReposts(post)
+                                }
+                            )
+                        }
                     }
                 }
                 PostShareButton(postId = post.id)
@@ -1129,7 +1166,10 @@ fun CommentThreadContent(
     depth: Int,
     onFocusComment: ((Comment) -> Unit)?
 ) {
-    val isBlockedPlaceholder = comment.content == "This comment is from a user you blocked"
+    val isBlockedPlaceholder = comment.blocked
+    // One-time reveal: pressing Show is per comment instance and resets when
+    // the comment leaves composition. It never unblocks the user.
+    var commentRevealed by remember(comment.id) { mutableStateOf(false) }
     val isReply = comment.parent != null
     Row(
         modifier = Modifier
@@ -1229,13 +1269,22 @@ fun CommentThreadContent(
             }
             
             // Content text
-            if (isBlockedPlaceholder) {
+            if (isBlockedPlaceholder && !commentRevealed) {
                 Text(
-                    text = comment.content,
+                    text = "This comment is from a user you blocked",
                     style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.padding(bottom = 2.dp)
                 )
+                if (LocalShowBlockedRevealButton.current) {
+                    TextButton(
+                        onClick = { commentRevealed = true },
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Show")
+                    }
+                }
             } else {
                 val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
                 HtmlText(
