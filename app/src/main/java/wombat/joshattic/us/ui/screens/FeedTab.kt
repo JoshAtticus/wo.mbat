@@ -126,6 +126,16 @@ fun FeedTab(
         }
     }
 
+    // Load more when reaching near the end of the feed
+    LaunchedEffect(listState, posts.size) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .collect { lastVisibleIndex ->
+                if (lastVisibleIndex != null && lastVisibleIndex >= posts.size - 5) {
+                    onLoadNextPage()
+                }
+            }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         PullToRefreshBox(
             modifier = Modifier.fillMaxSize(),
