@@ -85,6 +85,9 @@ fun CommentComposer(
     var lastSyncedDraft by remember { mutableStateOf("") }
     var currentImages by remember { mutableStateOf(extractImages(draft)) }
     var isUploadingImage by remember { mutableStateOf(false) }
+    // Track batch progress so the UI can show "image 2 of 5" instead of a generic spinner
+    var uploadCurrent by remember { mutableStateOf(0) }
+    var uploadTotal by remember { mutableStateOf(0) }
     var imageUploadError by remember { mutableStateOf<String?>(null) }
     var isBoldActive by remember { mutableStateOf(false) }
     var isItalicActive by remember { mutableStateOf(false) }
@@ -114,18 +117,24 @@ fun CommentComposer(
     }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 8)
+    ) { uris ->
         val upload = onUploadImage
-        if (uri != null && upload != null) {
+        if (uris.isNotEmpty() && upload != null) {
             isUploadingImage = true
             imageUploadError = null
+            uploadTotal = uris.size
+            uploadCurrent = 0
             coroutineScope.launch {
                 try {
-                    val uploadedUrl = upload(uri)
-                    val updatedImages = currentImages + uploadedUrl
-                    currentImages = updatedImages
-                    richEditTextRef?.let { updateDraft(it, updatedImages) }
+                    // Upload sequentially so images append to the draft in picker order,
+                    // and so already-uploaded images survive if a later one fails
+                    uris.forEachIndexed { index, uri ->
+                        uploadCurrent = index + 1
+                        val uploadedUrl = upload(uri)
+                        currentImages = currentImages + uploadedUrl
+                        richEditTextRef?.let { updateDraft(it, currentImages) }
+                    }
                 } catch (e: Exception) {
                     imageUploadError = e.message ?: "Upload failed"
                 } finally {
@@ -207,7 +216,11 @@ fun CommentComposer(
                 IconButton(
                     onClick = {
                         imageUploadError = null
-                        imagePickerLauncher.launch("image/*")
+                        imagePickerLauncher.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
                     },
                     enabled = !isUploadingImage,
                     modifier = Modifier.size(36.dp)
@@ -218,13 +231,26 @@ fun CommentComposer(
         }
 
         if (isUploadingImage) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(vertical = 4.dp)
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                Text("Uploading image…", style = MaterialTheme.typography.bodySmall)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(
+                        if (uploadTotal > 1) "Uploading image $uploadCurrent of $uploadTotal…" else "Uploading image…",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (uploadTotal > 1) {
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { uploadCurrent.toFloat() / uploadTotal },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
         imageUploadError?.let { error ->
