@@ -342,22 +342,24 @@ fun ProfileScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            Text(
-                                text = profile.name,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                color = accent,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            UserBadges(
-                                verified = profile.verified,
-                                admin = profile.permissions?.admin == true,
-                                beta = profile.beta,
-                                accentColor = accent
-                            )
-                        
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = profile.name,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = accent,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                UserBadges(
+                                    verified = profile.verified,
+                                    admin = profile.permissions?.admin == true,
+                                    beta = profile.beta,
+                                    accentColor = accent
+                                )
+                            }
+
                         Spacer(modifier = Modifier.height(10.dp))
                         HtmlText(
                             html = autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")),
