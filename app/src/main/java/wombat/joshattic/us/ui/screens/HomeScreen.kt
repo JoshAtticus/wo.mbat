@@ -635,7 +635,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onClearFocusComment = viewModel::clearFocusComment,
                                             blockedUsernames = uiState.blockedUsernames,
                                             blockedQuoteHandling = uiState.blockedQuoteHandling,
-                                            errorMessage = uiState.errorMessage
+                                            errorMessage = uiState.errorMessage,
+                                            onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                                         )
                                     }
                                     uiState.viewingWallUsername != null -> {
@@ -658,7 +659,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                              focusedComment = uiState.focusedComment,
                                              onFocusComment = viewModel::focusComment,
                                              onClearFocusComment = viewModel::clearFocusComment,
-                                             errorMessage = uiState.errorMessage
+                                             errorMessage = uiState.errorMessage,
+                                             onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                                         )
                                     }
                                     uiState.viewingProfileUsername != null -> {
@@ -1103,7 +1105,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                          onClearFocusComment = viewModel::clearFocusComment,
                          blockedUsernames = uiState.blockedUsernames,
                          blockedQuoteHandling = uiState.blockedQuoteHandling,
-                         errorMessage = uiState.errorMessage
+                         errorMessage = uiState.errorMessage,
+                         onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                      )
                  }
 
@@ -1127,7 +1130,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                          focusedComment = uiState.focusedComment,
                          onFocusComment = viewModel::focusComment,
                          onClearFocusComment = viewModel::clearFocusComment,
-                         errorMessage = uiState.errorMessage
+                         errorMessage = uiState.errorMessage,
+                         onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                      )
                  }
              }

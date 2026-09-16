@@ -104,7 +104,8 @@ fun PostDetailsContent(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
     errorMessage: String? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
     val listState = rememberLazyListState()
 
@@ -274,7 +275,9 @@ fun PostDetailsContent(
                         onPostClick = onPostClickById,
                         openLinksInApp = openLinksInApp,
                         depth = 0,
-                        onFocusComment = onFocusComment
+                        onFocusComment = onFocusComment,
+                        showImages = showImages,
+                        onImageClick = { images, index -> onImageClick(images, index, null) }
                     )
                 }
             }
@@ -344,30 +347,14 @@ fun PostDetailsContent(
                             }
                         }
 
-                        OutlinedTextField(
-                            value = draft,
-                            onValueChange = onDraftChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(24.dp),
-                            maxLines = 4,
-                            placeholder = {
-                                Text(
-                                    if (replyingTo != null) "Reply to @${replyingTo.poster.name}..."
-                                    else "Write a reply..."
-                                )
-                            },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = onSubmit,
-                                    enabled = draft.isNotBlank()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "Send reply",
-                                        tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                    )
-                                }
-                            }
+                        CommentComposer(
+                            draft = draft,
+                            onDraftChange = onDraftChange,
+                            onSubmit = onSubmit,
+                            placeholder = if (replyingTo != null) "Reply to @${replyingTo.poster.name}..."
+                            else "Write a reply...",
+                            onUploadImage = onUploadImage,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -415,7 +402,8 @@ fun PostDetailsSheet(
     onClearFocusComment: () -> Unit = {},
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
@@ -470,7 +458,8 @@ fun PostDetailsSheet(
             onClearFocusComment = onClearFocusComment,
             blockedUsernames = blockedUsernames,
             blockedQuoteHandling = blockedQuoteHandling,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            onUploadImage = onUploadImage
         )
     }
 }

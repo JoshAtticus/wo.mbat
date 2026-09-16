@@ -1112,7 +1112,9 @@ fun CommentCard(
     onPostClick: ((String) -> Unit)? = null,
     openLinksInApp: Boolean = true,
     depth: Int = 0,
-    onFocusComment: ((Comment) -> Unit)? = null
+    onFocusComment: ((Comment) -> Unit)? = null,
+    showImages: Boolean = true,
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
 ) {
     val isReply = comment.parent != null
     if (!isReply) {
@@ -1135,7 +1137,9 @@ fun CommentCard(
                     onPostClick = onPostClick,
                     openLinksInApp = openLinksInApp,
                     depth = depth,
-                    onFocusComment = onFocusComment
+                    onFocusComment = onFocusComment,
+                    showImages = showImages,
+                    onImageClick = onImageClick
                 )
             }
         }
@@ -1149,7 +1153,9 @@ fun CommentCard(
             onPostClick = onPostClick,
             openLinksInApp = openLinksInApp,
             depth = depth,
-            onFocusComment = onFocusComment
+            onFocusComment = onFocusComment,
+            showImages = showImages,
+            onImageClick = onImageClick
         )
     }
 }
@@ -1164,7 +1170,9 @@ fun CommentThreadContent(
     onPostClick: ((String) -> Unit)?,
     openLinksInApp: Boolean,
     depth: Int,
-    onFocusComment: ((Comment) -> Unit)?
+    onFocusComment: ((Comment) -> Unit)?,
+    showImages: Boolean = true,
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
 ) {
     val isBlockedPlaceholder = comment.blocked
     // One-time reveal: pressing Show is per comment instance and resets when
@@ -1286,6 +1294,7 @@ fun CommentThreadContent(
                     }
                 }
             } else {
+                val commentImageUrls = remember(comment.content) { extractImages(comment.content) }
                 val displayContent = remember(comment.content) { autoLinkAndMentions(stripImages(comment.content)) }
                 HtmlText(
                     html = displayContent,
@@ -1294,6 +1303,14 @@ fun CommentThreadContent(
                     openLinksInApp = openLinksInApp,
                     modifier = Modifier.padding(bottom = 2.dp)
                 )
+                if (showImages && commentImageUrls.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    PostImageSquares(
+                        images = commentImageUrls,
+                        onImageClick = onImageClick,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
             }
             
             // Nested replies list
@@ -1328,7 +1345,9 @@ fun CommentThreadContent(
                                 onPostClick = onPostClick,
                                 openLinksInApp = openLinksInApp,
                                 depth = depth + 1,
-                                onFocusComment = onFocusComment
+                                onFocusComment = onFocusComment,
+                                showImages = showImages,
+                                onImageClick = onImageClick
                             )
                         }
                     }

@@ -87,7 +87,8 @@ fun WallDetailsContent(
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
     errorMessage: String? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
     val listState = rememberLazyListState()
 
@@ -288,33 +289,14 @@ fun WallDetailsContent(
                             }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = draft,
-                                onValueChange = onDraftChange,
-                                placeholder = {
-                                    Text(if (replyingTo != null) "Write a reply..." else "Post a message...")
-                                },
-                                modifier = Modifier.weight(1f),
-                                maxLines = 3,
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            Button(
-                                onClick = onSubmit,
-                                enabled = draft.isNotBlank(),
-                                shape = RoundedCornerShape(20.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Send",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                        CommentComposer(
+                            draft = draft,
+                            onDraftChange = onDraftChange,
+                            onSubmit = onSubmit,
+                            placeholder = if (replyingTo != null) "Write a reply..." else "Post a message...",
+                            onUploadImage = onUploadImage,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -342,7 +324,8 @@ fun WallDetailsSheet(
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val coroutineScope = rememberCoroutineScope()
@@ -377,7 +360,8 @@ fun WallDetailsSheet(
             focusedComment = focusedComment,
             onFocusComment = onFocusComment,
             onClearFocusComment = onClearFocusComment,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            onUploadImage = onUploadImage
         )
     }
 }
