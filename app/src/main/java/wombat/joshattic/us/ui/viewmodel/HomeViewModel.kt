@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import wombat.joshattic.us.ui.utils.NetworkConnectivityObserver
+import wombat.joshattic.us.ui.utils.friendlyMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +32,7 @@ import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.state.HomeUiState
 import wombat.joshattic.us.ui.state.BlockedWarningTarget
+import wombat.joshattic.us.ui.state.LoginStep
 
 class HomeViewModel(
     private val repository: WombatRepository,
@@ -114,7 +116,13 @@ class HomeViewModel(
     }
 
     fun setAddingAccount(adding: Boolean) {
-        _uiState.value = _uiState.value.copy(isAddingAccount = adding, loginError = null, loginUsername = "", loginPassword = "")
+        _uiState.value = _uiState.value.copy(
+            isAddingAccount = adding,
+            loginError = null,
+            loginUsername = "",
+            loginPassword = "",
+            loginStep = LoginStep.USERNAME
+        )
     }
 
     fun selectTab(tab: BottomTab) {
@@ -148,30 +156,80 @@ class HomeViewModel(
         }
     }
 
+    private fun isBanned(): Boolean =
+        _uiState.value.accountProfile?.permissions?.banned == true
+
     fun setLoginUsername(username: String) {
-        _uiState.value = _uiState.value.copy(loginUsername = username, loginError = null)
+        // Editing the username always restarts the login flow at step one.
+        _uiState.value = _uiState.value.copy(
+            loginUsername = username,
+            loginError = null,
+            loginStep = LoginStep.USERNAME
+        )
     }
 
     fun setLoginPassword(password: String) {
         _uiState.value = _uiState.value.copy(loginPassword = password, loginError = null)
     }
 
+    fun loginBackToUsername() {
+        _uiState.value = _uiState.value.copy(
+            loginStep = LoginStep.USERNAME,
+            loginPassword = "",
+            loginError = null
+        )
+    }
+
     fun login() {
         val snapshot = _uiState.value
         val username = snapshot.loginUsername.trim().lowercase()
-        val password = snapshot.loginPassword
-        if (username.isBlank()) {
-            _uiState.value = snapshot.copy(loginError = "Enter your username.")
+
+        if (snapshot.loginStep == LoginStep.USERNAME) {
+            // Server-side usernames must match /^[a-z0-9_\-]{4,20}$/ — fail fast
+            // without a network round-trip for anything the API can't accept.
+            if (!Regex("^[a-z0-9_\\-]{4,20}$").matches(username)) {
+                _uiState.value = snapshot.copy(
+                    loginError = "Usernames are 4–20 characters: a–z, 0–9, _ or -"
+                )
+                return
+            }
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(authLoading = true, loginError = null)
+                runCatching { repository.isUsernameAvailable(username) }
+                    .onSuccess { available ->
+                        if (available) {
+                            _uiState.value = _uiState.value.copy(
+                                authLoading = false,
+                                loginError = "No account named \"$username\" exists."
+                            )
+                        } else {
+                            _uiState.value = _uiState.value.copy(
+                                authLoading = false,
+                                loginStep = LoginStep.PASSWORD
+                            )
+                        }
+                    }
+                    .onFailure { throwable ->
+                        _uiState.value = _uiState.value.copy(
+                            authLoading = false,
+                            loginError = throwable.friendlyMessage(default = "Couldn't check that username")
+                        )
+                    }
+            }
             return
         }
 
+        val password = snapshot.loginPassword
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(authLoading = true, loginError = null)
             repository.login(username, password)
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         authLoading = false,
-                        loginError = throwable.message ?: "Unable to sign in"
+                        loginError = throwable.friendlyMessage(
+                            default = "Unable to sign in",
+                            unauthorized = "Incorrect password"
+                        )
                     )
                 }
                 .onSuccess { session ->
@@ -179,6 +237,7 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(
                         authLoading = false,
                         loginPassword = "",
+                        loginStep = LoginStep.USERNAME,
                         isAddingAccount = false,
                         toastMessage = if (isPasswordless) "Your account is insecure, please set a password on wasteof.money" else _uiState.value.toastMessage
                     )
@@ -284,7 +343,12 @@ class HomeViewModel(
                         updatePostInState(updatedPost, fallbackId = editPostId, fallbackContent = draft)
                     }
                     .onFailure { throwable ->
-                        _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
+                        _uiState.value = _uiState.value.copy(
+                            errorMessage = throwable.friendlyMessage(
+                                default = "Couldn't edit post",
+                                banned = isBanned()
+                            )
+                        )
                     }
             } else {
                 runCatching { repository.createPost(session, draft, repostId) }
@@ -306,7 +370,10 @@ class HomeViewModel(
                             composerDrafts = if (!draft.isBlank() && !currentDrafts.contains(draft)) {
                                 listOf(draft) + currentDrafts
                             } else currentDrafts,
-                            errorMessage = "Couldn't post${throwable.message?.let { m -> ": $m" } ?: ""} — saved to drafts"
+                            errorMessage = "${throwable.friendlyMessage(
+                                default = "Couldn't post",
+                                banned = isBanned()
+                            )} — saved to drafts"
                         )
                     }
             }
@@ -324,7 +391,12 @@ class HomeViewModel(
                     onSuccess()
                 }
                 .onFailure { throwable ->
-                    _uiState.value = _uiState.value.copy(errorMessage = throwable.message ?: "Failed to repost")
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = throwable.friendlyMessage(
+                            default = "Failed to repost",
+                            banned = isBanned()
+                        )
+                    )
                 }
         }
     }
@@ -374,7 +446,7 @@ class HomeViewModel(
                     if (_uiState.value.viewRepostsPost?.id == post.id) {
                         _uiState.value = _uiState.value.copy(
                             repostsLoading = false,
-                            repostsError = throwable.message ?: "Couldn't load reposts"
+                            repostsError = throwable.friendlyMessage(default = "Couldn't load reposts")
                         )
                     }
                 }
@@ -540,7 +612,7 @@ class HomeViewModel(
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     exploreTrendingLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load trending"
+                    errorMessage = throwable.friendlyMessage(default = "Unable to load trending")
                 )
             }
         }
@@ -621,7 +693,7 @@ class HomeViewModel(
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfileLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load profile"
+                    errorMessage = throwable.friendlyMessage(default = "Unable to load profile")
                 )
             }
         }
@@ -665,7 +737,7 @@ class HomeViewModel(
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfileLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load next page"
+                    errorMessage = throwable.friendlyMessage(default = "Unable to load next page")
                 )
             }
         }
@@ -730,7 +802,7 @@ class HomeViewModel(
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     commentsLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load post"
+                    errorMessage = throwable.friendlyMessage(default = "Unable to load post")
                 )
             }
         }
@@ -907,7 +979,9 @@ class HomeViewModel(
                     loadComments(selectedPost.id)
                 }
                 .onFailure { throwable ->
-                    _uiState.value = _uiState.value.copy(errorMessage = throwable.message ?: "Unable to post comment")
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = throwable.friendlyMessage(default = "Unable to post comment")
+                    )
                 }
         }
     }
@@ -983,7 +1057,7 @@ class HomeViewModel(
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     wallCommentsLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load wall comments"
+                    errorMessage = throwable.friendlyMessage(default = "Unable to load wall comments")
                 )
             }
         }
@@ -1021,7 +1095,9 @@ class HomeViewModel(
                     loadWallCommentsPage(username, 1)
                 }
                 .onFailure { throwable ->
-                    _uiState.value = _uiState.value.copy(errorMessage = throwable.message ?: "Unable to post wall comment")
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = throwable.friendlyMessage(default = "Unable to post wall comment")
+                    )
                 }
         }
     }
@@ -1160,7 +1236,11 @@ class HomeViewModel(
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         editProfileLoading = false,
-                        editProfileError = throwable.message ?: "Failed to update bio"
+                        editProfileError = throwable.friendlyMessage(
+                            default = "Failed to update bio",
+                            banned = isBanned(),
+                            bannedMessage = "You can't edit your profile while banned."
+                        )
                     )
                 }
         }
@@ -1182,7 +1262,11 @@ class HomeViewModel(
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         editProfileLoading = false,
-                        editProfileError = throwable.message ?: "Failed to delete profile picture"
+                        editProfileError = throwable.friendlyMessage(
+                            default = "Failed to delete profile picture",
+                            banned = isBanned(),
+                            bannedMessage = "You can't edit your profile while banned."
+                        )
                     )
                 }
         }
@@ -1204,7 +1288,11 @@ class HomeViewModel(
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         editProfileLoading = false,
-                        editProfileError = throwable.message ?: "Failed to upload profile picture"
+                        editProfileError = throwable.friendlyMessage(
+                            default = "Failed to upload profile picture",
+                            banned = isBanned(),
+                            bannedMessage = "You can't edit your profile while banned."
+                        )
                     )
                 }
         }
@@ -1226,7 +1314,11 @@ class HomeViewModel(
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         editProfileLoading = false,
-                        editProfileError = throwable.message ?: "Failed to delete banner"
+                        editProfileError = throwable.friendlyMessage(
+                            default = "Failed to delete banner",
+                            banned = isBanned(),
+                            bannedMessage = "You can't edit your profile while banned."
+                        )
                     )
                 }
         }
@@ -1248,7 +1340,11 @@ class HomeViewModel(
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         editProfileLoading = false,
-                        editProfileError = throwable.message ?: "Failed to upload banner"
+                        editProfileError = throwable.friendlyMessage(
+                            default = "Failed to upload banner",
+                            banned = isBanned(),
+                            bannedMessage = "You can't edit your profile while banned."
+                        )
                     )
                 }
         }
@@ -1311,7 +1407,7 @@ class HomeViewModel(
                 }
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
-                        errorMessage = throwable.message ?: "Failed to toggle love"
+                        errorMessage = throwable.friendlyMessage(default = "Failed to toggle love")
                     )
                 }
         }
@@ -1380,7 +1476,11 @@ class HomeViewModel(
                 _uiState.value = _uiState.value.copy(
                     userListToShow = null,
                     userListLoading = false,
-                    toastMessage = throwable.message ?: "Failed to load followers"
+                    toastMessage = throwable.friendlyMessage(
+                        default = "Failed to load followers",
+                        banned = isBanned(),
+                        bannedMessage = "You can't view followers while banned."
+                    )
                 )
             }
         }
@@ -1411,7 +1511,11 @@ class HomeViewModel(
                 _uiState.value = _uiState.value.copy(
                     userListToShow = null,
                     userListLoading = false,
-                    toastMessage = throwable.message ?: "Failed to load following"
+                    toastMessage = throwable.friendlyMessage(
+                        default = "Failed to load following",
+                        banned = isBanned(),
+                        bannedMessage = "You can't view following while banned."
+                    )
                 )
             }
         }
@@ -1508,7 +1612,7 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(
                         followLoadingUsernames = _uiState.value.followLoadingUsernames - normalized,
                         viewingProfileFollowLoading = if (isViewingThisProfile) false else _uiState.value.viewingProfileFollowLoading,
-                        errorMessage = throwable.message ?: "Unable to update follow"
+                        errorMessage = throwable.friendlyMessage(default = "Unable to update follow")
                     )
                 }
         }
@@ -1569,7 +1673,7 @@ class HomeViewModel(
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     reportLoading = false,
-                    toastMessage = throwable.message ?: "Failed to report post"
+                    toastMessage = throwable.friendlyMessage(default = "Failed to report post")
                 )
             }
         }
@@ -1681,7 +1785,9 @@ class HomeViewModel(
         viewModelScope.launch {
             repository.sessionFlow
                 .catch { throwable ->
-                    _uiState.value = _uiState.value.copy(errorMessage = throwable.message)
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = throwable.friendlyMessage(default = "Session error")
+                    )
                 }
                 .collectLatest { session ->
                     if (session == null) {
@@ -1785,7 +1891,7 @@ class HomeViewModel(
         }.onFailure { throwable ->
             _uiState.value = _uiState.value.copy(
                 feedLoading = false,
-                errorMessage = throwable.message ?: "Unable to load feed"
+                errorMessage = throwable.friendlyMessage(default = "Unable to load feed")
             )
         }
     }
@@ -1942,7 +2048,7 @@ class HomeViewModel(
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     accountLoading = false,
-                    errorMessage = throwable.message ?: "Unable to load next page"
+                    errorMessage = throwable.friendlyMessage(default = "Unable to load next page")
                 )
             }
         }
@@ -1987,7 +2093,7 @@ class HomeViewModel(
         }.onFailure { throwable ->
             _uiState.value = _uiState.value.copy(
                 commentsLoading = false,
-                errorMessage = throwable.message ?: "Unable to load comments"
+                errorMessage = throwable.friendlyMessage(default = "Unable to load comments")
             )
         }
     }
@@ -2255,7 +2361,9 @@ class HomeViewModel(
             }.onSuccess { message ->
                 _uiState.value = _uiState.value.copy(toastMessage = message)
             }.onFailure { throwable ->
-                _uiState.value = _uiState.value.copy(toastMessage = throwable.message ?: "Oh no! Something went wrong D:")
+                _uiState.value = _uiState.value.copy(
+                    toastMessage = throwable.friendlyMessage(default = "Oh no! Something went wrong D:")
+                )
             }
         }
     }

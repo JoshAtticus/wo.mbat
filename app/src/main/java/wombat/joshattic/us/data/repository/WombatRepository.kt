@@ -67,6 +67,13 @@ class WombatRepository(
         }
     }
 
+    /**
+     * True when no account holds this username. The login UI uses this to
+     * check the username exists before asking for a password.
+     */
+    suspend fun isUsernameAvailable(username: String): Boolean =
+        apiService.checkUsernameAvailable(username).available
+
     suspend fun login(username: String, password: String): Result<AuthSession> = runCatching {
         val loginResponse = apiService.login(LoginRequest(username = username, password = password))
         val cleanUsername = username.trim()

@@ -7,6 +7,8 @@ import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 
+enum class LoginStep { USERNAME, PASSWORD }
+
 @Immutable
 data class HomeUiState(
     val session: AuthSession? = null,
@@ -58,6 +60,7 @@ data class HomeUiState(
     val errorMessage: String? = null,
     val toastMessage: String? = null,
     val loginError: String? = null,
+    val loginStep: LoginStep = LoginStep.USERNAME,
     val loginUsername: String = "",
     val loginPassword: String = "",
     val composeDraft: String = "",

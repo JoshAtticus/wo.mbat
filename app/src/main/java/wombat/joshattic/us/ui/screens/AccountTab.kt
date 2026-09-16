@@ -76,6 +76,7 @@ import coil.request.ImageRequest
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
+import wombat.joshattic.us.ui.state.LoginStep
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 
 @Composable
@@ -88,12 +89,14 @@ fun AccountTab(
     loginPassword: String,
     loginLoading: Boolean,
     loginError: String?,
+    loginStep: LoginStep = LoginStep.USERNAME,
     savedAccounts: List<AuthSession>,
     savedAccountUnreadCounts: Map<String, Int>,
     isAddingAccount: Boolean,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
+    onLoginBack: () -> Unit = {},
     onLogout: () -> Unit,
     onSwitchAccount: (String) -> Unit,
     onAddAccount: () -> Unit,
@@ -449,23 +452,37 @@ fun AccountTab(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(12.dp))
-                            OutlinedTextField(
-                                value = loginUsername,
-                                onValueChange = onUsernameChange,
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                label = { Text("Username") },
-                                leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) }
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            OutlinedTextField(
-                                value = loginPassword,
-                                onValueChange = onPasswordChange,
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                label = { Text("Password") },
-                                visualTransformation = PasswordVisualTransformation()
-                            )
+                            if (loginStep == LoginStep.USERNAME) {
+                                OutlinedTextField(
+                                    value = loginUsername,
+                                    onValueChange = onUsernameChange,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    label = { Text("Username") },
+                                    leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) }
+                                )
+                            } else {
+                                // Username already validated in step one; show it
+                                // read-only so the user knows whose password to enter.
+                                OutlinedTextField(
+                                    value = loginUsername,
+                                    onValueChange = {},
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    readOnly = true,
+                                    label = { Text("Username") },
+                                    leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) }
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                OutlinedTextField(
+                                    value = loginPassword,
+                                    onValueChange = onPasswordChange,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    label = { Text("Password") },
+                                    visualTransformation = PasswordVisualTransformation()
+                                )
+                            }
                             if (!loginError.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(loginError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
@@ -477,7 +494,12 @@ fun AccountTab(
                                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
-                                    Text("Sign in")
+                                    Text(if (loginStep == LoginStep.USERNAME) "Next" else "Sign in")
+                                }
+                                if (loginStep == LoginStep.PASSWORD) {
+                                    TextButton(onClick = onLoginBack, enabled = !loginLoading) {
+                                        Text("Back")
+                                    }
                                 }
                                 if (isAddingAccount) {
                                     TextButton(onClick = onCancelAddAccount) {

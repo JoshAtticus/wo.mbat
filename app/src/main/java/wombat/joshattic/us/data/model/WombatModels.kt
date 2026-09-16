@@ -113,6 +113,8 @@ data class LoginRequest(val username: String, val password: String)
 
 data class LoginResponse(val token: String)
 
+data class UsernameAvailableResponse(val available: Boolean = false)
+
 data class SessionResponse(val user: User? = null)
 
 data class Permissions(val admin: Boolean, val banned: Boolean)

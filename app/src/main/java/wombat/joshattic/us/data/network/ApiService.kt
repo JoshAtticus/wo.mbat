@@ -23,6 +23,7 @@ import wombat.joshattic.us.data.model.FollowToggleResponse
 import wombat.joshattic.us.data.model.LoginRequest
 import wombat.joshattic.us.data.model.ReportRequest
 import wombat.joshattic.us.data.model.LoginResponse
+import wombat.joshattic.us.data.model.UsernameAvailableResponse
 import wombat.joshattic.us.data.model.MarkReadRequest
 import wombat.joshattic.us.data.model.LoveToggleResponse
 import wombat.joshattic.us.data.model.Notification
@@ -39,6 +40,9 @@ import wombat.joshattic.us.data.model.FrogResponse
 interface ApiService {
     @POST("session")
     suspend fun login(@Body request: LoginRequest): LoginResponse
+
+    @GET("username-available")
+    suspend fun checkUsernameAvailable(@Query("username") username: String): UsernameAvailableResponse
 
     @GET("session")
     suspend fun getSession(@Header("authorization") token: String): wombat.joshattic.us.data.model.SessionResponse
