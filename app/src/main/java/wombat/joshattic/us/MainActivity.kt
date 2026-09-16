@@ -86,7 +86,13 @@ class MainActivity : ComponentActivity() {
                 homeViewModel.handleDeepLink(deepLink)
             }
 
-            WombatTheme(userColor = uiState.accountProfile?.color) {
+            // Theme: custom theme overrides the account colour; optionally use system Material You (12L+)
+            val useCustomTheme = uiState.themeSource == "custom"
+            val useDynamic = useCustomTheme && uiState.customThemeDynamic &&
+                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S_V2
+            val themeUserColor = if (useCustomTheme && !useDynamic) uiState.customThemeColor else uiState.accountProfile?.color
+
+            WombatTheme(userColor = themeUserColor, dynamicColor = useDynamic) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     wombat.joshattic.us.ui.screens.LocalOnViewReposts provides { post ->
                         homeViewModel.openReposts(post)

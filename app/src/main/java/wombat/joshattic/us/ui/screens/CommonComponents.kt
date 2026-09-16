@@ -71,6 +71,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -495,6 +498,38 @@ fun WombatBottomNavigationBar(
                     }
                 }
             }
+        }
+    }
+}
+
+// Icon-only status badges for a user; nothing renders when the user has no badges
+@Composable
+fun UserBadges(verified: Boolean, admin: Boolean, beta: Boolean, accentColor: Color? = null) {
+    if (!verified && !admin && !beta) return
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (verified) {
+            Icon(
+                Icons.Filled.Verified,
+                contentDescription = "Verified",
+                modifier = Modifier.size(18.dp),
+                tint = accentColor ?: MaterialTheme.colorScheme.primary
+            )
+        }
+        if (admin) {
+            Icon(
+                Icons.Filled.AdminPanelSettings,
+                contentDescription = "Admin",
+                modifier = Modifier.size(18.dp),
+                tint = Color(0xFFFFC107)
+            )
+        }
+        if (beta) {
+            Icon(
+                Icons.Filled.Science,
+                contentDescription = "Beta tester",
+                modifier = Modifier.size(18.dp),
+                tint = accentColor ?: MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

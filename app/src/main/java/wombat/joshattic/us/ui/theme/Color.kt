@@ -10,6 +10,12 @@ val LightCardVariant = Color(0xFFF8FAFC)
 
 val SurfaceWhite = Color(0xFFFFFFFF)
 
+// Palette names available for the custom theme picker; indices map to getWombatColorPalette keys
+val WombatThemeColorNames = listOf(
+    "red", "orange", "yellow", "green", "teal", "cyan",
+    "blue", "indigo", "violet", "purple", "fuchsia", "pink", "gray"
+)
+
 data class WombatColorPalette(
     val brand: Color,
     val brandVariant: Color,

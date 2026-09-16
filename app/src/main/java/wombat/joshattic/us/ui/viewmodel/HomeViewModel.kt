@@ -2265,6 +2265,21 @@ class HomeViewModel(
                 _uiState.value = _uiState.value.copy(showBlockedRevealButton = value)
             }
         }
+        viewModelScope.launch {
+            prefs.themeSource.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(themeSource = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.customThemeColor.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(customThemeColor = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.customThemeDynamic.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(customThemeDynamic = value)
+            }
+        }
     }
 
     fun openSettings() {
@@ -2305,6 +2320,18 @@ class HomeViewModel(
 
     fun setOpenLinksInApp(value: Boolean) {
         viewModelScope.launch { repository.settingsPreferences.setOpenLinksInApp(value) }
+    }
+
+    fun setThemeSource(value: String) {
+        viewModelScope.launch { repository.settingsPreferences.setThemeSource(value) }
+    }
+
+    fun setCustomThemeColor(value: String) {
+        viewModelScope.launch { repository.settingsPreferences.setCustomThemeColor(value) }
+    }
+
+    fun setCustomThemeDynamic(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setCustomThemeDynamic(value) }
     }
 
     fun setWearAccount(value: String) {

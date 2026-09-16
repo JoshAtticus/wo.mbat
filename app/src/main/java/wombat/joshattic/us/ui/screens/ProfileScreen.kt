@@ -65,6 +65,7 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
+import wombat.joshattic.us.ui.theme.WombatTheme
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 
 @Composable
@@ -79,7 +80,16 @@ fun ProfileHeader(profile: User) {
                 ProfilePicture(username = profile.name, size = 56.dp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(profile.name, style = MaterialTheme.typography.titleLarge)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(profile.name, style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        UserBadges(
+                            verified = profile.verified,
+                            admin = profile.permissions?.admin == true,
+                            beta = profile.beta,
+                            accentColor = getUserColorSchemeColors(profile.color).first
+                        )
+                    }
                     Text(
                         text = if (profile.online) "Online" else "Offline",
                         style = MaterialTheme.typography.bodyMedium,
@@ -138,6 +148,8 @@ fun ProfileScreen(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning"
 ) {
+    // Always theme this screen with the signed-in account colour, even when a custom theme is active
+    WombatTheme(userColor = profile?.color) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
 
@@ -338,6 +350,13 @@ fun ProfileScreen(
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            UserBadges(
+                                verified = profile.verified,
+                                admin = profile.permissions?.admin == true,
+                                beta = profile.beta,
+                                accentColor = accent
+                            )
                         
                         Spacer(modifier = Modifier.height(10.dp))
                         HtmlText(
@@ -472,5 +491,6 @@ fun ProfileScreen(
                 }
             }
         }
+    }
     }
 }

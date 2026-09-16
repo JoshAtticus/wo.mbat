@@ -26,6 +26,10 @@ class SettingsPreferences(private val context: Context) {
         val WearFeedType = stringPreferencesKey("wear_feed_type")
         val BlockedQuoteHandling = stringPreferencesKey("blocked_quote_handling")
         val ShowBlockedRevealButton = booleanPreferencesKey("show_blocked_reveal_button")
+
+        val ThemeSource = stringPreferencesKey("theme_source") // "account" | "custom"
+        val CustomThemeColor = stringPreferencesKey("custom_theme_color")
+        val CustomThemeDynamic = booleanPreferencesKey("custom_theme_dynamic")
     }
 
     val showImagesInFeed: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.ShowImagesInFeed] ?: true }
@@ -42,6 +46,10 @@ class SettingsPreferences(private val context: Context) {
     val wearFeedType: Flow<String> = context.settingsDataStore.data.map { it[Keys.WearFeedType] ?: "Home" }
     val blockedQuoteHandling: Flow<String> = context.settingsDataStore.data.map { it[Keys.BlockedQuoteHandling] ?: "warning" }
     val showBlockedRevealButton: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.ShowBlockedRevealButton] ?: false }
+
+    val themeSource: Flow<String> = context.settingsDataStore.data.map { it[Keys.ThemeSource] ?: "account" }
+    val customThemeColor: Flow<String> = context.settingsDataStore.data.map { it[Keys.CustomThemeColor] ?: "indigo" }
+    val customThemeDynamic: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.CustomThemeDynamic] ?: false }
 
     suspend fun setShowImagesInFeed(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.ShowImagesInFeed] = value }
@@ -93,5 +101,17 @@ class SettingsPreferences(private val context: Context) {
 
     suspend fun setShowBlockedRevealButton(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.ShowBlockedRevealButton] = value }
+    }
+
+    suspend fun setThemeSource(value: String) {
+        context.settingsDataStore.edit { it[Keys.ThemeSource] = value }
+    }
+
+    suspend fun setCustomThemeColor(value: String) {
+        context.settingsDataStore.edit { it[Keys.CustomThemeColor] = value }
+    }
+
+    suspend fun setCustomThemeDynamic(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.CustomThemeDynamic] = value }
     }
 }

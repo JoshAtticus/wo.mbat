@@ -136,6 +136,9 @@ data class HomeUiState(
     val followLoadingUsernames: Set<String> = emptySet(),
     val blockedQuoteHandling: String = "warning",
     val showBlockedRevealButton: Boolean = false,
+    val themeSource: String = "account", // "account" | "custom"
+    val customThemeColor: String = "indigo",
+    val customThemeDynamic: Boolean = false,
     val blockedWarningTarget: BlockedWarningTarget? = null
 ) {
     val accountLabel: String = session?.username ?: "Account"
@@ -150,7 +153,7 @@ enum class BottomTab {
 }
 
 enum class SettingsCategory {
-    FEED, NOTIFICATIONS, LINKS, BLOCKED_USERS, WEAR_OS, ABOUT
+    FEED, THEMING, NOTIFICATIONS, LINKS, BLOCKED_USERS, WEAR_OS, ABOUT
 }
 
 sealed interface BlockedWarningTarget {

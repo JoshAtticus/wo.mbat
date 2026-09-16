@@ -83,6 +83,7 @@ import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.ui.state.LoginStep
+import wombat.joshattic.us.ui.theme.WombatTheme
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 
 // Pick a friendly sign-in header; different pools for first vs. additional accounts.
@@ -155,6 +156,8 @@ fun AccountTab(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning"
 ) {
+    // Always theme this screen with the signed-in account colour, even when a custom theme is active
+    WombatTheme(userColor = profile?.color) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),
@@ -353,6 +356,13 @@ fun AccountTab(
                                         color = accent,
                                         maxLines = 1,
                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    UserBadges(
+                                        verified = profile.verified,
+                                        admin = profile.permissions?.admin == true,
+                                        beta = profile.beta,
+                                        accentColor = accent
                                     )
 
                                     Spacer(modifier = Modifier.height(10.dp))
@@ -568,5 +578,6 @@ fun AccountTab(
                 }
             }
         }
+    }
     }
 }

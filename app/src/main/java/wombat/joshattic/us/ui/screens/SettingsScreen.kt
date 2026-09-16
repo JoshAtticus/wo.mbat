@@ -6,10 +6,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalUriHandler
@@ -38,8 +41,10 @@ import androidx.compose.material.icons.filled.Feed
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -66,6 +71,9 @@ import androidx.compose.ui.unit.dp
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.ui.state.HomeUiState
 import wombat.joshattic.us.ui.state.SettingsCategory
+import android.os.Build
+import wombat.joshattic.us.ui.theme.WombatThemeColorNames
+import wombat.joshattic.us.ui.theme.getWombatColorPalette
 
 @Composable
 fun SettingsScreen(
@@ -80,6 +88,12 @@ fun SettingsScreen(
     onOpenLinksInAppChange: (Boolean) -> Unit,
     linkPreviewPriority: String,
     onLinkPreviewPriorityChange: (String) -> Unit,
+    themeSource: String,
+    customThemeColor: String,
+    customThemeDynamic: Boolean,
+    onThemeSourceChange: (String) -> Unit,
+    onCustomThemeColorChange: (String) -> Unit,
+    onCustomThemeDynamicChange: (Boolean) -> Unit,
     onWearAccountChange: (String) -> Unit,
     onWearShowImagesChange: (Boolean) -> Unit,
     onWearShowProfilePicturesChange: (Boolean) -> Unit,
@@ -129,6 +143,7 @@ fun SettingsScreen(
                 Text(
                     text = if (isTablet) "Settings" else when (uiState.settingsCategory) {
                         SettingsCategory.FEED -> "Feed"
+                        SettingsCategory.THEMING -> "Theming"
                         SettingsCategory.NOTIFICATIONS -> "Notifications"
                         SettingsCategory.LINKS -> "Links"
                         SettingsCategory.BLOCKED_USERS -> "Blocked Users"
@@ -189,6 +204,7 @@ fun SettingsScreen(
                                 Text(
                                     text = when (category) {
                                         SettingsCategory.FEED -> "Feed Settings"
+                                        SettingsCategory.THEMING -> "Theming Settings"
                                         SettingsCategory.NOTIFICATIONS -> "Notification Settings"
                                         SettingsCategory.LINKS -> "Link Settings"
                                         SettingsCategory.BLOCKED_USERS -> "Blocked Users"
@@ -210,6 +226,14 @@ fun SettingsScreen(
                                         showNewPosts = uiState.showNewPostsPopup,
                                         onShowImagesChange = onShowImagesInFeedChange,
                                         onShowNewPostsChange = onShowNewPostsPopupChange
+                                    )
+                                    SettingsCategory.THEMING -> ThemingSettings(
+                                        themeSource = themeSource,
+                                        customThemeColor = customThemeColor,
+                                        customThemeDynamic = customThemeDynamic,
+                                        onThemeSourceChange = onThemeSourceChange,
+                                        onCustomThemeColorChange = onCustomThemeColorChange,
+                                        onCustomThemeDynamicChange = onCustomThemeDynamicChange
                                     )
                                     SettingsCategory.NOTIFICATIONS -> NotificationSettings(
                                         inApp = uiState.inAppNotifications,
@@ -272,6 +296,14 @@ fun SettingsScreen(
                             showNewPosts = uiState.showNewPostsPopup,
                             onShowImagesChange = onShowImagesInFeedChange,
                             onShowNewPostsChange = onShowNewPostsPopupChange
+                        )
+                        SettingsCategory.THEMING -> ThemingSettings(
+                            themeSource = themeSource,
+                            customThemeColor = customThemeColor,
+                            customThemeDynamic = customThemeDynamic,
+                            onThemeSourceChange = onThemeSourceChange,
+                            onCustomThemeColorChange = onCustomThemeColorChange,
+                            onCustomThemeDynamicChange = onCustomThemeDynamicChange
                         )
                         SettingsCategory.NOTIFICATIONS -> NotificationSettings(
                             inApp = uiState.inAppNotifications,
@@ -342,6 +374,29 @@ private fun SettingsMenu(
         }
         item {
             CategoryMenuItem(
+                title = "Theming",
+                icon = Icons.Filled.Palette,
+                iconContainerBrush = Brush.sweepGradient(
+                    colors = listOf(
+                        Color(0xFFE42DAC), // magenta (right)
+                        Color(0xFF5B6DFD), // indigo (bottom-right)
+                        Color(0xFF2B97FA), // blue (bottom)
+                        Color(0xFF16DFCF), // turquoise (bottom-left)
+                        Color(0xFF67FF6C), // green (left)
+                        Color(0xFF95FF55), // lime (top-left)
+                        Color(0xFFEBBB11), // yellow (top)
+                        Color(0xFFFF6C62), // coral-red (top-right)
+                        Color(0xFFE42DAC)  // magenta wrap
+                    )
+                ),
+                iconColor = Color.White,
+                badge = "NEW",
+                selected = selectedCategory == SettingsCategory.THEMING,
+                onClick = { onCategorySelect(SettingsCategory.THEMING) }
+            )
+        }
+        item {
+            CategoryMenuItem(
                 title = "Notifications",
                 icon = Icons.Filled.Notifications,
                 iconContainerColor = Color(0xFFEF5350), // red
@@ -397,9 +452,11 @@ private fun SettingsMenu(
 private fun CategoryMenuItem(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconContainerColor: Color,
+    iconContainerColor: Color = Color.Unspecified,
     iconColor: Color,
     selected: Boolean = false,
+    iconContainerBrush: Brush? = null,
+    badge: String? = null,
     onClick: () -> Unit
 ) {
     val containerColor = if (selected) {
@@ -426,10 +483,13 @@ private fun CategoryMenuItem(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val containerModifier = if (iconContainerBrush != null) {
+                Modifier.size(36.dp).background(brush = iconContainerBrush, shape = CircleShape)
+            } else {
+                Modifier.size(36.dp).background(color = iconContainerColor, shape = CircleShape)
+            }
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(color = iconContainerColor, shape = CircleShape),
+                modifier = containerModifier,
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -440,12 +500,35 @@ private fun CategoryMenuItem(
                 )
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = contentColor,
-                modifier = Modifier.weight(1f)
-            )
+            // Title and badge share one weighted row so the arrow always stays right-aligned
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = contentColor
+                )
+                if (badge != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(50)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = badge,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+            }
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
@@ -480,6 +563,151 @@ private fun FeedSettings(
             checked = showNewPosts,
             onCheckedChange = onShowNewPostsChange
         )
+    }
+}
+
+@Composable
+private fun ThemingSettings(
+    themeSource: String,
+    customThemeColor: String,
+    customThemeDynamic: Boolean,
+    onThemeSourceChange: (String) -> Unit,
+    onCustomThemeColorChange: (String) -> Unit,
+    onCustomThemeDynamicChange: (Boolean) -> Unit
+) {
+    val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2 // Android 12L+
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                "Choose where wo.mbat gets its colours from",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            ) {
+                Column(modifier = Modifier.padding(4.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onThemeSourceChange("account") }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = themeSource == "account", onClick = { onThemeSourceChange("account") })
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Account theme", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Follow the theme colour of your wasteof account (default)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onThemeSourceChange("custom") }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = themeSource == "custom", onClick = { onThemeSourceChange("custom") })
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Custom theme", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Pick your own theme colour below", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                        }
+                    }
+                }
+            }
+        }
+
+        if (themeSource == "custom") {
+            item {
+                Text(
+                    "Theme colour",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        WombatThemeColorNames.chunked(4).forEach { rowColors ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                rowColors.forEach { colorName ->
+                                    val palette = getWombatColorPalette(colorName)
+                                    val isSelected = colorName == customThemeColor && !customThemeDynamic
+                                    val borderColor = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.brand)
+                                            .border(
+                                                width = if (isSelected) 3.dp else 1.dp,
+                                                color = borderColor,
+                                                shape = CircleShape
+                                            )
+                                            .clickable {
+                                                onCustomThemeDynamicChange(false)
+                                                onCustomThemeColorChange(colorName)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Filled.Check,
+                                                contentDescription = colorName,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (supportsDynamic) {
+                item {
+                    SettingToggleCard(
+                        title = "Use system Material You theme",
+                        subtitle = "Use the wallpaper-based dynamic colour scheme from your Android 12L+ system instead of a fixed colour",
+                        checked = customThemeDynamic,
+                        onCheckedChange = onCustomThemeDynamicChange
+                    )
+                }
+            }
+        }
     }
 }
 
