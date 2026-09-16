@@ -101,6 +101,7 @@ fun PostDetailsContent(
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
+    onLoadReplies: (Comment) -> Unit = {},
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
     errorMessage: String? = null,
@@ -276,6 +277,7 @@ fun PostDetailsContent(
                         openLinksInApp = openLinksInApp,
                         depth = 0,
                         onFocusComment = onFocusComment,
+                        onLoadReplies = onLoadReplies,
                         showImages = showImages,
                         onImageClick = { images, index -> onImageClick(images, index, null) }
                     )
@@ -400,6 +402,7 @@ fun PostDetailsSheet(
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
+    onLoadReplies: (Comment) -> Unit = {},
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
     errorMessage: String? = null,
@@ -456,6 +459,7 @@ fun PostDetailsSheet(
             focusedComment = focusedComment,
             onFocusComment = onFocusComment,
             onClearFocusComment = onClearFocusComment,
+            onLoadReplies = onLoadReplies,
             blockedUsernames = blockedUsernames,
             blockedQuoteHandling = blockedQuoteHandling,
             errorMessage = errorMessage,

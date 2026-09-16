@@ -633,6 +633,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             focusedComment = uiState.focusedComment,
                                             onFocusComment = viewModel::focusComment,
                                             onClearFocusComment = viewModel::clearFocusComment,
+                                            onLoadReplies = viewModel::loadRepliesForComment,
                                             blockedUsernames = uiState.blockedUsernames,
                                             blockedQuoteHandling = uiState.blockedQuoteHandling,
                                             errorMessage = uiState.errorMessage,
@@ -659,6 +660,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                              focusedComment = uiState.focusedComment,
                                              onFocusComment = viewModel::focusComment,
                                              onClearFocusComment = viewModel::clearFocusComment,
+                                             onLoadReplies = viewModel::loadWallRepliesForComment,
                                              errorMessage = uiState.errorMessage,
                                              onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                                         )
@@ -1103,6 +1105,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         focusedComment = uiState.focusedComment,
                         onFocusComment = viewModel::focusComment,
                          onClearFocusComment = viewModel::clearFocusComment,
+                         onLoadReplies = viewModel::loadRepliesForComment,
                          blockedUsernames = uiState.blockedUsernames,
                          blockedQuoteHandling = uiState.blockedQuoteHandling,
                          errorMessage = uiState.errorMessage,
@@ -1130,6 +1133,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                          focusedComment = uiState.focusedComment,
                          onFocusComment = viewModel::focusComment,
                          onClearFocusComment = viewModel::clearFocusComment,
+                         onLoadReplies = viewModel::loadWallRepliesForComment,
                          errorMessage = uiState.errorMessage,
                          onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                      )

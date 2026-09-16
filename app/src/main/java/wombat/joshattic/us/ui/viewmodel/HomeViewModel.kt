@@ -420,9 +420,7 @@ class HomeViewModel(
             _uiState.value = current.copy(feedLoading = true)
             runCatching {
                 val response = repository.loadFeed(current.session, nextPage)
-                val posts = if (current.session != null) augmentLoveStatuses(response.posts, current.session) else response.posts
-                val filtered = filterBlockedPosts(posts)
-                Pair(filtered, response.last)
+                Pair(filterBlockedPosts(response.posts), response.last)
             }.onSuccess { (newPosts, isLast) ->
                 _uiState.value = _uiState.value.copy(
                     feed = _uiState.value.feed + newPosts,
@@ -430,6 +428,9 @@ class HomeViewModel(
                     feedPage = nextPage,
                     feedLast = isLast
                 )
+                current.session?.let { session -> augmentLovesInBackground(newPosts) { augmented ->
+                    _uiState.value = _uiState.value.copy(feed = mergeLoveStatuses(_uiState.value.feed, augmented))
+                } }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     feedLoading = false,
@@ -493,8 +494,7 @@ class HomeViewModel(
             val timeframe = _uiState.value.exploreTrendingTimeframe
             runCatching {
                 val response = repository.loadTrendingPosts(currentSession, timeframe)
-                val posts = if (currentSession != null) augmentLoveStatuses(response.posts, currentSession) else response.posts
-                val filteredPosts = filterBlockedPosts(posts)
+                val filteredPosts = filterBlockedPosts(response.posts)
                 
                 val followedMap = if (currentSession != null) {
                     val uniquePosters = filteredPosts
@@ -532,6 +532,11 @@ class HomeViewModel(
                     exploreTrendingLoading = false,
                     followedUsernames = currentFollowed
                 )
+                if (session != null) augmentLovesInBackground(posts) { augmented ->
+                    _uiState.value = _uiState.value.copy(
+                        exploreTrendingPosts = mergeLoveStatuses(_uiState.value.exploreTrendingPosts, augmented)
+                    )
+                }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     exploreTrendingLoading = false,
@@ -578,8 +583,7 @@ class HomeViewModel(
                     val postsDeferred = async {
                         val response = repository.loadUserPosts(currentSession, normalizedUsername, 1)
                         val allPosts = (response.pinned ?: emptyList()) + response.posts
-                        val posts = if (currentSession != null) augmentLoveStatuses(allPosts, currentSession) else allPosts
-                        posts to response.last
+                        allPosts to response.last
                     }
                     val followDeferred = async {
                         currentSession
@@ -609,6 +613,11 @@ class HomeViewModel(
                     viewingProfileLast = followAndLast.second,
                     followedUsernames = currentFollowed
                 )
+                if (currentSession != null) augmentLovesInBackground(posts) { augmented ->
+                    _uiState.value = _uiState.value.copy(
+                        viewingProfilePosts = mergeLoveStatuses(_uiState.value.viewingProfilePosts, augmented)
+                    )
+                }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfileLoading = false,
@@ -640,9 +649,7 @@ class HomeViewModel(
             _uiState.value = current.copy(viewingProfileLoading = true)
             runCatching {
                 val response = repository.loadUserPosts(current.session, username, nextPage)
-                val posts = if (current.session != null) augmentLoveStatuses(response.posts, current.session) else response.posts
-                val filtered = posts // bypass filter
-                Pair(filtered, response.last)
+                Pair(response.posts, response.last)
             }.onSuccess { (newPosts, isLast) ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfilePosts = _uiState.value.viewingProfilePosts + newPosts,
@@ -650,6 +657,11 @@ class HomeViewModel(
                     viewingProfilePage = nextPage,
                     viewingProfileLast = isLast
                 )
+                current.session?.let { session -> augmentLovesInBackground(newPosts) { augmented ->
+                    _uiState.value = _uiState.value.copy(
+                        viewingProfilePosts = mergeLoveStatuses(_uiState.value.viewingProfilePosts, augmented)
+                    )
+                } }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     viewingProfileLoading = false,
@@ -956,15 +968,18 @@ class HomeViewModel(
             runCatching {
                 val response = repository.loadWallComments(session, username, page)
                 val topLevel = response.comments.map { it.copy(replies = it.replies ?: emptyList()) }
-                val fullComments = topLevel.map { loadRepliesRecursively(it, session) }
-                fullComments to response.last
-            }.onSuccess { (fullComments, isLast) ->
+                topLevel to response.last
+            }.onSuccess { (topLevel, isLast) ->
+                val filtered = filterBlockedComments(topLevel, _uiState.value.blockedUsernames)
                 _uiState.value = _uiState.value.copy(
-                    wallComments = if (page == 1) fullComments else _uiState.value.wallComments + fullComments,
+                    wallComments = if (page == 1) filtered else _uiState.value.wallComments + filtered,
                     wallCommentsLoading = false,
                     wallCommentsPage = page,
                     wallCommentsLast = isLast
                 )
+                fetchTopLevelRepliesInBackground(filtered) { id, transform ->
+                    updateWallComment(id, transform)
+                }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     wallCommentsLoading = false,
@@ -1285,6 +1300,8 @@ class HomeViewModel(
 
     fun togglePostLove(post: Post) {
         val session = _uiState.value.session ?: return
+        // Love status not augmented yet: ignore taps so we don't toggle blind
+        if (post.isLoving == null) return
         viewModelScope.launch {
             runCatching { repository.toggleLove(session, post.id) }
                 .onSuccess { response ->
@@ -1633,6 +1650,33 @@ class HomeViewModel(
         }.awaitAll()
     }
 
+    // Fetch love statuses after posts are already shown, then merge them back
+    // in without overwriting any love toggles the user made meanwhile.
+    private fun augmentLovesInBackground(posts: List<Post>, merge: (List<Post>) -> Unit) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            merge(augmentLoveStatuses(posts, session))
+        }
+    }
+
+    private fun mergeLoveStatuses(current: List<Post>, augmented: List<Post>): List<Post> {
+        if (current.isEmpty()) return augmented
+        val loveById = augmented.associate { it.id to it.isLoving }
+        val repostLoveById = augmented.mapNotNull { p -> p.repost?.let { p.id to it.isLoving } }.toMap()
+        return current.map { post ->
+            var p = post
+            loveById[p.id]?.let { loved ->
+                if (p.isLoving == null) p = p.copy(isLoving = loved)
+            }
+            if (p.repost != null) {
+                repostLoveById[p.id]?.let { loved ->
+                    if (p.repost?.isLoving == null) p = p.copy(repost = p.repost?.copy(isLoving = loved))
+                }
+            }
+            p
+        }
+    }
+
     private fun observeSessionAndRefresh() {
         viewModelScope.launch {
             repository.sessionFlow
@@ -1718,8 +1762,7 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(feedLoading = true, errorMessage = null)
         runCatching {
             val response = repository.loadFeed(session, 1)
-            val posts = if (session != null) augmentLoveStatuses(response.posts, session) else response.posts
-            filterBlockedPosts(posts) to response.last
+            filterBlockedPosts(response.posts) to response.last
         }.onSuccess { (posts, isLast) ->
             val oldFeedIds = _uiState.value.feed.map { it.id }.toSet()
             val newPosts = if (oldFeedIds.isNotEmpty()) {
@@ -1736,6 +1779,9 @@ class HomeViewModel(
                 feedPage = 1,
                 newPostsUsernames = newPostsUsernames
             )
+            if (session != null) augmentLovesInBackground(posts) { augmented ->
+                _uiState.value = _uiState.value.copy(feed = mergeLoveStatuses(_uiState.value.feed, augmented))
+            }
         }.onFailure { throwable ->
             _uiState.value = _uiState.value.copy(
                 feedLoading = false,
@@ -1848,8 +1894,7 @@ class HomeViewModel(
                 runCatching {
                     val response = repository.loadUserPosts(session, session.username, 1)
                     val allPosts = (response.pinned ?: emptyList()) + response.posts
-                    val posts = filterBlockedPosts(augmentLoveStatuses(allPosts, session))
-                    posts to response.last
+                    filterBlockedPosts(allPosts) to response.last
                 }
             }
 
@@ -1862,6 +1907,11 @@ class HomeViewModel(
                     accountLast = isLast,
                     accountPage = 1
                 )
+                if (session != null) augmentLovesInBackground(posts) { augmented ->
+                    _uiState.value = _uiState.value.copy(
+                        accountPosts = mergeLoveStatuses(_uiState.value.accountPosts, augmented)
+                    )
+                }
             }
         }
         _uiState.value = _uiState.value.copy(accountLoading = false)
@@ -1876,9 +1926,7 @@ class HomeViewModel(
             _uiState.value = current.copy(accountLoading = true)
             runCatching {
                 val response = repository.loadUserPosts(session, session.username, nextPage)
-                val posts = augmentLoveStatuses(response.posts, session)
-                val filtered = filterBlockedPosts(posts)
-                Pair(filtered, response.last)
+                Pair(filterBlockedPosts(response.posts), response.last)
             }.onSuccess { (newPosts, isLast) ->
                 _uiState.value = _uiState.value.copy(
                     accountPosts = _uiState.value.accountPosts + newPosts,
@@ -1886,6 +1934,11 @@ class HomeViewModel(
                     accountPage = nextPage,
                     accountLast = isLast
                 )
+                augmentLovesInBackground(newPosts) { augmented ->
+                    _uiState.value = _uiState.value.copy(
+                        accountPosts = mergeLoveStatuses(_uiState.value.accountPosts, augmented)
+                    )
+                }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     accountLoading = false,
@@ -1920,13 +1973,17 @@ class HomeViewModel(
         runCatching {
             val topLevel = repository.loadComments(session, postId).comments
                 .map { it.copy(replies = it.replies ?: emptyList()) }
-            val fullComments = topLevel.map { loadRepliesRecursively(it, session) }
-            filterBlockedComments(fullComments, _uiState.value.blockedUsernames)
-        }.onSuccess { fullComments ->
+            filterBlockedComments(topLevel, _uiState.value.blockedUsernames)
+        }.onSuccess { topLevel ->
             _uiState.value = _uiState.value.copy(
-                comments = fullComments,
+                comments = topLevel,
                 commentsLoading = false
             )
+            // Show base comments immediately; fetch each thread's replies in the
+            // background so the list paints without waiting on them.
+            fetchTopLevelRepliesInBackground(topLevel) { id, transform ->
+                updatePostComment(id, transform)
+            }
         }.onFailure { throwable ->
             _uiState.value = _uiState.value.copy(
                 commentsLoading = false,
@@ -1935,7 +1992,77 @@ class HomeViewModel(
         }
     }
 
-    private suspend fun loadRepliesRecursively(comment: Comment, session: AuthSession?): Comment {
+    // Load the first level of replies for every thread that has none yet.
+    // Deeper levels stay unloaded until the user taps "See replies".
+    private fun fetchTopLevelRepliesInBackground(
+        comments: List<Comment>,
+        update: (String, (Comment) -> Comment) -> Unit
+    ) {
+        val session = _uiState.value.session
+        comments
+            .filter { it.hasReplies && (it.replies ?: emptyList()).isEmpty() }
+            .forEach { comment ->
+                update(comment.id) { it.copy(repliesLoading = true) }
+                viewModelScope.launch(Dispatchers.IO) {
+                    val loaded = loadRepliesOneLevel(comment, session)
+                    update(comment.id) {
+                        it.copy(
+                            replies = filterBlockedComments(loaded.replies, _uiState.value.blockedUsernames),
+                            repliesLoading = false
+                        )
+                    }
+                }
+            }
+    }
+
+    // User tapped "See replies": fetch the next level of replies for one comment.
+    fun loadRepliesForComment(comment: Comment) {
+        val session = _uiState.value.session
+        if (comment.repliesLoading || (comment.replies ?: emptyList()).isNotEmpty()) return
+        updatePostComment(comment.id) { it.copy(repliesLoading = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val loaded = loadRepliesOneLevel(comment, session)
+            updatePostComment(comment.id) {
+                it.copy(
+                    replies = filterBlockedComments(loaded.replies, _uiState.value.blockedUsernames),
+                    repliesLoading = false
+                )
+            }
+        }
+    }
+
+    fun loadWallRepliesForComment(comment: Comment) {
+        val session = _uiState.value.session
+        if (comment.repliesLoading || (comment.replies ?: emptyList()).isNotEmpty()) return
+        updateWallComment(comment.id) { it.copy(repliesLoading = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val loaded = loadRepliesOneLevel(comment, session)
+            updateWallComment(comment.id) {
+                it.copy(
+                    replies = filterBlockedComments(loaded.replies, _uiState.value.blockedUsernames),
+                    repliesLoading = false
+                )
+            }
+        }
+    }
+
+    private fun updatePostComment(commentId: String, transform: (Comment) -> Comment) {
+        _uiState.value = _uiState.value.copy(
+            comments = _uiState.value.comments.map {
+                if (it.id == commentId) transform(it) else it
+            }
+        )
+    }
+
+    private fun updateWallComment(commentId: String, transform: (Comment) -> Comment) {
+        _uiState.value = _uiState.value.copy(
+            wallComments = _uiState.value.wallComments.map {
+                if (it.id == commentId) transform(it) else it
+            }
+        )
+    }
+
+    private suspend fun loadRepliesOneLevel(comment: Comment, session: AuthSession?): Comment {
         val safeReplies = comment.replies ?: emptyList()
         if (!comment.hasReplies || safeReplies.isNotEmpty()) {
             return comment.copy(replies = safeReplies)
@@ -1948,8 +2075,7 @@ class HomeViewModel(
             if (resp.last) break
             page++
         }
-        val loaded = allReplies.map { loadRepliesRecursively(it, session) }
-        return comment.copy(replies = loaded)
+        return comment.copy(replies = allReplies)
     }
 
     private fun refreshForSelectedTab(tab: BottomTab) {

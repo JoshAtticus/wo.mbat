@@ -102,6 +102,8 @@ data class Comment(
     val hasReplies: Boolean,
     val top: String? = null,
     val replies: List<Comment> = emptyList(),
+    // In-memory flags: replies fetched lazily on demand; never persisted.
+    val repliesLoading: Boolean = false,
     // In-memory flag: the poster is blocked. Real content is kept so an
     // explicit "Show" can reveal it; never persisted.
     val blocked: Boolean = false

@@ -1041,6 +1041,7 @@ fun PostCard(
                     label = "loves",
                     icon = if (post.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                     isActive = post.isLoving == true,
+                    enabled = post.isLoving != null,
                     onClick = onLoveClick?.let { { onLoveClick(post) } }
                 )
                 PostMetric(post.comments, "comments", Icons.Filled.Chat)
@@ -1113,6 +1114,7 @@ fun CommentCard(
     openLinksInApp: Boolean = true,
     depth: Int = 0,
     onFocusComment: ((Comment) -> Unit)? = null,
+    onLoadReplies: ((Comment) -> Unit)? = null,
     showImages: Boolean = true,
     onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
 ) {
@@ -1138,6 +1140,7 @@ fun CommentCard(
                     openLinksInApp = openLinksInApp,
                     depth = depth,
                     onFocusComment = onFocusComment,
+                    onLoadReplies = onLoadReplies,
                     showImages = showImages,
                     onImageClick = onImageClick
                 )
@@ -1154,6 +1157,7 @@ fun CommentCard(
             openLinksInApp = openLinksInApp,
             depth = depth,
             onFocusComment = onFocusComment,
+            onLoadReplies = onLoadReplies,
             showImages = showImages,
             onImageClick = onImageClick
         )
@@ -1171,6 +1175,7 @@ fun CommentThreadContent(
     openLinksInApp: Boolean,
     depth: Int,
     onFocusComment: ((Comment) -> Unit)?,
+    onLoadReplies: ((Comment) -> Unit)? = null,
     showImages: Boolean = true,
     onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
 ) {
@@ -1315,40 +1320,59 @@ fun CommentThreadContent(
             
             // Nested replies list
             val safeReplies = comment.replies ?: emptyList()
-            if (safeReplies.isNotEmpty()) {
-                val maxDepth = 2 // Cap depth at 2 inline levels
-                if (depth >= maxDepth) {
+            when {
+                // Replies not fetched yet: offer to load them on demand
+                safeReplies.isEmpty() && comment.hasReplies && onLoadReplies != null -> {
                     androidx.compose.material3.TextButton(
-                        onClick = { onFocusComment?.invoke(comment) },
+                        onClick = { onLoadReplies(comment) },
+                        enabled = !comment.repliesLoading,
                         contentPadding = PaddingValues(0.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
                         Text(
-                            text = "See replies (${safeReplies.size})",
+                            text = if (comment.repliesLoading) "Loading replies..." else "See replies",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                } else {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        safeReplies.forEach { reply ->
-                            CommentCard(
-                                comment = reply,
-                                isBanned = isBanned,
-                                onReply = onReply,
-                                onProfileClick = onProfileClick,
-                                onMentionClick = onMentionClick,
-                                onPostClick = onPostClick,
-                                openLinksInApp = openLinksInApp,
-                                depth = depth + 1,
-                                onFocusComment = onFocusComment,
-                                showImages = showImages,
-                                onImageClick = onImageClick
+                }
+                safeReplies.isNotEmpty() -> {
+                    val maxDepth = 2 // Cap depth at 2 inline levels
+                    if (depth >= maxDepth) {
+                        androidx.compose.material3.TextButton(
+                            onClick = { onFocusComment?.invoke(comment) },
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text(
+                                text = "See replies (${safeReplies.size})",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
+                        }
+                    } else {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            safeReplies.forEach { reply ->
+                                CommentCard(
+                                    comment = reply,
+                                    isBanned = isBanned,
+                                    onReply = onReply,
+                                    onProfileClick = onProfileClick,
+                                    onMentionClick = onMentionClick,
+                                    onPostClick = onPostClick,
+                                    openLinksInApp = openLinksInApp,
+                                    depth = depth + 1,
+                                    onFocusComment = onFocusComment,
+                                    onLoadReplies = onLoadReplies,
+                                    showImages = showImages,
+                                    onImageClick = onImageClick
+                                )
+                            }
                         }
                     }
                 }
@@ -1761,13 +1785,16 @@ fun PostMetric(
     label: String,
     icon: ImageVector,
     isActive: Boolean = false,
+    enabled: Boolean = true,
     onClick: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     val isLoveMetric = label == "loves"
     val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
 
-    val containerColor = if (isActive) {
+    val containerColor = if (!enabled) {
+        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+    } else if (isActive) {
         if (isLoveMetric) {
             if (isDarkTheme) Color(0xFF5C1D24) else Color(0xFFFEE2E2)
         } else {
@@ -1777,7 +1804,9 @@ fun PostMetric(
         MaterialTheme.colorScheme.surfaceContainerHigh
     }
 
-    val contentColor = if (isActive) {
+    val contentColor = if (!enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    } else if (isActive) {
         if (isLoveMetric) {
             if (isDarkTheme) Color(0xFFFF8A80) else Color(0xFFEF4444)
         } else {
@@ -1808,7 +1837,7 @@ fun PostMetric(
         shape = CircleShape,
         color = containerColor,
         contentColor = contentColor,
-        modifier = if (onClick != null) Modifier.clickable {
+        modifier = if (onClick != null) Modifier.clickable(enabled = enabled) {
             if (!isActive) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 animMode = (0..2).random()
@@ -2586,8 +2615,8 @@ fun FullScreenImageViewer(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = 0.18f))
-                                            .clickable {
+                                            .background(Color.White.copy(alpha = if (p.isLoving == null) 0.08f else 0.18f))
+                                            .clickable(enabled = p.isLoving != null) {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 onLoveClick?.invoke(p)
                                             }
@@ -2596,7 +2625,11 @@ fun FullScreenImageViewer(
                                         Icon(
                                             imageVector = if (p.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                             contentDescription = "Love",
-                                            tint = if (p.isLoving == true) Color(0xFFFF4081) else Color.White,
+                                            tint = when {
+                                                p.isLoving == true -> Color(0xFFFF4081)
+                                                p.isLoving == null -> Color.White.copy(alpha = 0.5f)
+                                                else -> Color.White
+                                            },
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Text(

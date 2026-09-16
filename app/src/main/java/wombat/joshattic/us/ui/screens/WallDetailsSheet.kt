@@ -86,6 +86,7 @@ fun WallDetailsContent(
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
+    onLoadReplies: (Comment) -> Unit = {},
     errorMessage: String? = null,
     modifier: Modifier = Modifier,
     onUploadImage: (suspend (android.net.Uri) -> String)? = null
@@ -223,7 +224,8 @@ fun WallDetailsContent(
                     onPostClick = onPostClickById,
                     openLinksInApp = openLinksInApp,
                     depth = 0,
-                    onFocusComment = onFocusComment
+                    onFocusComment = onFocusComment,
+                    onLoadReplies = onLoadReplies
                 )
             }
 
@@ -324,6 +326,7 @@ fun WallDetailsSheet(
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
+    onLoadReplies: (Comment) -> Unit = {},
     errorMessage: String? = null,
     onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
@@ -360,6 +363,7 @@ fun WallDetailsSheet(
             focusedComment = focusedComment,
             onFocusComment = onFocusComment,
             onClearFocusComment = onClearFocusComment,
+            onLoadReplies = onLoadReplies,
             errorMessage = errorMessage,
             onUploadImage = onUploadImage
         )
