@@ -2,6 +2,11 @@
 
 package wombat.joshattic.us.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,6 +68,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import kotlin.random.Random
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -78,6 +84,26 @@ import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.ui.state.LoginStep
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
+
+// Pick a friendly sign-in header; different pools for first vs. additional accounts.
+internal fun randomSignInHeader(hasSavedAccounts: Boolean): String {
+    val firstAccount = listOf(
+        "Hey there!",
+        "Welcome!",
+        "First time?",
+        "Let's get started!",
+        "Ready to start?"
+    )
+    val anotherAccount = listOf(
+        "Two is better than one",
+        "Another one?",
+        "Add as many as you want",
+        "Yippee, another one!",
+        "Another account? Exciting!"
+    )
+    val pool = if (hasSavedAccounts) anotherAccount else firstAccount
+    return pool[Random.nextInt(pool.size)]
+}
 
 @Composable
 fun AccountTab(
@@ -444,7 +470,10 @@ fun AccountTab(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Sign in", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = remember { randomSignInHeader(savedAccounts.isNotEmpty()) },
+                                style = MaterialTheme.typography.headlineMedium
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Use your wasteof.money account to post, comment, and see notifications.",
@@ -473,19 +502,46 @@ fun AccountTab(
                                     label = { Text("Username") },
                                     leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) }
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                OutlinedTextField(
-                                    value = loginPassword,
-                                    onValueChange = onPasswordChange,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    label = { Text("Password") },
-                                    visualTransformation = PasswordVisualTransformation()
-                                )
+                                AnimatedVisibility(
+                                    visible = loginStep == LoginStep.PASSWORD,
+                                    enter = fadeIn() + expandVertically(),
+                                    exit = fadeOut() + shrinkVertically()
+                                ) {
+                                    Column {
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        OutlinedTextField(
+                                            value = loginPassword,
+                                            onValueChange = onPasswordChange,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            label = { Text("Password") },
+                                            visualTransformation = PasswordVisualTransformation(),
+                                            isError = !loginError.isNullOrBlank(),
+                                            supportingText = {
+                                                AnimatedVisibility(
+                                                    visible = !loginError.isNullOrBlank(),
+                                                    enter = fadeIn() + expandVertically(),
+                                                    exit = fadeOut() + shrinkVertically()
+                                                ) {
+                                                    Text(loginError.orEmpty(), color = MaterialTheme.colorScheme.error)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
                             }
-                            if (!loginError.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(loginError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                            // Username-step errors have no password field to attach to,
+                            // so they render inline below the username box instead.
+                            AnimatedVisibility(
+                                visible = loginStep == LoginStep.USERNAME && !loginError.isNullOrBlank(),
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                Text(
+                                    loginError.orEmpty(),
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
