@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,6 +57,8 @@ fun NotificationsTab(
     onMarkAllRead: () -> Unit,
     onNotificationClick: (Notification) -> Unit,
     onLoadNextPage: () -> Unit = {},
+    isBanned: Boolean = false,
+    banReason: String? = null,
     openLinksInApp: Boolean = true,
     onMentionClick: ((String) -> Unit)? = null,
     onPostClickById: ((String) -> Unit)? = null
@@ -97,6 +100,63 @@ fun NotificationsTab(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (isBanned) {
+                item(key = "banned_notice") {
+                    // Styled like an unread notification so the ban reason reads
+                    // as a system message rather than an empty state.
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(
+                                    imageVector = Icons.Filled.Block,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = "Can't show notifications",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Text(
+                                text = "Your account is banned, so notifications can't be loaded :(",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            banReason?.let { reason ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            text = "Admin notification",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = reason,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             if (session == null || unreadNotifications.isNotEmpty()) {
                 item {

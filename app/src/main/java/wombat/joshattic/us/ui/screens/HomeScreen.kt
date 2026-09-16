@@ -84,6 +84,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material.icons.filled.Info
 
 @Composable
@@ -161,7 +162,45 @@ fun HomeScreen(viewModel: HomeViewModel) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissBannedPopup() },
             title = { Text("Banned :(") },
-            text = { Text("\"${uiState.banReason ?: "unknown reasons"}\". You can still browse your feed as read only, but you won't be able to make new posts or interact with anyone") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column {
+                        Text(
+                            text = "Reason",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = uiState.banReason ?: "Unknown reasons",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    }
+                    HorizontalDivider()
+                    Column {
+                        Text(
+                            text = "You can still",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text("• Browse your feed", style = MaterialTheme.typography.bodyMedium)
+                        Text("• View posts, profiles and walls", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Column {
+                        Text(
+                            text = "You can't",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text("• Make new posts or comments", style = MaterialTheme.typography.bodyMedium)
+                        Text("• Like, repost or follow anyone", style = MaterialTheme.typography.bodyMedium)
+                        Text("• See your notifications", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissBannedPopup() }) {
                     Text("OK")
@@ -225,6 +264,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalIsBanned provides uiState.isBanned) {
         Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = MaterialTheme.colorScheme.background,
@@ -490,6 +530,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 loading = uiState.notificationsLoading,
                                                 loadingMore = uiState.notificationsLoadingMore,
                                                 isLastPage = uiState.unreadNotificationsLast && uiState.readNotificationsLast,
+                                                isBanned = uiState.isBanned,
+                                                banReason = uiState.banReason,
                                                 onRefresh = viewModel::refreshNotifications,
                                                 onMarkAllRead = viewModel::markAllNotificationsRead,
                                                 onNotificationClick = viewModel::handleNotificationClick,
@@ -886,6 +928,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         loading = uiState.notificationsLoading,
                                         loadingMore = uiState.notificationsLoadingMore,
                                         isLastPage = uiState.unreadNotificationsLast && uiState.readNotificationsLast,
+                                        isBanned = uiState.isBanned,
+                                        banReason = uiState.banReason,
                                         onRefresh = viewModel::refreshNotifications,
                                         onMarkAllRead = viewModel::markAllNotificationsRead,
                                         onNotificationClick = viewModel::handleNotificationClick,
@@ -1285,6 +1329,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             frogMessage = uiState.exploreFrogMessage
         )
     }
+        }
 }
 }
 

@@ -56,7 +56,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -79,6 +83,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
@@ -693,6 +698,9 @@ fun repostHeaderText(reposters: List<Post>): String {
     }
 }
 
+/** True while the signed-in user is banned; disables interaction affordances on posts. */
+val LocalIsBanned = staticCompositionLocalOf { false }
+
 @Composable
 fun PostCard(
     post: Post,
@@ -747,6 +755,7 @@ fun PostCard(
     var menuExpanded by remember { mutableStateOf(false) }
 
     val isPureRepost = remember(post) { isPureRepost(post) }
+    val isBanned = LocalIsBanned.current
 
     if (isPureRepost) {
         Column(modifier = modifier.fillMaxWidth()) {
@@ -1041,7 +1050,9 @@ fun PostCard(
                     label = "loves",
                     icon = if (post.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                     isActive = post.isLoving == true,
-                    enabled = post.isLoving != null,
+                    // Banned: hard-greyed; otherwise pulsing until love status arrives
+                    enabled = post.isLoving != null && !isBanned,
+                    pulse = post.isLoving == null && !isBanned,
                     onClick = onLoveClick?.let { { onLoveClick(post) } }
                 )
                 PostMetric(post.comments, "comments", Icons.Filled.Chat)
@@ -1786,13 +1797,15 @@ fun PostMetric(
     icon: ImageVector,
     isActive: Boolean = false,
     enabled: Boolean = true,
+    // Pulsing icon while state is still loading; distinct from a hard disable.
+    pulse: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     val isLoveMetric = label == "loves"
     val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
 
-    val containerColor = if (!enabled) {
+    val containerColor = if (!enabled && !pulse) {
         MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
     } else if (isActive) {
         if (isLoveMetric) {
@@ -1804,7 +1817,7 @@ fun PostMetric(
         MaterialTheme.colorScheme.surfaceContainerHigh
     }
 
-    val contentColor = if (!enabled) {
+    val contentColor = if (!enabled && !pulse) {
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
     } else if (isActive) {
         if (isLoveMetric) {
@@ -1832,6 +1845,18 @@ fun PostMetric(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "MetricIconOffsetY"
     )
+    val pulseAlpha = if (pulse) {
+        val transition = rememberInfiniteTransition(label = "MetricPulse")
+        transition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(700),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "MetricPulseAlpha"
+        ).value
+    } else 1f
 
     Surface(
         shape = CircleShape,
@@ -1848,7 +1873,9 @@ fun PostMetric(
         } else Modifier
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .graphicsLayer { alpha = pulseAlpha },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
