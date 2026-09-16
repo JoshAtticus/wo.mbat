@@ -191,21 +191,21 @@ fun EditProfileContent(
                             Button(
                                 onClick = { pfpLauncher.launch("image/*") },
                                 colors = ButtonDefaults.buttonColors(containerColor = accent),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.size(40.dp)
                             ) {
-                                Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Change")
+                                Icon(Icons.Filled.PhotoCamera, contentDescription = "Change profile picture", modifier = Modifier.size(18.dp))
                             }
                             OutlinedButton(
                                 onClick = onDeletePfp,
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
                                 border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.size(40.dp)
                             ) {
-                                Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Remove")
+                                Icon(Icons.Filled.Delete, contentDescription = "Remove profile picture", modifier = Modifier.size(18.dp))
                             }
                         }
                     }
