@@ -185,11 +185,9 @@ class HomeViewModel(
         val username = snapshot.loginUsername.trim().lowercase()
 
         if (snapshot.loginStep == LoginStep.USERNAME) {
-            // Server-side usernames must match /^[a-z0-9_\-]{4,20}$/ — fail fast
-            // without a network round-trip for anything the API can't accept.
-            if (!Regex("^[a-z0-9_\\-]{4,20}$").matches(username)) {
+            if (!Regex("^[a-z0-9_.\\-]{4,20}$").matches(username)) {
                 _uiState.value = snapshot.copy(
-                    loginError = "Usernames are 4–20 characters: a–z, 0–9, _ or -"
+                    loginError = "Usernames are 4–20 characters: a–z, 0–9, _ . or -"
                 )
                 return
             }
