@@ -56,11 +56,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -210,6 +207,7 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
+import wombat.joshattic.us.data.LoveCache
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Post
@@ -1083,8 +1081,11 @@ fun PostCard(
                 PostMetric(
                     value = post.loves,
                     label = "loves",
-                    icon = if (post.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    isActive = post.isLoving == true,
+                    // Cached-loved: show the liked state immediately while status re-verifies
+                    icon = if (post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true)) {
+                        Icons.Filled.Favorite
+                    } else Icons.Filled.FavoriteBorder,
+                    isActive = post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true),
                     // Banned: hard-greyed; otherwise pulsing until love status arrives
                     enabled = post.isLoving != null && !isBanned,
                     pulse = post.isLoving == null && !isBanned,
@@ -1880,18 +1881,6 @@ fun PostMetric(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "MetricIconOffsetY"
     )
-    val pulseAlpha = if (pulse) {
-        val transition = rememberInfiniteTransition(label = "MetricPulse")
-        transition.animateFloat(
-            initialValue = 0.35f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(700),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "MetricPulseAlpha"
-        ).value
-    } else 1f
 
     Surface(
         shape = CircleShape,
@@ -1908,25 +1897,31 @@ fun PostMetric(
         } else Modifier
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .graphicsLayer { alpha = pulseAlpha },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier
-                    .size(16.dp)
-                    .graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
-                        rotationZ = iconRotation
-                        translationY = iconOffsetY
-                    },
-                tint = contentColor
-            )
+            if (pulse) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = contentColor
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                            rotationZ = iconRotation
+                            translationY = iconOffsetY
+                        },
+                    tint = contentColor
+                )
+            }
             Text(
                 text = value.toString(),
                 style = MaterialTheme.typography.labelLarge,
@@ -2671,13 +2666,14 @@ fun FullScreenImageViewer(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(top = 4.dp)
                                 ) {
-                                    // Like Button
+                                    // Like Button (cached-loved still renders as liked while verifying)
+                                    val pCachedLoved = p.isLoving == null && LoveCache.get(p.id) == true
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = if (p.isLoving == null) 0.08f else 0.18f))
+                                            .background(Color.White.copy(alpha = if (p.isLoving == null && !pCachedLoved) 0.08f else 0.18f))
                                             .clickable(enabled = p.isLoving != null) {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 onLoveClick?.invoke(p)
@@ -2685,10 +2681,10 @@ fun FullScreenImageViewer(
                                             .padding(horizontal = 14.dp, vertical = 8.dp)
                                     ) {
                                         Icon(
-                                            imageVector = if (p.isLoving == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                            imageVector = if (p.isLoving == true || pCachedLoved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                             contentDescription = "Love",
                                             tint = when {
-                                                p.isLoving == true -> Color(0xFFFF4081)
+                                                p.isLoving == true || pCachedLoved -> Color(0xFFFF4081)
                                                 p.isLoving == null -> Color.White.copy(alpha = 0.5f)
                                                 else -> Color.White
                                             },

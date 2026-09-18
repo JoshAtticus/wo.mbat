@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.firstOrNull
+import wombat.joshattic.us.data.LoveCache
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
@@ -1678,6 +1679,8 @@ class HomeViewModel(
     }
 
     private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
+        // Cache the authoritative result so future loads render liked instantly
+        LoveCache.put(postId, newIsLoving)
         val current = _uiState.value
         fun transform(p: Post): Post {
             var updated = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
@@ -1730,34 +1733,46 @@ class HomeViewModel(
         }
     }
 
-    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> = coroutineScope {
-        posts.map { post ->
-            async(Dispatchers.IO) {
-                val loved = runCatching {
-                    repository.getPostLoveStatus(session, post.id, session.username)
-                }.getOrDefault(post.isLoving ?: false)
-                
-                val repostLoved = if (post.repost != null) {
-                    runCatching {
-                        repository.getPostLoveStatus(session, post.repost.id, session.username)
-                    }.getOrDefault(post.repost.isLoving ?: false)
-                } else null
-                
-                var p = post.copy(isLoving = loved)
-                if (repostLoved != null) {
-                    p = p.copy(repost = p.repost?.copy(isLoving = repostLoved))
-                }
-                p
-            }
-        }.awaitAll()
-    }
+    private suspend fun augmentLoveStatus(post: Post, session: AuthSession): Post =
+        withContext(Dispatchers.IO) {
+            val loved = runCatching {
+                repository.getPostLoveStatus(session, post.id, session.username)
+            }.getOrDefault(post.isLoving ?: false)
 
-    // Fetch love statuses after posts are already shown, then merge them back
-    // in without overwriting any love toggles the user made meanwhile.
+            val repostLoved = if (post.repost != null) {
+                runCatching {
+                    repository.getPostLoveStatus(session, post.repost.id, session.username)
+                }.getOrDefault(post.repost.isLoving ?: false)
+            } else null
+
+            // Remember confirmed states so a reload can show liked immediately
+            LoveCache.put(post.id, loved)
+            post.repost?.let { LoveCache.put(it.id, repostLoved ?: false) }
+
+            var p = post.copy(isLoving = loved)
+            if (repostLoved != null) {
+                p = p.copy(repost = p.repost?.copy(isLoving = repostLoved))
+            }
+            p
+        }
+
+    private suspend fun augmentLoveStatuses(posts: List<Post>, session: AuthSession): List<Post> =
+        coroutineScope {
+            posts.map { post -> async { augmentLoveStatus(post, session) } }.awaitAll()
+        }
+
+    // Fetch love statuses after posts are already shown, merging each one back
+    // the moment its request returns instead of waiting for the whole batch.
     private fun augmentLovesInBackground(posts: List<Post>, merge: (List<Post>) -> Unit) {
         val session = _uiState.value.session ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            merge(augmentLoveStatuses(posts, session))
+        viewModelScope.launch {
+            coroutineScope {
+                posts.forEach { post ->
+                    launch {
+                        merge(listOf(augmentLoveStatus(post, session)))
+                    }
+                }
+            }
         }
     }
 
