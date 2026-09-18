@@ -13,9 +13,16 @@ data class User(
     val stats: UserStats?,
     val online: Boolean,
     val permissions: Permissions? = null,
-    val links: List<String> = emptyList(),
+    // API sends links as objects ({label, url}) or sometimes raw strings; keep both parseable
+    val links: List<UserLink?> = emptyList(),
     val history: UserHistory? = null,
     val beta: Boolean = false
+)
+
+@Immutable
+data class UserLink(
+    val label: String? = null,
+    val url: String = ""
 )
 
 @Immutable
