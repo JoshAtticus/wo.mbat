@@ -151,7 +151,8 @@ fun ProfileScreen(
     // Always theme this screen with the signed-in account colour, even when a custom theme is active
     WombatTheme(userColor = profile?.color) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+    // Paint the themed background so the parent (custom-theme) scaffold colour doesn't show through
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 12.dp)) {
 
         if (isBlocked) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

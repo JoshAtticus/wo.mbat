@@ -160,7 +160,8 @@ fun AccountTab(
     WombatTheme(userColor = profile?.color) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
-        modifier = Modifier.fillMaxSize(),
+        // Paint the themed background so the parent (custom-theme) scaffold colour doesn't show through
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         state = refreshState,
         isRefreshing = loading,
         onRefresh = onRefresh
