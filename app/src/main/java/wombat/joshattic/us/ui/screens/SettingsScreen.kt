@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
@@ -60,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,7 +73,14 @@ import androidx.compose.ui.unit.dp
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.ui.state.HomeUiState
 import wombat.joshattic.us.ui.state.SettingsCategory
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.Process
+import android.provider.Settings
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import wombat.joshattic.us.ui.theme.WombatThemeColorNames
 import wombat.joshattic.us.ui.theme.getWombatColorPalette
 
@@ -800,6 +809,7 @@ private fun LinkSettings(
                 }
             }
         }
+        LinkApprovalCard()
         Text("Prioritise in post cards", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 4.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -838,6 +848,77 @@ private fun LinkSettings(
                         Text("Show large Open Graph previews first; images become thumbnails", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Shows whether Android currently lets wo.mbat open wasteof.money links, and a button
+ * that opens the system "Open by default" page where the user can approve them.
+ * State is re-checked on every resume so returning from system settings updates the card.
+ */
+@Composable
+private fun LinkApprovalCard() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    // null = unknown (pre-Android 12 has no per-domain user approval API)
+    var approved by remember { mutableStateOf<Boolean?>(null) }
+
+    fun refreshState() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            approved = try {
+                val manager = context.getSystemService(android.content.pm.verify.domain.DomainVerificationManager::class.java)
+                val state = manager?.getDomainVerificationUserState(context.packageName)
+                val hostState = state?.hostToStateMap?.get("wasteof.money")
+                // DOMAIN_STATE_VERIFIED (2) or DOMAIN_STATE_SELECTED (1) both mean links open in-app
+                hostState == 1 || hostState == 2
+            } catch (_: Exception) {
+                null
+            }
+        } else {
+            approved = null
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshState()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("wasteof.money links", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = when (approved) {
+                    true -> "Android is set to open wasteof.money links in wo.mbat."
+                    false -> "Android is currently opening wasteof.money links in your browser. Tap below to allow wo.mbat to open them."
+                    null -> "If wasteof.money links don't open in wo.mbat, approve them in Android's app settings."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Button(onClick = {
+                // Android 12+ has a dedicated per-app page; older versions only have app details
+                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, Uri.parse("package:${context.packageName}"))
+                } else {
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                }
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            }) {
+                Text(if (approved == false) "Allow in system settings" else "Open system settings")
             }
         }
     }
