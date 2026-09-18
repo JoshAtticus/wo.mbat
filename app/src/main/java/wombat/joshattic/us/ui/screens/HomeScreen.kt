@@ -66,6 +66,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.state.SettingsCategory
+import wombat.joshattic.us.ui.theme.WombatTheme
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.Row
@@ -278,6 +279,22 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 topBar = {
                     if (!isTablet) {
                         val viewingUser = uiState.viewingProfileUsername
+                        // Match the per-user theming used by ProfileScreen/AccountTab so the
+                        // top bar doesn't sit on an unthemed colour while the page below it is themed
+                        val topBarUserColor = when {
+                            viewingUser != null -> uiState.viewingProfile?.color
+                            uiState.selectedTab == BottomTab.Account -> uiState.accountProfile?.color
+                            else -> null
+                        }
+                        // Only re-theme when a per-user color exists; passing null to WombatTheme
+                        // would discard the outer custom theme and fall back to the default palette
+                        val themedTopBar: @Composable (content: @Composable () -> Unit) -> Unit =
+                            if (topBarUserColor != null) {
+                                { content -> WombatTheme(userColor = topBarUserColor, content = content) }
+                            } else {
+                                { content -> content() }
+                            }
+                        themedTopBar {
                         CenterAlignedTopAppBar(
                             navigationIcon = {
                                 if (viewingUser != null) {
@@ -342,6 +359,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 titleContentColor = MaterialTheme.colorScheme.onBackground
                             )
                         )
+                        }
                     }
                 },
                 floatingActionButton = {},
