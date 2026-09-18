@@ -85,6 +85,9 @@ fun ExploreTab(
     onPostClickById: ((String) -> Unit)? = null,
     followedUsernames: Set<String> = emptySet(),
     followLoadingUsernames: Set<String> = emptySet(),
+    // True while the background follow-status lookup is still running; follow
+    // buttons spin instead of showing a possibly-wrong state.
+    followStatusLoading: Boolean = false,
     onFollowClick: ((String) -> Unit)? = null,
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
@@ -205,7 +208,8 @@ fun ExploreTab(
                             contentType = { "post" }
                         ) { post ->
                             val isFollowing = followedUsernames.contains(post.poster.name.lowercase())
-                            val followLoading = followLoadingUsernames.contains(post.poster.name.lowercase())
+                            val followLoading = followLoadingUsernames.contains(post.poster.name.lowercase()) ||
+                                (followStatusLoading && !isFollowing)
                             Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                                 PostCard(
                                     post = post,
@@ -317,7 +321,8 @@ fun ExploreTab(
                             contentType = { "post" }
                         ) { post ->
                             val isFollowing = followedUsernames.contains(post.poster.name.lowercase())
-                            val followLoading = followLoadingUsernames.contains(post.poster.name.lowercase())
+                            val followLoading = followLoadingUsernames.contains(post.poster.name.lowercase()) ||
+                                (followStatusLoading && !isFollowing)
                             PostCard(
                                 post = post,
                                 onClick = { onOpenPost(post) },

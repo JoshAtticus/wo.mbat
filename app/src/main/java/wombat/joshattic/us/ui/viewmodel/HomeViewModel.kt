@@ -564,46 +564,18 @@ class HomeViewModel(
             val currentSession = _uiState.value.session
             val timeframe = _uiState.value.exploreTrendingTimeframe
             runCatching {
-                val response = repository.loadTrendingPosts(currentSession, timeframe)
+                repository.loadTrendingPosts(currentSession, timeframe)
+            }.onSuccess { response ->
                 val filteredPosts = filterBlockedPosts(response.posts)
-                
-                val followedMap = if (currentSession != null) {
-                    val uniquePosters = filteredPosts
-                        .map { it.poster.name }
-                        .distinct()
-                        .filterNot { it.equals(currentSession.username, ignoreCase = true) }
-                    
-                    coroutineScope {
-                        uniquePosters.map { username ->
-                            async(Dispatchers.IO) {
-                                username.lowercase() to runCatching {
-                                    repository.getFollowStatus(currentSession, username, currentSession.username)
-                                }.getOrDefault(false)
-                            }
-                        }.awaitAll().toMap()
-                    }
-                } else {
-                    emptyMap()
-                }
-                
-                Triple(filteredPosts, followedMap, currentSession)
-            }.onSuccess { (posts, followedMap, session) ->
-                val currentFollowed = _uiState.value.followedUsernames.toMutableSet()
-                if (session != null) {
-                    followedMap.forEach { (username, isFollowing) ->
-                        if (isFollowing) {
-                            currentFollowed.add(username)
-                        } else {
-                            currentFollowed.remove(username)
-                        }
-                    }
-                }
+                // Render posts immediately — follow status is resolved in the
+                // background so the trend list never waits on N follow lookups.
                 _uiState.value = _uiState.value.copy(
-                    exploreTrendingPosts = posts,
+                    exploreTrendingPosts = filteredPosts,
                     exploreTrendingLoading = false,
-                    followedUsernames = currentFollowed
+                    exploreFollowStatusesLoading = currentSession != null
                 )
-                if (session != null) augmentLovesInBackground(posts) { augmented ->
+                if (currentSession != null) loadExploreFollowStatuses(filteredPosts, currentSession)
+                augmentLovesInBackground(filteredPosts) { augmented ->
                     _uiState.value = _uiState.value.copy(
                         exploreTrendingPosts = mergeLoveStatuses(_uiState.value.exploreTrendingPosts, augmented)
                     )
@@ -614,6 +586,29 @@ class HomeViewModel(
                     errorMessage = throwable.friendlyMessage(default = "Unable to load trending")
                 )
             }
+        }
+    }
+
+    private fun loadExploreFollowStatuses(posts: List<Post>, session: AuthSession) {
+        val uniquePosters = posts
+            .map { it.poster.name }
+            .distinct()
+            .filterNot { it.equals(session.username, ignoreCase = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val followedMap = uniquePosters.associateWith { username ->
+                runCatching {
+                    repository.getFollowStatus(session, username, session.username)
+                }.getOrDefault(false)
+            }
+            val currentFollowed = _uiState.value.followedUsernames.toMutableSet()
+            followedMap.forEach { (username, isFollowing) ->
+                val key = username.lowercase()
+                if (isFollowing) currentFollowed.add(key) else currentFollowed.remove(key)
+            }
+            _uiState.value = _uiState.value.copy(
+                followedUsernames = currentFollowed,
+                exploreFollowStatusesLoading = false
+            )
         }
     }
 

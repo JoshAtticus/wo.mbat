@@ -30,6 +30,9 @@ data class HomeUiState(
     val explorePosts: List<Post> = emptyList(),
     val exploreTrendingPosts: List<Post> = emptyList(),
     val exploreTrendingLoading: Boolean = false,
+    // True while the background pass resolving who the user follows is running;
+    // follow buttons spin until this settles.
+    val exploreFollowStatusesLoading: Boolean = false,
     val exploreTrendingTimeframe: String? = null, // null = API auto-pick
     val exploreSearchQuery: String = "",
     val exploreSearchActive: Boolean = false,
