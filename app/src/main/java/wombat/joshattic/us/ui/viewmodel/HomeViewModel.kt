@@ -42,6 +42,9 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // Profiles viewed before the currently open one, so back can walk the chain
+    private val profileBackStack = ArrayDeque<String>()
+
     init {
         val initialSession = runBlocking {
             repository.sessionFlow.firstOrNull()
@@ -626,6 +629,12 @@ class HomeViewModel(
 
     fun openProfileBypassingBlock(username: String) {
         val normalizedUsername = username.trim()
+        // Remember the profile we're leaving so back can return to it
+        _uiState.value.viewingProfileUsername?.let { current ->
+            if (!current.equals(normalizedUsername, ignoreCase = true)) {
+                profileBackStack.addLast(current)
+            }
+        }
         _uiState.value = _uiState.value.copy(
             viewingProfileUsername = normalizedUsername,
             viewingProfile = null,
@@ -704,6 +713,18 @@ class HomeViewModel(
             viewingProfilePage = 1,
             viewingProfileLast = false
         )
+        profileBackStack.clear()
+    }
+
+    /** Pops the previously-viewed profile, or closes the profile view if none. */
+    fun navigateBackFromProfile() {
+        val previous = profileBackStack.removeLastOrNull() ?: run {
+            closeProfile()
+            return
+        }
+        // Drop the current username first so it isn't re-pushed while reopening the previous one
+        _uiState.value = _uiState.value.copy(viewingProfileUsername = null)
+        openProfileBypassingBlock(previous)
     }
 
     fun loadNextProfilePage() {

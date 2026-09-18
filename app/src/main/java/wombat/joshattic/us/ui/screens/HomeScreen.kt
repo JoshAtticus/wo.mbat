@@ -3,6 +3,7 @@
 package wombat.joshattic.us.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -122,6 +123,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
 
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // System back walks the profile history instead of leaving the app
+    BackHandler(enabled = uiState.viewingProfileUsername != null) {
+        viewModel.navigateBackFromProfile()
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
