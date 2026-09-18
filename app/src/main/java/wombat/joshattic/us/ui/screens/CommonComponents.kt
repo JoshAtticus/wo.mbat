@@ -16,8 +16,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -2474,22 +2476,36 @@ fun FullScreenImageViewer(
                 ) { page ->
                     var scale by remember { mutableStateOf(1f) }
                     var offset by remember { mutableStateOf(Offset.Zero) }
-                    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-                        scale = (scale * zoomChange).coerceIn(1f, 5f)
-                        if (scale > 1.02f) {
-                            offset += offsetChange
-                            isZoomedIn = true
-                        } else {
-                            offset = Offset.Zero
-                            scale = 1f
-                            isZoomedIn = false
-                        }
-                    }
 
+                    // transformable() would consume horizontal drags even at scale 1
+                    // and block the pager from swiping, so zoom/pan is handled here
+                    // manually and only intercepted when pinching or already zoomed.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .transformable(state = transformableState, enabled = true)
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    do {
+                                        val event = awaitPointerEvent()
+                                        val zoomChange = event.calculateZoom()
+                                        val panChange = event.calculatePan()
+                                        val isPinch = event.changes.size > 1
+                                        if (isPinch || scale > 1f) {
+                                            scale = (scale * zoomChange).coerceIn(1f, 5f)
+                                            if (scale > 1.02f) {
+                                                offset += panChange
+                                                isZoomedIn = true
+                                            } else {
+                                                offset = Offset.Zero
+                                                scale = 1f
+                                                isZoomedIn = false
+                                            }
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    } while (event.changes.any { it.pressed })
+                                }
+                            }
                             .pointerInput(Unit) {
                                 detectTapGestures(
                                     onTap = {
