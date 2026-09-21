@@ -902,6 +902,43 @@ class HomeViewModel(
         )
     }
 
+    // After a reply lands, the reloaded tree hides it behind a collapsed
+    // "See replies" whenever the parent is itself nested. Load the parent
+    // thread's replies and focus it so the sheet re-roots to that thread and
+    // the new comment is visible. Top-level parents already show the reply
+    // inline via the background pre-fetch, so no focus jump is needed.
+    private suspend fun revealReplyInThread(
+        parentComment: Comment?,
+        session: AuthSession?,
+        getComments: () -> List<Comment>,
+        update: (String, (Comment) -> Comment) -> Unit
+    ) {
+        if (parentComment == null || parentComment.parent == null) return
+        val parentId = parentComment.id
+        val freshParent = findCommentById(getComments(), parentId) ?: return
+        if ((freshParent.replies ?: emptyList()).isEmpty() && freshParent.hasReplies) {
+            update(parentId) { it.copy(repliesLoading = true) }
+            val loaded = withContext(Dispatchers.IO) { loadRepliesOneLevel(freshParent, session) }
+            update(parentId) {
+                it.copy(
+                    replies = filterBlockedComments(loaded.replies, _uiState.value.blockedUsernames),
+                    repliesLoading = false
+                )
+            }
+        }
+        _uiState.value = _uiState.value.copy(
+            focusedComment = findCommentById(getComments(), parentId)
+        )
+    }
+
+    private fun findCommentById(comments: List<Comment>, commentId: String): Comment? {
+        for (comment in comments) {
+            if (comment.id == commentId) return comment
+            findCommentById(comment.replies ?: emptyList(), commentId)?.let { return it }
+        }
+        return null
+    }
+
     fun openFullScreenImages(images: List<String>, index: Int, post: Post?) {
         _uiState.value = _uiState.value.copy(
             fullScreenImages = images,
@@ -984,7 +1021,8 @@ class HomeViewModel(
                 "<p dir=\"ltr\">$lineBreaks</p>"
             }
 
-            val parent = _uiState.value.commentReplyParent?.id
+            val parentComment = _uiState.value.commentReplyParent
+            val parent = parentComment?.id
             runCatching { repository.createComment(session, selectedPost.id, formattedHtml, parent) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
@@ -992,6 +1030,11 @@ class HomeViewModel(
                         commentReplyParent = null
                     )
                     loadComments(selectedPost.id)
+                    revealReplyInThread(
+                        parentComment,
+                        session,
+                        getComments = { _uiState.value.comments }
+                    ) { id, transform -> updatePostComment(id, transform) }
                 }
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
@@ -1100,7 +1143,8 @@ class HomeViewModel(
                 "<p dir=\"ltr\">$lineBreaks</p>"
             }
 
-            val parent = _uiState.value.wallCommentReplyParent?.id
+            val parentComment = _uiState.value.wallCommentReplyParent
+            val parent = parentComment?.id
             runCatching { repository.createWallComment(session, username, formattedHtml, parent) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
@@ -1108,6 +1152,11 @@ class HomeViewModel(
                         wallCommentReplyParent = null
                     )
                     loadWallCommentsPage(username, 1)
+                    revealReplyInThread(
+                        parentComment,
+                        session,
+                        getComments = { _uiState.value.wallComments }
+                    ) { id, transform -> updateWallComment(id, transform) }
                 }
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
@@ -2184,7 +2233,7 @@ class HomeViewModel(
     private fun updatePostComment(commentId: String, transform: (Comment) -> Comment) {
         _uiState.value = _uiState.value.copy(
             comments = _uiState.value.comments.map {
-                if (it.id == commentId) transform(it) else it
+                updateCommentInTree(it, commentId, transform)
             }
         )
     }
@@ -2192,9 +2241,22 @@ class HomeViewModel(
     private fun updateWallComment(commentId: String, transform: (Comment) -> Comment) {
         _uiState.value = _uiState.value.copy(
             wallComments = _uiState.value.wallComments.map {
-                if (it.id == commentId) transform(it) else it
+                updateCommentInTree(it, commentId, transform)
             }
         )
+    }
+
+    // "See replies" targets nested comments too, so the update has to walk the
+    // reply tree instead of only matching top-level comments.
+    private fun updateCommentInTree(
+        comment: Comment,
+        commentId: String,
+        transform: (Comment) -> Comment
+    ): Comment {
+        if (comment.id == commentId) return transform(comment)
+        val replies = comment.replies ?: emptyList()
+        if (replies.isEmpty()) return comment
+        return comment.copy(replies = replies.map { updateCommentInTree(it, commentId, transform) })
     }
 
     private suspend fun loadRepliesOneLevel(comment: Comment, session: AuthSession?): Comment {
