@@ -302,11 +302,18 @@ fun ProfileScreen(
                                                 contentColor = if (isFollowingUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         ) {
-                                            Icon(
-                                                imageVector = if (isFollowingUser) Icons.Filled.Check else Icons.Filled.PersonAdd,
-                                                contentDescription = if (isFollowingUser) "Unfollow" else "Follow",
-                                                modifier = Modifier.size(20.dp)
-                                            )
+                                            if (followLoading) {
+                                                androidx.compose.material3.CircularProgressIndicator(
+                                                    modifier = Modifier.size(20.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = if (isFollowingUser) Icons.Filled.Check else Icons.Filled.PersonAdd,
+                                                    contentDescription = if (isFollowingUser) "Unfollow" else "Follow",
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                         }
                                     }
                                     FilledTonalIconButton(

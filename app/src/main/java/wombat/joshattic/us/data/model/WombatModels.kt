@@ -44,7 +44,9 @@ data class Post(
     val loves: Int,
     val reposts: Int,
     val pinned: Boolean? = null,
-    val isLoving: Boolean? = null
+    val isLoving: Boolean? = null,
+    // In-memory flag: a love toggle request is in flight. Never persisted.
+    val loveLoading: Boolean = false
 )
 
 @Immutable

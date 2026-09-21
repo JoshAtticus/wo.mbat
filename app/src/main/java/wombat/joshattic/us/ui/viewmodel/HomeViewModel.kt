@@ -1460,8 +1460,10 @@ class HomeViewModel(
 
     fun togglePostLove(post: Post) {
         val session = _uiState.value.session ?: return
-        // Love status not augmented yet: ignore taps so we don't toggle blind
-        if (post.isLoving == null) return
+        // Love status not augmented yet: ignore taps so we don't toggle blind.
+        // A toggle already in flight: ignore taps so we don't double-fire.
+        if (post.isLoving == null || post.loveLoading) return
+        setPostLoveLoading(post.id, true)
         viewModelScope.launch {
             runCatching { repository.toggleLove(session, post.id) }
                 .onSuccess { response ->
@@ -1470,6 +1472,7 @@ class HomeViewModel(
                     updatePostsWithLove(post.id, newLoves, newIsLoving)
                 }
                 .onFailure { throwable ->
+                    setPostLoveLoading(post.id, false)
                     _uiState.value = _uiState.value.copy(
                         errorMessage = throwable.friendlyMessage(default = "Failed to toggle love")
                     )
@@ -1743,30 +1746,42 @@ class HomeViewModel(
         }
     }
 
-    private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
-        // Cache the authoritative result so future loads render liked instantly
-        LoveCache.put(postId, newIsLoving)
+    // Applies a change to one post (including an embedded repost with that id)
+    // everywhere it can appear, so all visible copies stay in sync.
+    private fun transformEveryPost(postId: String, transform: (Post) -> Post) {
         val current = _uiState.value
-        fun transform(p: Post): Post {
-            var updated = if (p.id == postId) p.copy(loves = newLoves, isLoving = newIsLoving) else p
+        fun apply(p: Post): Post {
+            var updated = if (p.id == postId) transform(p) else p
             if (updated.repost?.id == postId) {
-                updated = updated.copy(repost = updated.repost.copy(loves = newLoves, isLoving = newIsLoving))
+                updated = updated.copy(repost = transform(updated.repost))
             }
             return updated
         }
         _uiState.value = current.copy(
-            feed = current.feed.map(::transform),
-            exploreTrendingPosts = current.exploreTrendingPosts.map(::transform),
-            accountPosts = current.accountPosts.map(::transform),
-            viewingProfilePosts = current.viewingProfilePosts.map(::transform),
+            feed = current.feed.map(::apply),
+            exploreTrendingPosts = current.exploreTrendingPosts.map(::apply),
+            accountPosts = current.accountPosts.map(::apply),
+            viewingProfilePosts = current.viewingProfilePosts.map(::apply),
             // Keep the reposts sheet in sync so likes toggle live inside it
-            reposts = current.reposts.map(::transform),
-            viewRepostsPost = current.viewRepostsPost?.let { transform(it) },
-            // Always apply transform to selectedPost so that liking an embedded repost
-            // (where selectedPost.id != postId but selectedPost.repost.id == postId) also
-            // updates the love state shown in the details sheet.
-            selectedPost = current.selectedPost?.let { transform(it) }
+            reposts = current.reposts.map(::apply),
+            viewRepostsPost = current.viewRepostsPost?.let { apply(it) },
+            // Always apply to selectedPost so that liking an embedded repost
+            // (where selectedPost.id != postId but selectedPost.repost.id == postId)
+            // also updates the love state shown in the details sheet.
+            selectedPost = current.selectedPost?.let { apply(it) }
         )
+    }
+
+    private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
+        // Cache the authoritative result so future loads render liked instantly
+        LoveCache.put(postId, newIsLoving)
+        transformEveryPost(postId) { p ->
+            p.copy(loves = newLoves, isLoving = newIsLoving, loveLoading = false)
+        }
+    }
+
+    private fun setPostLoveLoading(postId: String, loading: Boolean) {
+        transformEveryPost(postId) { it.copy(loveLoading = loading) }
     }
 
     private fun filterBlockedPosts(posts: List<Post>): List<Post> =

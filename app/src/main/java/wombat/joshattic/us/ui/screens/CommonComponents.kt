@@ -1089,8 +1089,9 @@ fun PostCard(
                     } else Icons.Filled.FavoriteBorder,
                     isActive = post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true),
                     // Banned: hard-greyed; otherwise pulsing until love status arrives
-                    enabled = post.isLoving != null && !isBanned,
-                    pulse = post.isLoving == null && !isBanned,
+                    // or while a love toggle request is in flight
+                    enabled = post.isLoving != null && !isBanned && !post.loveLoading,
+                    pulse = (post.isLoving == null || post.loveLoading) && !isBanned,
                     onClick = onLoveClick?.let { { onLoveClick(post) } }
                 )
                 PostMetric(post.comments, "comments", Icons.Filled.Chat)
@@ -2690,22 +2691,30 @@ fun FullScreenImageViewer(
                                         modifier = Modifier
                                             .clip(CircleShape)
                                             .background(Color.White.copy(alpha = if (p.isLoving == null && !pCachedLoved) 0.08f else 0.18f))
-                                            .clickable(enabled = p.isLoving != null) {
+                                            .clickable(enabled = p.isLoving != null && !p.loveLoading) {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 onLoveClick?.invoke(p)
                                             }
                                             .padding(horizontal = 14.dp, vertical = 8.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = if (p.isLoving == true || pCachedLoved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                            contentDescription = "Love",
-                                            tint = when {
-                                                p.isLoving == true || pCachedLoved -> Color(0xFFFF4081)
-                                                p.isLoving == null -> Color.White.copy(alpha = 0.5f)
-                                                else -> Color.White
-                                            },
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        if (p.loveLoading) {
+                                            androidx.compose.material3.CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                strokeWidth = 2.dp,
+                                                color = Color.White
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = if (p.isLoving == true || pCachedLoved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                                contentDescription = "Love",
+                                                tint = when {
+                                                    p.isLoving == true || pCachedLoved -> Color(0xFFFF4081)
+                                                    p.isLoving == null -> Color.White.copy(alpha = 0.5f)
+                                                    else -> Color.White
+                                                },
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                         Text(
                                             text = p.loves.toString(),
                                             style = MaterialTheme.typography.labelMedium,
