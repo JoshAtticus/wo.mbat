@@ -671,32 +671,17 @@ fun PostActionsMenu(
     }
 }
 
-/** Opens the "who reposted this" sheet; provided app-wide so every PostCard can use it. */
 val LocalOnViewReposts = compositionLocalOf<((Post) -> Unit)?> { null }
-
-/** When true, blocked quote/comment warnings gain a one-time "Show" button. */
 val LocalShowBlockedRevealButton = compositionLocalOf { false }
 
-/** True when [post] is a bare repost wrapper with no added text or images of its own. */
 fun isPureRepost(post: Post): Boolean {
     return post.repost != null &&
         post.content.replace(Regex("<.*?>"), "").trim().isBlank() &&
         extractImages(post.content).isEmpty()
 }
 
-/**
- * One feed entry: [primary] is the wrapper post that gets rendered, and
- * [reposters] lists every consecutive pure-repost wrapper of the same target
- * (including [primary] itself) to be shown in the combined header.
- */
 data class RepostGroup(val primary: Post, val reposters: List<Post>)
 
-/**
- * Merges runs of *consecutive* pure reposts of the same post into a single
- * [RepostGroup], so the feed can show "@a and @b reposted this" instead of
- * repeating the target card once per reposter. Regular posts and quote reposts
- * pass through as single-entry groups.
- */
 fun groupConsecutiveReposts(posts: List<Post>): List<RepostGroup> {
     val result = mutableListOf<RepostGroup>()
     for (post in posts) {
@@ -715,7 +700,6 @@ fun groupConsecutiveReposts(posts: List<Post>): List<RepostGroup> {
     return result
 }
 
-/** Combined header label for a group of consecutive reposts of the same post. */
 fun repostHeaderText(reposters: List<Post>): String {
     val names = reposters.distinctBy { it.poster.name.lowercase() }
         .map { "@${it.poster.name.lowercase()}" }
@@ -726,7 +710,6 @@ fun repostHeaderText(reposters: List<Post>): String {
     }
 }
 
-/** True while the signed-in user is banned; disables interaction affordances on posts. */
 val LocalIsBanned = staticCompositionLocalOf { false }
 
 @Composable
@@ -1891,7 +1874,6 @@ fun PostMetric(
     }
 }
 
-/** Opens the system share sheet for a post's wasteof.money URL. */
 fun sharePostUrl(context: Context, postId: String) {
     val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         putExtra(android.content.Intent.EXTRA_TEXT, "https://wasteof.money/posts/$postId")
@@ -1900,10 +1882,6 @@ fun sharePostUrl(context: Context, postId: String) {
     context.startActivity(android.content.Intent.createChooser(sendIntent, null))
 }
 
-/**
- * Icon-only share pill styled to match [PostMetric] buttons so it can sit
- * alongside them in the post action row.
- */
 @Composable
 fun PostShareButton(postId: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -2078,7 +2056,6 @@ fun stripImages(html: String): String {
     return result
 }
 
-/** Hosts that are wasteof frontends or otherwise handled by in-app navigation; never link-preview these. */
 private val OPEN_GRAPH_SKIPPED_HOSTS = setOf(
     "wasteof.money",
     "beta.wasteof.money",
@@ -2087,7 +2064,6 @@ private val OPEN_GRAPH_SKIPPED_HOSTS = setOf(
     "wasteof.eris.cafe"
 )
 
-/** Extracts the lowercase host (without "www.") from an absolute http(s) URL, or null. */
 fun urlHost(url: String): String? {
     val withoutScheme = url.substringAfter("://", "")
     if (withoutScheme.isEmpty()) return null
@@ -2099,14 +2075,12 @@ fun urlHost(url: String): String? {
     return host.lowercase(Locale.ROOT).removePrefix("www.").ifEmpty { null }
 }
 
-/** True when [url] is an absolute http(s) URL on a previewable (non-wasteof) host. */
 fun isOpenGraphEligibleUrl(url: String): Boolean {
     if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) return false
     val host = urlHost(url) ?: return false
     return host !in OPEN_GRAPH_SKIPPED_HOSTS
 }
 
-/** Strips trailing sentence punctuation and unbalanced closing brackets from a bare URL. */
 private fun trimTrailingUrlPunctuation(url: String): String {
     var result = url
     while (result.isNotEmpty() && result.last() in ".,;:!?…»\"'") {
@@ -2125,11 +2099,6 @@ private fun trimTrailingUrlPunctuation(url: String): String {
     return result
 }
 
-/**
- * Returns the first previewable link in [html] in document order — either an
- * <a href> target or a bare URL in visible text — skipping wasteof frontends,
- * which are handled by in-app navigation instead.
- */
 fun extractFirstLink(html: String): String? {
     val candidates = mutableListOf<Pair<Int, String>>()
     val hrefRegex = Regex("""href\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
@@ -2200,10 +2169,6 @@ fun autoLinkAndMentions(html: String): String {
     return sb.toString()
 }
 
-/**
- * Linkifies a single plain-text (between-tags) HTML segment.
- * Never called for tag internals, so attribute values cannot be corrupted here.
- */
 private fun linkifyPlainSegment(text: String, insideAnchor: Boolean): String {
     if (insideAnchor) return text
     var result = text
@@ -2320,10 +2285,6 @@ fun PostImageCarousel(
     }
 }
 
-/**
- * Compact tappable square thumbnails for post images, shown when OpenGraph
- * previews are prioritised over the full-size image carousel.
- */
 @Composable
 fun PostImageSquares(
     images: List<String>,

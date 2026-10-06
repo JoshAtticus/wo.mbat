@@ -13,13 +13,6 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import wombat.joshattic.us.data.storage.AuthPreferences
 
-/**
- * Listens for capability changes (watch connected/reconnected) and pushes
- * the current auth session to the watch via the Wearable Data Layer.
- *
- * Also exposed as a static helper so MainActivity can call [pushSession]
- * any time the session changes (login / logout / switch account).
- */
 class WearSyncService : WearableListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -39,10 +32,6 @@ class WearSyncService : WearableListenerService() {
         const val KEY_SHOW_PFP = "show_pfp"
         const val KEY_FEED_TYPE = "feed_type"
 
-        /**
-         * Push the currently active session to the watch.
-         * Call this from MainActivity whenever the session changes.
-         */
         fun pushSession(dataClient: DataClient, token: String?, username: String?) {
             val request = PutDataMapRequest.create(PATH_AUTH).apply {
                 dataMap.putString(KEY_TOKEN, token ?: "")
@@ -52,9 +41,6 @@ class WearSyncService : WearableListenerService() {
             dataClient.putDataItem(request.asPutDataRequest().setUrgent())
         }
 
-        /**
-         * Push settings to the watch.
-         */
         fun pushSettings(dataClient: DataClient, showImages: Boolean, showPfp: Boolean, feedType: String) {
             val request = PutDataMapRequest.create(PATH_SETTINGS).apply {
                 dataMap.putBoolean(KEY_SHOW_IMAGES, showImages)

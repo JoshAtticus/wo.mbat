@@ -5,21 +5,9 @@ import android.graphics.Paint
 import android.text.Layout
 import android.text.style.LeadingMarginSpan
 
-/** Blockquote stripe width in dp (density-scaled equivalent of the old 6px constant). */
 const val QUOTE_STRIPE_WIDTH_DP = 2
-
-/** Gap between blockquote stripe and text in dp (equivalent of the old 24px constant). */
 const val QUOTE_GAP_WIDTH_DP = 9
 
-/**
- * Brand-styled blockquote span that renders identically on all supported API levels.
- *
- * The platform [android.text.style.QuoteSpan] only gained configurable stripe/gap
- * widths in API 28; on older versions the single-color constructor draws a hairline
- * stripe with virtually no gap between it and the text. This span fixes that and is
- * used purely for display (see HtmlText) — the composer keeps platform QuoteSpans so
- * they survive HtmlCompat.toHtml round-trips.
- */
 class BrandedQuoteSpan(
     private val color: Int,
     stripeWidthPx: Int,

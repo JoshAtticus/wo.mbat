@@ -460,7 +460,6 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(composerDrafts = emptyList(), toastMessage = "All drafts cleared")
     }
 
-    /** True while connectivity is lost; used to skip futile network loads. */
     private fun isOffline(): Boolean = !_uiState.value.isOnline
 
     fun refreshFeed() {
@@ -704,7 +703,6 @@ class HomeViewModel(
         profileBackStack.clear()
     }
 
-    /** Pops the previously-viewed profile, or closes the profile view if none. */
     fun navigateBackFromProfile() {
         val previous = profileBackStack.removeLastOrNull() ?: run {
             closeProfile()

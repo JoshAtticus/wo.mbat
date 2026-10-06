@@ -26,10 +26,6 @@ import androidx.compose.ui.unit.dp
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Post
 
-/**
- * Bottom sheet listing everyone who reposted [post]. The original post sits at
- * the top for context; tapping any entry opens its post details.
- */
 @Composable
 fun RepostsSheet(
     post: Post,

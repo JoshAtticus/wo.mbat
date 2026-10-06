@@ -847,11 +847,6 @@ private fun LinkSettings(
     }
 }
 
-/**
- * Shows whether Android currently lets wo.mbat open wasteof.money links, and a button
- * that opens the system "Open by default" page where the user can approve them.
- * State is re-checked on every resume so returning from system settings updates the card.
- */
 @Composable
 private fun LinkApprovalCard() {
     val context = LocalContext.current

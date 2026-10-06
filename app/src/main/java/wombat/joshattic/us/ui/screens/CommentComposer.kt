@@ -63,14 +63,6 @@ import androidx.core.text.HtmlCompat
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.launch
 
-/**
- * Rich text editor for comments: shares the post composer's HTML draft format
- * (spans converted via HtmlCompat, images appended as <img> tags) so comments
- * render with the same formatting and images as posts.
- *
- * The keyboard's Enter key always inserts newlines; sending uses the send
- * button at the end of the toolbar.
- */
 @Composable
 fun CommentComposer(
     draft: String,

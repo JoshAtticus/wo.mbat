@@ -261,13 +261,8 @@ interface ApiService {
     ): wombat.joshattic.us.data.model.ImageUploadResponse
 }
 
-/** Fixed access token for the og.joshattic.us link-preview API. */
 const val OPEN_GRAPH_API_TOKEN = "3759146558600182"
 
-/**
- * OpenGraph link-preview metadata service, backed by og.joshattic.us.
- * Responses are cached server-side per URL, so repeat views never touch the origin site.
- */
 interface OpenGraphApiService {
     @GET("fetch")
     suspend fun fetchOpenGraph(

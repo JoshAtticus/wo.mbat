@@ -45,11 +45,6 @@ import wombat.joshattic.us.data.model.OpenGraphResponse
 import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.ui.screens.urlHost
 
-/**
- * Process-wide memory cache for link previews so recomposed feed cards and
- * repeated links never refetch. Failures are negatively cached too, so
- * unreachable sites are not hammered on every scroll pass.
- */
 object OpenGraphPreviewCache {
     private const val MAX_ENTRIES = 128
 
@@ -83,11 +78,6 @@ object OpenGraphPreviewCache {
     @Synchronized
     fun isKnownFailure(url: String): Boolean = url in failures
 
-    /**
-     * Returns cached metadata, or fetches it on the shared IO scope. Concurrent
-     * requests for the same URL share one in-flight call instead of doubling up,
-     * and every caller observes the outcome once the request settles.
-     */
     suspend fun getOrFetch(url: String): OpenGraphResponse? {
         cache[url]?.let { return it }
         if (isKnownFailure(url)) return null
@@ -105,7 +95,6 @@ object OpenGraphPreviewCache {
         }
     }
 
-    /** A response is usable when the fetch succeeded and any metadata came back. */
     fun isUsable(fetched: OpenGraphResponse): Boolean {
         val metadata = fetched.metadata ?: return false
         val statusOk = fetched.statusCode == null || fetched.statusCode in 200..299
@@ -116,28 +105,13 @@ object OpenGraphPreviewCache {
     }
 }
 
-/**
- * True when the preview should render as the large banner: requires a preview
- * image, and either the post has no images of its own or OpenGraph is
- * prioritised over post images.
- */
 fun shouldUseLargePreview(hasPreviewImage: Boolean, hasPostImages: Boolean, openGraphFirst: Boolean): Boolean =
     hasPreviewImage && (!hasPostImages || openGraphFirst)
 
-/** True when the "prioritise OpenGraph" link preview setting is active. */
 fun isOpenGraphPriority(linkPreviewPriority: String?): Boolean =
     linkPreviewPriority.equals("opengraph", ignoreCase = true)
 
 
-/**
- * Link preview card for the first external URL in a post, fetched from
- * og.joshattic.us. Two layouts:
- *  - Large banner (image with overlaid title and "From <domain>" caption) when
- *    the post has no images of its own and the preview provides one.
- *  - Compact card (domain / title / description, with a thumbnail when the
- *    preview has any image) in all other cases.
- * Renders nothing while loading or when no usable metadata is available.
- */
 @Composable
 fun OpenGraphPreview(
     url: String,

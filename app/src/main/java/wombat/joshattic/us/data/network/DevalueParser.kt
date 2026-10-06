@@ -5,20 +5,9 @@ import com.google.gson.JsonElement
 import wombat.joshattic.us.data.model.Poster
 import wombat.joshattic.us.data.model.Post
 
-/**
- * Decoder for SvelteKit's devalue serialization, which the Alpha API returns
- * instead of human-readable JSON. In this format the `data` array holds a flat
- * pool of values where objects map keys to *indices* into the same array,
- * e.g. `{"poster":2,"content":6}` means "the value at index 2 / index 6".
- */
 object DevalueParser {
     private val gson = Gson()
 
-    /**
-     * Parses a `posts/(id)/reposts/__data.json` response and returns the list
-     * of reposts as regular [Post] objects. The root of the payload is
-     * `{"post": <original post>, "reposts": [...]}`.
-     */
     fun parseReposts(json: String): List<Post> {
         val root = runCatching { gson.fromJson(json, JsonElement::class.java) }.getOrNull()
             ?: return emptyList()
@@ -62,7 +51,6 @@ object DevalueParser {
         return reposts.mapNotNull { it.toPost() }
     }
 
-    /** Alpha payloads key the id field as `id` instead of the regular API's `_id`. */
     private fun Any?.toPost(): Post? {
         val map = this as? Map<*, *> ?: return null
         val id = (map["id"] ?: map["_id"]) as? String ?: return null

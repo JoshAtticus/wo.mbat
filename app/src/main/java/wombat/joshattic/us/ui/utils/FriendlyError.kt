@@ -2,14 +2,6 @@ package wombat.joshattic.us.ui.utils
 
 import retrofit2.HttpException
 
-/**
- * Maps raw HTTP status codes to user-facing text so error codes like
- * "HTTP 401" never leak into the UI.
- *
- * A 403 usually means banned, but it can also mean an unauthenticated/expired
- * session — callers pass [banned] only when the local profile is known to be
- * banned; otherwise the user is told to sign in again.
- */
 fun Throwable.friendlyMessage(
     default: String,
     unauthorized: String? = null,

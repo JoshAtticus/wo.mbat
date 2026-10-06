@@ -67,10 +67,6 @@ class WombatRepository(
         }
     }
 
-    /**
-     * True when no account holds this username. The login UI uses this to
-     * check the username exists before asking for a password.
-     */
     suspend fun isUsernameAvailable(username: String): Boolean =
         apiService.checkUsernameAvailable(username).available
 
@@ -98,10 +94,6 @@ class WombatRepository(
         return apiService.getPost(postId = postId, token = session?.token)
     }
 
-    /**
-     * Fetches who reposted a post via the Alpha API. The request must remain
-     * unauthenticated or non-alpha accounts receive a 401.
-     */
     suspend fun loadReposts(postId: String): List<Post> = withContext(Dispatchers.IO) {
         val body = RetrofitClient.alphaApiService.getReposts(postId)
         body.use { response -> DevalueParser.parseReposts(response.string()) }
