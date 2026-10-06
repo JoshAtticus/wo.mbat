@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,11 +22,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -54,6 +57,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -84,6 +90,11 @@ fun CommentComposer(
     var isItalicActive by remember { mutableStateOf(false) }
     var isStrikethroughActive by remember { mutableStateOf(false) }
     var isUnderlineActive by remember { mutableStateOf(false) }
+    var editorScrollY by remember { mutableStateOf(0) }
+    var editorContentHeight by remember { mutableStateOf(0) }
+    var editorHeight by remember { mutableStateOf(0) }
+    val plainDraft = HtmlCompat.fromHtml(stripImages(draft), HtmlCompat.FROM_HTML_MODE_COMPACT).toString()
+    val maxCharacterCount = 12_000
 
     fun updateFormattingStates(editText: android.widget.EditText) {
         val text = editText.text ?: return
@@ -135,12 +146,16 @@ fun CommentComposer(
 
     Column(modifier = modifier) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             IconButton(
                 onClick = {
                     richEditTextRef?.let { editText ->
@@ -217,6 +232,17 @@ fun CommentComposer(
                     Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(18.dp))
                 }
             }
+            }
+            Text(
+                text = "${plainDraft.length} / $maxCharacterCount",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (plainDraft.length > maxCharacterCount) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.padding(start = 6.dp, end = 4.dp)
+            )
         }
 
         if (isUploadingImage) {
@@ -293,14 +319,21 @@ fun CommentComposer(
 
         val textColor = MaterialTheme.colorScheme.onSurface
         val borderColor = MaterialTheme.colorScheme.outlineVariant
+        val estimatedLines = plainDraft.split('\n').sumOf { (it.length / 38) + 1 }.coerceAtLeast(1)
+        val composerHeight = (56 + (estimatedLines - 1).coerceAtMost(8) * 22).dp
+        val scrollThumbColor = MaterialTheme.colorScheme.primary
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp, max = 120.dp)
+                .height(composerHeight)
+                .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(20.dp))
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.Bottom
+            ) {
                 AndroidView(
                 factory = { ctx ->
                     RichEditText(ctx).apply {
@@ -311,8 +344,28 @@ fun CommentComposer(
                             android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
                             android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                         setHorizontallyScrolling(false)
-                        isVerticalScrollBarEnabled = true
                         setScrollContainer(true)
+                        setOnScrollChangeListener { view, _, scrollY, _, _ ->
+                            editorScrollY = scrollY
+                            editorContentHeight = (view as RichEditText).verticalScrollRange()
+                            editorHeight = view.height
+                        }
+                        setOnTouchListener { view, event ->
+                            when (event.actionMasked) {
+                                android.view.MotionEvent.ACTION_DOWN,
+                                android.view.MotionEvent.ACTION_MOVE ->
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                android.view.MotionEvent.ACTION_UP -> {
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    view.postDelayed({
+                                        view.parent?.requestDisallowInterceptTouchEvent(false)
+                                    }, 250L)
+                                }
+                                android.view.MotionEvent.ACTION_CANCEL ->
+                                    view.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false
+                        }
                         hint = placeholder
                         setHintTextColor(textColor.copy(alpha = 0.6f).toArgb())
                         setTextColor(textColor.toArgb())
@@ -325,6 +378,11 @@ fun CommentComposer(
                             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                                 updateDraft(this@apply, currentImages)
+                                post {
+                                    editorContentHeight = verticalScrollRange()
+                                    editorHeight = height
+                                    editorScrollY = scrollY
+                                }
                             }
                             override fun afterTextChanged(s: android.text.Editable?) {}
                         })
@@ -342,17 +400,46 @@ fun CommentComposer(
                             editText.setSelection(cleanSpanned.length)
                         }
                         updateFormattingStates(editText)
+                        editorContentHeight = editText.verticalScrollRange()
+                        editorHeight = editText.height
+                        editorScrollY = editText.scrollY
                     }
                 },
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             )
+                if (editorContentHeight > editorHeight && editorHeight > 0) {
+                    Canvas(
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .fillMaxHeight()
+                            .padding(vertical = 10.dp)
+                            .width(4.dp)
+                    ) {
+                        val scrollableHeight = editorContentHeight - editorHeight
+                        if (size.height > 0f && scrollableHeight > 0) {
+                            val thumbHeight = (size.height * editorHeight / editorContentHeight)
+                                .coerceAtLeast(18f)
+                                .coerceAtMost(size.height)
+                            val thumbOffset = ((size.height - thumbHeight) * editorScrollY / scrollableHeight)
+                                .coerceIn(0f, (size.height - thumbHeight).coerceAtLeast(0f))
+                            drawRoundRect(
+                                color = scrollThumbColor,
+                                topLeft = Offset(0f, thumbOffset),
+                                size = Size(size.width, thumbHeight),
+                                cornerRadius = CornerRadius(size.width / 2f)
+                            )
+                        }
+                    }
+                }
                 FilledIconButton(
                     onClick = onSubmit,
-                    enabled = draft.isNotBlank(),
+                    enabled = draft.isNotBlank() && plainDraft.length <= maxCharacterCount,
                     modifier = Modifier
                         .padding(end = 8.dp)
+                        .padding(bottom = 8.dp)
                         .size(40.dp)
                 ) {
                     Icon(

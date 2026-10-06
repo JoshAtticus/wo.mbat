@@ -266,20 +266,26 @@ fun PostDetailsContent(
 
             if (!loading && displayComments.isNotEmpty()) {
                 items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
-                    CommentCard(
-                        comment = comment,
-                        isBanned = isBanned,
-                        onReply = onReplyToComment,
-                        onProfileClick = handleProfileClick,
-                        onMentionClick = handleMentionClick,
-                        onPostClick = onPostClickById,
-                        openLinksInApp = openLinksInApp,
-                        depth = 0,
-                        onFocusComment = onFocusComment,
-                        onLoadReplies = onLoadReplies,
-                        showImages = showImages,
-                        onImageClick = { images, index -> onImageClick(images, index, null) }
-                    )
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        CommentCard(
+                            comment = comment,
+                            isBanned = isBanned,
+                            onReply = onReplyToComment,
+                            onProfileClick = handleProfileClick,
+                            onMentionClick = handleMentionClick,
+                            onPostClick = onPostClickById,
+                            openLinksInApp = openLinksInApp,
+                            depth = 0,
+                            onFocusComment = onFocusComment,
+                            onLoadReplies = onLoadReplies,
+                            showImages = showImages,
+                            onImageClick = { images, index -> onImageClick(images, index, null) }
+                        )
+                    }
                 }
             }
         }

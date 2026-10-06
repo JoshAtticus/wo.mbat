@@ -215,18 +215,23 @@ fun WallDetailsContent(
             }
 
             items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
-                CommentCard(
-                    comment = comment,
-                    isBanned = isBanned,
-                    onReply = onReplyToComment,
-                    onProfileClick = handleProfileClick,
-                    onMentionClick = handleMentionClick,
-                    onPostClick = onPostClickById,
-                    openLinksInApp = openLinksInApp,
-                    depth = 0,
-                    onFocusComment = onFocusComment,
-                    onLoadReplies = onLoadReplies
-                )
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    CommentCard(
+                        comment = comment,
+                        isBanned = isBanned,
+                        onReply = onReplyToComment,
+                        onProfileClick = handleProfileClick,
+                        onPostClick = onPostClickById,
+                        openLinksInApp = openLinksInApp,
+                        depth = 0,
+                        onFocusComment = onFocusComment,
+                        onLoadReplies = onLoadReplies
+                    )
+                }
             }
 
             if (loading && comments.isNotEmpty()) {

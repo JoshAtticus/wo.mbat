@@ -13,7 +13,10 @@ import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.view.View
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.widget.EditText
+import android.widget.OverScroller
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -101,6 +104,45 @@ import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 
 class RichEditText(context: Context) : EditText(context) {
     var onSelectionChangedListener: ((start: Int, end: Int) -> Unit)? = null
+    private val flingScroller = OverScroller(context)
+    private val flingDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(event: MotionEvent): Boolean = true
+
+        override fun onFling(
+            start: MotionEvent?,
+            end: MotionEvent,
+            velocityX: Float,
+            velocityY: Float
+        ): Boolean {
+            flingScroller.fling(
+                scrollX,
+                scrollY,
+                0,
+                -velocityY.toInt(),
+                0,
+                0,
+                0,
+                (verticalScrollRange() - height).coerceAtLeast(0)
+            )
+            postInvalidateOnAnimation()
+            return true
+        }
+    })
+
+    fun verticalScrollRange(): Int = computeVerticalScrollRange()
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        flingDetector.onTouchEvent(event)
+        return super.onTouchEvent(event)
+    }
+
+    override fun computeScroll() {
+        if (flingScroller.computeScrollOffset()) {
+            scrollTo(flingScroller.currX, flingScroller.currY)
+            postInvalidateOnAnimation()
+        }
+        super.computeScroll()
+    }
 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)

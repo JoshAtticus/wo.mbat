@@ -1066,9 +1066,9 @@ class HomeViewModel(
         }
     }
 
-    private fun loadWallCommentsPage(username: String, page: Int) {
+    private fun loadWallCommentsPage(username: String, page: Int): kotlinx.coroutines.Job {
         val session = _uiState.value.session
-        viewModelScope.launch {
+        return viewModelScope.launch {
             _uiState.value = _uiState.value.copy(wallCommentsLoading = true)
             runCatching {
                 val response = repository.loadWallComments(session, username, page)
@@ -1124,7 +1124,7 @@ class HomeViewModel(
                         wallCommentDraft = "",
                         wallCommentReplyParent = null
                     )
-                    loadWallCommentsPage(username, 1)
+                    loadWallCommentsPage(username, 1).join()
                     revealReplyInThread(
                         parentComment,
                         session,
@@ -2485,7 +2485,7 @@ class HomeViewModel(
 
     companion object {
         private const val DEFAULT_GUEST_USER = "jeffalo"
-        const val MAX_CHAR_COUNT = 1500
+        const val MAX_CHAR_COUNT = 12000
 
         fun factory(repository: WombatRepository, context: Context): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {

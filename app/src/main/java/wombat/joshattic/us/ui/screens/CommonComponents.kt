@@ -91,6 +91,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
@@ -878,9 +879,11 @@ fun PostCard(
                                 onFollowClick()
                             }) {
                                 Icon(
-                                    imageVector = if (isFollowing == true) Icons.Filled.Check else Icons.Filled.PersonAdd,
+                                    imageVector = if (isFollowing == true) Icons.Filled.PersonRemove else Icons.Filled.PersonAdd,
                                     contentDescription = if (isFollowing == true) "Unfollow" else "Follow",
-                                    tint = if (isFollowing == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    // Follow (add) is the bright/action state; check is muted so users
+                                    // understand which button actually performs the follow action
+                                    tint = if (isFollowing == true) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -1194,7 +1197,15 @@ fun CommentThreadContent(
 ) {
     val isBlockedPlaceholder = comment.blocked
     var commentRevealed by remember(comment.id) { mutableStateOf(false) }
+    var repliesExpanded by remember(comment.id) { mutableStateOf(true) }
     val isReply = comment.parent != null
+    val safeReplies = comment.replies ?: emptyList()
+
+    LaunchedEffect(comment.repliesLoading, safeReplies.size, depth) {
+        if (depth >= 2 && !comment.repliesLoading && safeReplies.isNotEmpty()) {
+            onFocusComment?.invoke(comment)
+        }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1226,7 +1237,6 @@ fun CommentThreadContent(
                 }
             }
             
-            val safeReplies = comment.replies ?: emptyList()
             if (safeReplies.isNotEmpty() && depth < 2) {
                 Box(
                     modifier = Modifier
@@ -1344,8 +1354,7 @@ fun CommentThreadContent(
                     }
                 }
                 safeReplies.isNotEmpty() -> {
-                    val maxDepth = 2
-                    if (depth >= maxDepth) {
+                    if (depth >= 2) {
                         androidx.compose.material3.TextButton(
                             onClick = { onFocusComment?.invoke(comment) },
                             contentPadding = PaddingValues(0.dp),
@@ -1359,25 +1368,43 @@ fun CommentThreadContent(
                             )
                         }
                     } else {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(top = 4.dp)
+                        androidx.compose.material3.TextButton(
+                            onClick = { repliesExpanded = !repliesExpanded },
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.height(32.dp)
                         ) {
-                            safeReplies.forEach { reply ->
-                                CommentCard(
-                                    comment = reply,
-                                    isBanned = isBanned,
-                                    onReply = onReply,
-                                    onProfileClick = onProfileClick,
-                                    onMentionClick = onMentionClick,
-                                    onPostClick = onPostClick,
-                                    openLinksInApp = openLinksInApp,
-                                    depth = depth + 1,
-                                    onFocusComment = onFocusComment,
-                                    onLoadReplies = onLoadReplies,
-                                    showImages = showImages,
-                                    onImageClick = onImageClick
-                                )
+                            Text(
+                                text = if (repliesExpanded) "Hide replies" else "See replies (${safeReplies.size})",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = repliesExpanded,
+                            enter = fadeIn(animationSpec = tween(220)) + expandVertically(animationSpec = tween(280)),
+                            exit = fadeOut(animationSpec = tween(160)) + shrinkVertically(animationSpec = tween(220))
+                        ) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                safeReplies.forEach { reply ->
+                                    CommentCard(
+                                        comment = reply,
+                                        isBanned = isBanned,
+                                        onReply = onReply,
+                                        onProfileClick = onProfileClick,
+                                        onMentionClick = onMentionClick,
+                                        onPostClick = onPostClick,
+                                        openLinksInApp = openLinksInApp,
+                                        depth = depth + 1,
+                                        onFocusComment = onFocusComment,
+                                        onLoadReplies = onLoadReplies,
+                                        showImages = showImages,
+                                        onImageClick = onImageClick
+                                    )
+                                }
                             }
                         }
                     }
