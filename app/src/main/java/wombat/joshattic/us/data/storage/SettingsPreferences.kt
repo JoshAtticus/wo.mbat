@@ -26,6 +26,8 @@ class SettingsPreferences(private val context: Context) {
         val WearFeedType = stringPreferencesKey("wear_feed_type")
         val BlockedQuoteHandling = stringPreferencesKey("blocked_quote_handling")
         val ShowBlockedRevealButton = booleanPreferencesKey("show_blocked_reveal_button")
+        val ShowBlockedQuoteRevealButton = booleanPreferencesKey("show_blocked_quote_reveal_button")
+        val ShowBlockedCommentRevealButton = booleanPreferencesKey("show_blocked_comment_reveal_button")
 
         val ThemeSource = stringPreferencesKey("theme_source")
         val CustomThemeColor = stringPreferencesKey("custom_theme_color")
@@ -45,7 +47,12 @@ class SettingsPreferences(private val context: Context) {
     val wearShowProfilePictures: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.WearShowProfilePictures] ?: true }
     val wearFeedType: Flow<String> = context.settingsDataStore.data.map { it[Keys.WearFeedType] ?: "Home" }
     val blockedQuoteHandling: Flow<String> = context.settingsDataStore.data.map { it[Keys.BlockedQuoteHandling] ?: "warning" }
-    val showBlockedRevealButton: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.ShowBlockedRevealButton] ?: false }
+    val showBlockedQuoteRevealButton: Flow<Boolean> = context.settingsDataStore.data.map {
+        it[Keys.ShowBlockedQuoteRevealButton] ?: it[Keys.ShowBlockedRevealButton] ?: false
+    }
+    val showBlockedCommentRevealButton: Flow<Boolean> = context.settingsDataStore.data.map {
+        it[Keys.ShowBlockedCommentRevealButton] ?: it[Keys.ShowBlockedRevealButton] ?: false
+    }
 
     val themeSource: Flow<String> = context.settingsDataStore.data.map { it[Keys.ThemeSource] ?: "account" }
     val customThemeColor: Flow<String> = context.settingsDataStore.data.map { it[Keys.CustomThemeColor] ?: "indigo" }
@@ -99,8 +106,12 @@ class SettingsPreferences(private val context: Context) {
         context.settingsDataStore.edit { it[Keys.BlockedQuoteHandling] = value }
     }
 
-    suspend fun setShowBlockedRevealButton(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.ShowBlockedRevealButton] = value }
+    suspend fun setShowBlockedQuoteRevealButton(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.ShowBlockedQuoteRevealButton] = value }
+    }
+
+    suspend fun setShowBlockedCommentRevealButton(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.ShowBlockedCommentRevealButton] = value }
     }
 
     suspend fun setThemeSource(value: String) {

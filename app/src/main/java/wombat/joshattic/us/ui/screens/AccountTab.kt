@@ -168,7 +168,7 @@ fun AccountTab(
         LaunchedEffect(listState, posts.size) {
             snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
                 .collect { lastVisibleIndex ->
-                    if (lastVisibleIndex != null && lastVisibleIndex >= posts.size - 5 && session != null) {
+                    if (posts.isNotEmpty() && lastVisibleIndex != null && lastVisibleIndex >= posts.size - 5 && session != null) {
                         onLoadNextPage()
                     }
                 }

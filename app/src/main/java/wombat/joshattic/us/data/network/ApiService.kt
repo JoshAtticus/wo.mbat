@@ -139,6 +139,19 @@ interface ApiService {
         @Body request: CreateCommentRequest
     ): Comment
 
+    @POST("comments/{comment_id}/report")
+    suspend fun reportComment(
+        @Header("authorization") token: String,
+        @Path("comment_id") commentId: String,
+        @Body request: ReportRequest
+    )
+
+    @DELETE("comments/{comment_id}")
+    suspend fun deleteComment(
+        @Path("comment_id") commentId: String,
+        @Header("authorization") token: String
+    )
+
     @GET("explore/posts/trending")
     suspend fun getTrendingPosts(
         @Header("authorization") token: String? = null,

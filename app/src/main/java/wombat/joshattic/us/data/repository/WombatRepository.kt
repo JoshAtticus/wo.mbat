@@ -174,6 +174,18 @@ class WombatRepository(
         )
     }
 
+    suspend fun reportComment(session: AuthSession, commentId: String, reason: String) {
+        apiService.reportComment(
+            commentId = commentId,
+            token = session.token,
+            request = wombat.joshattic.us.data.model.ReportRequest(reason = reason)
+        )
+    }
+
+    suspend fun deleteComment(session: AuthSession, commentId: String) {
+        apiService.deleteComment(commentId, session.token)
+    }
+
     suspend fun loadWallComments(session: AuthSession?, username: String, page: Int = 1): CommentResponse {
         return apiService.getWallComments(username = username, page = page, token = session?.token)
     }

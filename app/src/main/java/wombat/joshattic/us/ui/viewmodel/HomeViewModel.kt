@@ -954,6 +954,28 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(commentDraft = comment, errorMessage = null)
     }
 
+    fun deleteComment(comment: Comment) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            runCatching { repository.deleteComment(session, comment.id) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        comments = removeCommentFromTree(_uiState.value.comments, comment.id),
+                        wallComments = removeCommentFromTree(_uiState.value.wallComments, comment.id),
+                        focusedComment = if (_uiState.value.focusedComment?.id == comment.id) null else _uiState.value.focusedComment,
+                        commentReplyParent = if (_uiState.value.commentReplyParent?.id == comment.id) null else _uiState.value.commentReplyParent,
+                        wallCommentReplyParent = if (_uiState.value.wallCommentReplyParent?.id == comment.id) null else _uiState.value.wallCommentReplyParent,
+                        toastMessage = "Comment deleted"
+                    )
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = "Failed to delete comment: ${throwable.message}"
+                    )
+                }
+        }
+    }
+
     fun deletePost(postId: String, postAuthor: String? = null) {
         val currentSession = _uiState.value.session
         val savedAccounts = _uiState.value.savedAccounts
@@ -1665,10 +1687,22 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(showBannedPopup = false)
     }
 
-    fun openReportDialog(postId: String) {
+    fun openReportDialog(postId: String, posterName: String? = null) {
         _uiState.value = _uiState.value.copy(
             showReportDialog = true,
             reportPostId = postId,
+            reportCommentId = null,
+            reportTargetUsername = posterName,
+            reportReason = ""
+        )
+    }
+
+    fun openCommentReportDialog(commentId: String, posterName: String? = null) {
+        _uiState.value = _uiState.value.copy(
+            showReportDialog = true,
+            reportCommentId = commentId,
+            reportPostId = null,
+            reportTargetUsername = posterName,
             reportReason = ""
         )
     }
@@ -1677,9 +1711,22 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(
             showReportDialog = false,
             reportPostId = null,
+            reportCommentId = null,
             reportReason = "",
             reportLoading = false
         )
+    }
+
+    fun dismissReportSuccess() {
+        _uiState.value = _uiState.value.copy(
+            reportSuccessMessage = null
+        )
+    }
+
+    fun blockReportedUser() {
+        val username = _uiState.value.reportTargetUsername ?: return
+        _uiState.value = _uiState.value.copy(reportSuccessMessage = null)
+        blockUser(username)
     }
 
     fun setReportReason(reason: String) {
@@ -1688,27 +1735,36 @@ class HomeViewModel(
 
     fun submitReport(reason: String) {
         val currentSession = _uiState.value.session ?: return
-        val postId = _uiState.value.reportPostId ?: return
-        if (_uiState.value.blockedUsernames.contains(_uiState.value.selectedPost?.poster?.name?.lowercase())) return
+        val commentId = _uiState.value.reportCommentId
+        val postId = _uiState.value.reportPostId ?: if (commentId != null) null else return
+        if (commentId == null && _uiState.value.blockedUsernames.contains(_uiState.value.selectedPost?.poster?.name?.lowercase())) return
 
         _uiState.value = _uiState.value.copy(reportLoading = true)
         viewModelScope.launch {
-            runCatching {
-                repository.reportPost(currentSession, postId, reason)
-            }.onSuccess {
-                _uiState.value = _uiState.value.copy(
-                    showReportDialog = false,
-                    reportPostId = null,
-                    reportReason = "",
-                    reportLoading = false,
-                    toastMessage = "Post reported"
-                )
-            }.onFailure { throwable ->
-                _uiState.value = _uiState.value.copy(
-                    reportLoading = false,
-                    toastMessage = throwable.friendlyMessage(default = "Failed to report post")
-                )
+            val result = if (commentId != null) {
+                runCatching { repository.reportComment(currentSession, commentId, reason) }
+                    .map { "Comment reported" }
+            } else {
+                runCatching { repository.reportPost(currentSession, postId!!, reason) }
+                    .map { "Post reported" }
             }
+            result
+                .onSuccess { message ->
+                    _uiState.value = _uiState.value.copy(
+                        showReportDialog = false,
+                        reportPostId = null,
+                        reportCommentId = null,
+                        reportReason = "",
+                        reportLoading = false,
+                        reportSuccessMessage = message
+                    )
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        reportLoading = false,
+                        toastMessage = throwable.friendlyMessage(default = "Failed to report")
+                    )
+                }
         }
     }
 
@@ -2109,11 +2165,7 @@ class HomeViewModel(
             val isBlocked = blockedUsernames.contains(posterNameLower)
             val filteredReplies = filterBlockedComments(comment.replies ?: emptyList(), blockedUsernames)
             if (isBlocked) {
-                if (filteredReplies.isNotEmpty()) {
-                    comment.copy(blocked = true, replies = filteredReplies)
-                } else {
-                    null
-                }
+                comment.copy(blocked = true, replies = filteredReplies)
             } else {
                 comment.copy(replies = filteredReplies)
             }
@@ -2184,29 +2236,43 @@ class HomeViewModel(
         if (comment.repliesLoading || (comment.replies ?: emptyList()).isNotEmpty()) return
         updateWallComment(comment.id) { it.copy(repliesLoading = true) }
         viewModelScope.launch(Dispatchers.IO) {
-            val loaded = loadRepliesOneLevel(comment, session)
-            updateWallComment(comment.id) {
-                it.copy(
-                    replies = filterBlockedComments(loaded.replies, _uiState.value.blockedUsernames),
-                    repliesLoading = false
-                )
+            runCatching { loadRepliesOneLevel(comment, session) }
+                .onSuccess { loaded ->
+                    updateWallComment(comment.id) {
+                        it.copy(
+                            replies = filterBlockedComments(loaded.replies, _uiState.value.blockedUsernames),
+                            repliesLoading = false
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    updateWallComment(comment.id) { it.copy(repliesLoading = false) }
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = throwable.friendlyMessage(default = "Unable to load replies")
+                    )
+                }
             }
-        }
     }
 
     private fun updatePostComment(commentId: String, transform: (Comment) -> Comment) {
+        val updatedComments = _uiState.value.comments.map {
+            updateCommentInTree(it, commentId, transform)
+        }
+        val focused = _uiState.value.focusedComment
         _uiState.value = _uiState.value.copy(
-            comments = _uiState.value.comments.map {
-                updateCommentInTree(it, commentId, transform)
-            }
+            comments = updatedComments,
+            focusedComment = focused?.let { findCommentById(updatedComments, it.id) ?: it }
         )
     }
 
     private fun updateWallComment(commentId: String, transform: (Comment) -> Comment) {
+        val updatedComments = _uiState.value.wallComments.map {
+            updateCommentInTree(it, commentId, transform)
+        }
+        val focused = _uiState.value.focusedComment
         _uiState.value = _uiState.value.copy(
-            wallComments = _uiState.value.wallComments.map {
-                updateCommentInTree(it, commentId, transform)
-            }
+            wallComments = updatedComments,
+            focusedComment = focused?.let { findCommentById(updatedComments, it.id) ?: it }
         )
     }
 
@@ -2219,6 +2285,14 @@ class HomeViewModel(
         val replies = comment.replies ?: emptyList()
         if (replies.isEmpty()) return comment
         return comment.copy(replies = replies.map { updateCommentInTree(it, commentId, transform) })
+    }
+
+    private fun removeCommentFromTree(comments: List<Comment>, commentId: String): List<Comment> {
+        return comments
+            .filter { it.id != commentId }
+            .map { comment ->
+                comment.copy(replies = removeCommentFromTree(comment.replies ?: emptyList(), commentId))
+            }
     }
 
     private suspend fun loadRepliesOneLevel(comment: Comment, session: AuthSession?): Comment {
@@ -2316,8 +2390,13 @@ class HomeViewModel(
             }
         }
         viewModelScope.launch {
-            prefs.showBlockedRevealButton.collectLatest { value ->
-                _uiState.value = _uiState.value.copy(showBlockedRevealButton = value)
+            prefs.showBlockedQuoteRevealButton.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(showBlockedQuoteRevealButton = value)
+            }
+        }
+        viewModelScope.launch {
+            prefs.showBlockedCommentRevealButton.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(showBlockedCommentRevealButton = value)
             }
         }
         viewModelScope.launch {
@@ -2409,8 +2488,12 @@ class HomeViewModel(
         viewModelScope.launch { repository.settingsPreferences.setBlockedQuoteHandling(value) }
     }
 
-    fun setShowBlockedRevealButton(value: Boolean) {
-        viewModelScope.launch { repository.settingsPreferences.setShowBlockedRevealButton(value) }
+    fun setShowBlockedQuoteRevealButton(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setShowBlockedQuoteRevealButton(value) }
+    }
+
+    fun setShowBlockedCommentRevealButton(value: Boolean) {
+        viewModelScope.launch { repository.settingsPreferences.setShowBlockedCommentRevealButton(value) }
     }
 
     suspend fun uploadImage(context: Context, uri: Uri): String {

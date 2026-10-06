@@ -117,6 +117,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -673,7 +674,8 @@ fun PostActionsMenu(
 }
 
 val LocalOnViewReposts = compositionLocalOf<((Post) -> Unit)?> { null }
-val LocalShowBlockedRevealButton = compositionLocalOf { false }
+val LocalShowBlockedQuoteRevealButton = compositionLocalOf { false }
+val LocalShowBlockedCommentRevealButton = compositionLocalOf { false }
 
 fun isPureRepost(post: Post): Boolean {
     return post.repost != null &&
@@ -998,7 +1000,7 @@ fun PostCard(
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    if (LocalShowBlockedRevealButton.current) {
+                                    if (LocalShowBlockedQuoteRevealButton.current) {
                                         TextButton(onClick = { quoteRevealed = true }) {
                                             Text("Show")
                                         }
@@ -1048,7 +1050,7 @@ fun PostCard(
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 PostMetric(
                     value = post.loves,
@@ -1059,16 +1061,23 @@ fun PostCard(
                     isActive = post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true),
                     enabled = post.isLoving != null && !isBanned && !post.loveLoading,
                     pulse = (post.isLoving == null || post.loveLoading) && !isBanned,
-                    onClick = onLoveClick?.let { { onLoveClick(post) } }
+                    onClick = onLoveClick?.let { { onLoveClick(post) } },
+                    shape = RoundedCornerShape(28.dp)
                 )
-                PostMetric(post.comments, "comments", Icons.Filled.Chat)
+                PostMetric(
+                    value = post.comments,
+                    label = "comments",
+                    icon = Icons.Filled.Chat,
+                    shape = RoundedCornerShape(28.dp)
+                )
                 Box {
                     var repostMenuExpanded by remember { mutableStateOf(false) }
                     PostMetric(
                         value = post.reposts,
                         label = "reposts",
                         icon = Icons.Filled.Repeat,
-                        onClick = if (onRepostClick != null || onQuoteClick != null) { { repostMenuExpanded = true } } else null
+                        onClick = if (onRepostClick != null || onQuoteClick != null) { { repostMenuExpanded = true } } else null,
+                        shape = RoundedCornerShape(28.dp)
                     )
                     DropdownMenu(
                         expanded = repostMenuExpanded,
@@ -1123,7 +1132,10 @@ fun PostCard(
 fun CommentCard(
     comment: Comment,
     isBanned: Boolean = false,
+    currentUsername: String? = null,
     onReply: (Comment) -> Unit = {},
+    onDeleteComment: ((Comment) -> Unit)? = null,
+    onReportComment: ((Comment) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
     onMentionClick: ((String) -> Unit)? = null,
     onPostClick: ((String) -> Unit)? = null,
@@ -1149,7 +1161,10 @@ fun CommentCard(
                 CommentThreadContent(
                     comment = comment,
                     isBanned = isBanned,
+                    currentUsername = currentUsername,
                     onReply = onReply,
+                    onDeleteComment = onDeleteComment,
+                    onReportComment = onReportComment,
                     onProfileClick = onProfileClick,
                     onMentionClick = onMentionClick,
                     onPostClick = onPostClick,
@@ -1166,7 +1181,10 @@ fun CommentCard(
         CommentThreadContent(
             comment = comment,
             isBanned = isBanned,
+            currentUsername = currentUsername,
             onReply = onReply,
+            onDeleteComment = onDeleteComment,
+            onReportComment = onReportComment,
             onProfileClick = onProfileClick,
             onMentionClick = onMentionClick,
             onPostClick = onPostClick,
@@ -1184,7 +1202,10 @@ fun CommentCard(
 fun CommentThreadContent(
     comment: Comment,
     isBanned: Boolean,
+    currentUsername: String?,
     onReply: (Comment) -> Unit,
+    onDeleteComment: ((Comment) -> Unit)?,
+    onReportComment: ((Comment) -> Unit)?,
     onProfileClick: (String) -> Unit,
     onMentionClick: ((String) -> Unit)?,
     onPostClick: ((String) -> Unit)?,
@@ -1198,8 +1219,13 @@ fun CommentThreadContent(
     val isBlockedPlaceholder = comment.blocked
     var commentRevealed by remember(comment.id) { mutableStateOf(false) }
     var repliesExpanded by remember(comment.id) { mutableStateOf(true) }
+    var showDeleteDialog by remember(comment.id) { mutableStateOf(false) }
+    var moreMenuExpanded by remember(comment.id) { mutableStateOf(false) }
     val isReply = comment.parent != null
     val safeReplies = comment.replies ?: emptyList()
+    val normalizedCurrentUsername = currentUsername?.trim()?.removePrefix("@")
+    val canManage = normalizedCurrentUsername != null &&
+        normalizedCurrentUsername.equals(comment.poster.name.trim().removePrefix("@"), ignoreCase = true)
 
     LaunchedEffect(comment.repliesLoading, safeReplies.size, depth) {
         if (depth >= 2 && !comment.repliesLoading && safeReplies.isNotEmpty()) {
@@ -1285,19 +1311,25 @@ fun CommentThreadContent(
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
-                if (!isBanned && !isBlockedPlaceholder) {
-                    IconButton(
-                        onClick = { onReply(comment) }, 
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Chat, 
-                            contentDescription = "Reply", 
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                        )
+            }
+
+            if (showDeleteDialog && onDeleteComment != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Delete comment?") },
+                    text = { Text("This cannot be undone.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                onDeleteComment(comment)
+                                showDeleteDialog = false
+                            }
+                        ) { Text("Delete") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
                     }
-                }
+                )
             }
             
             if (isBlockedPlaceholder && !commentRevealed) {
@@ -1307,7 +1339,7 @@ fun CommentThreadContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.padding(bottom = 2.dp)
                 )
-                if (LocalShowBlockedRevealButton.current) {
+                if (LocalShowBlockedCommentRevealButton.current) {
                     TextButton(
                         onClick = { commentRevealed = true },
                         contentPadding = PaddingValues(0.dp),
@@ -1333,6 +1365,65 @@ fun CommentThreadContent(
                         onImageClick = onImageClick,
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
+                }
+                if (!isBanned && !isBlockedPlaceholder) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedButton(
+                            onClick = { onReply(comment) },
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.heightIn(min = 40.dp)
+                        ) {
+                            Icon(Icons.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Reply")
+                        }
+                        val showOwnerMenu = canManage && onDeleteComment != null
+                        val showReport = onReportComment != null
+                        if (showOwnerMenu || showReport) {
+                            Box {
+                                OutlinedButton(
+                                    onClick = { moreMenuExpanded = true },
+                                    contentPadding = PaddingValues(horizontal = 12.dp),
+                                    modifier = Modifier.heightIn(min = 40.dp)
+                                ) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("More")
+                                }
+                                DropdownMenu(
+                                    expanded = moreMenuExpanded,
+                                    onDismissRequest = { moreMenuExpanded = false }
+                                ) {
+                                    if (showReport) {
+                                        DropdownMenuItem(
+                                            text = { Text("Report") },
+                                            onClick = {
+                                                moreMenuExpanded = false
+                                                onReportComment?.invoke(comment)
+                                            },
+                                            leadingIcon = { Icon(Icons.Filled.Flag, contentDescription = null) }
+                                        )
+                                    }
+                                    if (showOwnerMenu) {
+                                        DropdownMenuItem(
+                                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                                            onClick = {
+                                                moreMenuExpanded = false
+                                                showDeleteDialog = true
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Filled.Delete,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
@@ -1393,7 +1484,10 @@ fun CommentThreadContent(
                                     CommentCard(
                                         comment = reply,
                                         isBanned = isBanned,
+                                        currentUsername = currentUsername,
                                         onReply = onReply,
+                                        onDeleteComment = onDeleteComment,
+                                        onReportComment = onReportComment,
                                         onProfileClick = onProfileClick,
                                         onMentionClick = onMentionClick,
                                         onPostClick = onPostClick,
@@ -1804,7 +1898,8 @@ fun PostMetric(
     isActive: Boolean = false,
     enabled: Boolean = true,
     pulse: Boolean = false,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    shape: androidx.compose.ui.graphics.Shape = CircleShape
 ) {
     val haptic = LocalHapticFeedback.current
     val isLoveMetric = label == "loves"
@@ -1852,18 +1947,27 @@ fun PostMetric(
     )
 
     Surface(
-        shape = CircleShape,
+        shape = shape,
         color = containerColor,
         contentColor = contentColor,
-        modifier = if (onClick != null) Modifier.clickable(enabled = enabled) {
-            if (!isActive) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                animMode = (0..2).random()
-            } else {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            }
-            onClick()
-        } else Modifier
+        modifier = Modifier
+            .heightIn(min = 32.dp)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = shape
+            )
+            .then(
+                if (onClick != null) Modifier.clickable(enabled = enabled) {
+                    if (!isActive) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        animMode = (0..2).random()
+                    } else {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    onClick()
+                } else Modifier
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -1927,7 +2031,7 @@ fun PostShareButton(postId: String) {
                 .heightIn(min = 32.dp)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
                 imageVector = Icons.Filled.Share,
@@ -2729,7 +2833,8 @@ fun ReportDialog(
     onReasonChange: (String) -> Unit,
     loading: Boolean,
     onDismiss: () -> Unit,
-    onSubmit: (String) -> Unit
+    onSubmit: (String) -> Unit,
+    title: String = "Report Post"
 ) {
     val presets = listOf(
         "Spam",
@@ -2744,7 +2849,7 @@ fun ReportDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Report Post") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 presets.forEach { preset ->

@@ -79,6 +79,8 @@ fun PostDetailsContent(
     replyingTo: Comment? = null,
     onCancelReply: () -> Unit = {},
     onReplyToComment: (Comment) -> Unit = {},
+    onReportComment: ((Comment) -> Unit)? = null,
+    onDeleteComment: ((Comment) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: ((Post) -> Unit)? = null,
     onPostClick: ((Post) -> Unit)? = null,
@@ -274,7 +276,10 @@ fun PostDetailsContent(
                         CommentCard(
                             comment = comment,
                             isBanned = isBanned,
+                            currentUsername = currentUsername,
                             onReply = onReplyToComment,
+                            onDeleteComment = onDeleteComment,
+                            onReportComment = onReportComment,
                             onProfileClick = handleProfileClick,
                             onMentionClick = handleMentionClick,
                             onPostClick = onPostClickById,
@@ -361,8 +366,7 @@ fun PostDetailsContent(
                             else "Write a reply...",
                             onUploadImage = onUploadImage,
                             modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                        )                    }
                 }
             }
         }
@@ -385,6 +389,8 @@ fun PostDetailsSheet(
     replyingTo: Comment? = null,
     onCancelReply: () -> Unit = {},
     onReplyToComment: (Comment) -> Unit = {},
+    onReportComment: ((Comment) -> Unit)? = null,
+    onDeleteComment: ((Comment) -> Unit)? = null,
     onProfileClick: (String) -> Unit = {},
     onLoveClick: (Post) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
@@ -441,6 +447,8 @@ fun PostDetailsSheet(
             replyingTo = replyingTo,
             onCancelReply = onCancelReply,
             onReplyToComment = onReplyToComment,
+            onDeleteComment = onDeleteComment,
+            onReportComment = onReportComment,
             onProfileClick = onProfileClick,
             onLoveClick = onLoveClick,
             onPostClick = onPostClick,

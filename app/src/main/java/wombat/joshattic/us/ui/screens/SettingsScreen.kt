@@ -110,7 +110,8 @@ fun SettingsScreen(
     onUnblockUser: (String) -> Unit,
     onFollowJosh: () -> Unit,
     onBlockedQuoteHandlingChange: (String) -> Unit,
-    onShowBlockedRevealButtonChange: (Boolean) -> Unit,
+    onShowBlockedQuoteRevealButtonChange: (Boolean) -> Unit,
+    onShowBlockedCommentRevealButtonChange: (Boolean) -> Unit,
     frogMessage: String? = null
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -259,8 +260,10 @@ fun SettingsScreen(
                                         onUnblockUser = onUnblockUser,
                                         blockedQuoteHandling = uiState.blockedQuoteHandling,
                                         onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange,
-                                        showRevealButton = uiState.showBlockedRevealButton,
-                                        onShowRevealButtonChange = onShowBlockedRevealButtonChange
+                                        showQuoteRevealButton = uiState.showBlockedQuoteRevealButton,
+                                        onShowQuoteRevealButtonChange = onShowBlockedQuoteRevealButtonChange,
+                                        showCommentRevealButton = uiState.showBlockedCommentRevealButton,
+                                        onShowCommentRevealButtonChange = onShowBlockedCommentRevealButtonChange
                                     )
                                     SettingsCategory.WEAR_OS -> WearSettings(
                                         currentAccount = uiState.wearAccount,
@@ -328,8 +331,10 @@ fun SettingsScreen(
                             onUnblockUser = onUnblockUser,
                             blockedQuoteHandling = uiState.blockedQuoteHandling,
                             onBlockedQuoteHandlingChange = onBlockedQuoteHandlingChange,
-                            showRevealButton = uiState.showBlockedRevealButton,
-                            onShowRevealButtonChange = onShowBlockedRevealButtonChange
+                            showQuoteRevealButton = uiState.showBlockedQuoteRevealButton,
+                            onShowQuoteRevealButtonChange = onShowBlockedQuoteRevealButtonChange,
+                            showCommentRevealButton = uiState.showBlockedCommentRevealButton,
+                            onShowCommentRevealButtonChange = onShowBlockedCommentRevealButtonChange
                         )
                         SettingsCategory.WEAR_OS -> WearSettings(
                             currentAccount = uiState.wearAccount,
@@ -916,8 +921,10 @@ private fun BlockedUsersSettings(
     onUnblockUser: (String) -> Unit,
     blockedQuoteHandling: String,
     onBlockedQuoteHandlingChange: (String) -> Unit,
-    showRevealButton: Boolean,
-    onShowRevealButtonChange: (Boolean) -> Unit
+    showQuoteRevealButton: Boolean,
+    onShowQuoteRevealButtonChange: (Boolean) -> Unit,
+    showCommentRevealButton: Boolean,
+    onShowCommentRevealButtonChange: (Boolean) -> Unit
 ) {
     var showBlockHandlingSettings by remember { mutableStateOf(false) }
 
@@ -936,9 +943,9 @@ private fun BlockedUsersSettings(
                 Text("Block Handling Options", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Text("Block Handling", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("Blocked quote posts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
-                "Choose what happens when a post quotes a post by a user you blocked.",
+                "Choose what happens when a post quotes content from a user you blocked.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -962,17 +969,17 @@ private fun BlockedUsersSettings(
                     modifier = Modifier.fillMaxWidth().padding(start = 8.dp)
                 ) {
                     Text(
-                        "Add a Show button to reveal blocked content",
+                        "Add a Show button to reveal blocked quoted posts",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f)
                     )
                     Switch(
-                        checked = showRevealButton,
-                        onCheckedChange = onShowRevealButtonChange
+                        checked = showQuoteRevealButton,
+                        onCheckedChange = onShowQuoteRevealButtonChange
                     )
                 }
                 Text(
-                    "Adds a one-time Show button to blocked quotes and comments. It must be pressed again for each item and never unblocks anyone.",
+                    "Adds a one-time Show button to blocked quoted posts. It must be pressed again for each item and never unblocks anyone.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
@@ -1002,6 +1009,37 @@ private fun BlockedUsersSettings(
                     Text("Completely filter out any quote post of a blocked user's post from your feed", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Text("Blocked comments", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Choose whether blocked comments can be revealed one at a time.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp)
+            ) {
+                Text(
+                    "Add a Show button to reveal blocked comments",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = showCommentRevealButton,
+                    onCheckedChange = onShowCommentRevealButtonChange
+                )
+            }
+            Text(
+                "Adds a one-time Show button to blocked comments. It must be pressed again for each item and never unblocks anyone.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+            )
         }
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -1027,8 +1065,8 @@ private fun BlockedUsersSettings(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Quote Repost Behavior", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("Manage how quote posts of blocked users are handled", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                        Text("Blocked User Behavior", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("Manage how content from blocked users is handled", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
                     }
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,

@@ -131,6 +131,7 @@ data class MarkReadRequest(val messages: List<String>)
 
 data class CreateCommentRequest(val content: String, val parent: String? = null)
 
+
 data class CreateWallCommentResponse(val ok: String, val id: String)
 
 data class AuthSession(

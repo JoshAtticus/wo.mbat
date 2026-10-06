@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.IconButton
@@ -465,7 +466,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                     confirmMessage = "Are you sure you want to block @$username?"
                                                     confirmAction = { viewModel.blockUser(username) }
                                                 },
-                                                onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                                                onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                                 onLoadNextPage = viewModel::loadNextFeedPage,
                                                 onRepostClick = { 
                                                     viewModel.submitRepost(it.id) {
@@ -509,7 +510,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                     confirmMessage = "Are you sure you want to block @$username?"
                                                     confirmAction = { viewModel.blockUser(username) }
                                                 },
-                                                onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                                                onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                                 onRepostClick = { 
                                                     viewModel.submitRepost(it.id) {
                                                         coroutineScope.launch { exploreListState.animateScrollToItem(0) }
@@ -664,6 +665,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             replyingTo = uiState.commentReplyParent,
                                             onCancelReply = { viewModel.setCommentReplyParent(null) },
                                             onReplyToComment = viewModel::setCommentReplyParent,
+                                            onDeleteComment = viewModel::deleteComment,
+                                            onReportComment = { comment ->
+                                                viewModel.openCommentReportDialog(comment.id, comment.poster.name)
+                                            },
                                             onProfileClick = viewModel::openProfile,
                                             onLoveClick = viewModel::togglePostLove,
                                             onPostClick = viewModel::openPost,
@@ -672,7 +677,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 confirmMessage = "Are you sure you want to block @$username?"
                                                 confirmAction = { viewModel.blockUser(username) }
                                             },
-                                            onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                                            onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                             scrollToCommentId = uiState.scrollToCommentId,
                                             onScrollToCommentComplete = viewModel::clearScrollToComment,
                                             onImageClick = viewModel::openFullScreenImages,
@@ -710,6 +715,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             replyingTo = uiState.wallCommentReplyParent,
                                             onCancelReply = { viewModel.setWallCommentReplyParent(null) },
                                             onReplyToComment = viewModel::setWallCommentReplyParent,
+                                             currentUsername = uiState.session?.username,
+                                             onDeleteComment = viewModel::deleteComment,
+                                             onReportComment = { comment ->
+                                                 viewModel.openCommentReportDialog(comment.id, comment.poster.name)
+                                             },
                                             onProfileClick = viewModel::openProfile,
                                             openLinksInApp = uiState.openLinksInApp,
                                             onPostClickById = viewModel::openPostById,
@@ -742,7 +752,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 confirmMessage = "Are you sure you want to report and block @$username?"
                                                 confirmAction = { viewModel.blockUser(username, reported = true) }
                                             },
-                                            onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                                            onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                             onUnblockClick = viewModel::unblockViewedProfile,
                                             onPostClick = viewModel::openPost,
                                             onMentionClick = { username ->
@@ -814,7 +824,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                     confirmMessage = "Are you sure you want to report and block @$username?"
                                     confirmAction = { viewModel.blockUser(username, reported = true) }
                                 },
-                                onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                                onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                 onUnblockClick = viewModel::unblockViewedProfile,
                                 onPostClick = viewModel::openPost,
                                 onMentionClick = { username ->
@@ -862,7 +872,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             confirmMessage = "Are you sure you want to block @$username?"
                                             confirmAction = { viewModel.blockUser(username) }
                                         },
-                                        onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                                        onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                         onLoadNextPage = viewModel::loadNextFeedPage,
                                         onRepostClick = { 
                                             viewModel.submitRepost(it.id) {
@@ -906,7 +916,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             confirmMessage = "Are you sure you want to block @$username?"
                                             confirmAction = { viewModel.blockUser(username) }
                                         },
-                                        onReportPost = { post -> viewModel.openReportDialog(post.id) },
+                                        onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                         onRepostClick = { 
                                             viewModel.submitRepost(it.id) {
                                                 coroutineScope.launch { exploreListState.animateScrollToItem(0) }
@@ -1134,20 +1144,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         replyingTo = uiState.commentReplyParent,
                         onCancelReply = { viewModel.setCommentReplyParent(null) },
                         onReplyToComment = viewModel::setCommentReplyParent,
-                        onProfileClick = viewModel::openProfile,
-                        onLoveClick = viewModel::togglePostLove,
-                        onPostClick = viewModel::openPost,
-                        onBlockUser = { username: String -> 
-                            confirmTitle = "Block User"
-                            confirmMessage = "Are you sure you want to block @$username?"
-                            confirmAction = { viewModel.blockUser(username) }
-                        },
-                        onReportPost = { post -> viewModel.openReportDialog(post.id) },
-                        scrollToCommentId = uiState.scrollToCommentId,
-                        onScrollToCommentComplete = viewModel::clearScrollToComment,
-                        onImageClick = viewModel::openFullScreenImages,
-                        onRepostClick = { viewModel.submitRepost(it.id) },
-                        onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                         currentUsername = uiState.session?.username,
                         savedAccounts = uiState.savedAccounts,
                         onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
@@ -1163,6 +1159,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                          blockedUsernames = uiState.blockedUsernames,
                          blockedQuoteHandling = uiState.blockedQuoteHandling,
                          errorMessage = uiState.errorMessage,
+                         onReportComment = { comment -> viewModel.openCommentReportDialog(comment.id, comment.poster.name) },
                          onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                      )
                  }
@@ -1181,6 +1178,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         replyingTo = uiState.wallCommentReplyParent,
                         onCancelReply = { viewModel.setWallCommentReplyParent(null) },
                         onReplyToComment = viewModel::setWallCommentReplyParent,
+                        currentUsername = uiState.session?.username,
+                        onDeleteComment = viewModel::deleteComment,
+                        onReportComment = { comment -> viewModel.openCommentReportDialog(comment.id, comment.poster.name) },
                         onProfileClick = viewModel::openProfile,
                         openLinksInApp = uiState.openLinksInApp,
                         onPostClickById = viewModel::openPostById,
@@ -1250,13 +1250,49 @@ fun HomeScreen(viewModel: HomeViewModel) {
         )
     }
 
-    if (uiState.showReportDialog && uiState.reportPostId != null) {
+    if (uiState.showReportDialog && (uiState.reportPostId != null || uiState.reportCommentId != null)) {
         ReportDialog(
             reason = uiState.reportReason,
             onReasonChange = viewModel::setReportReason,
             loading = uiState.reportLoading,
             onDismiss = viewModel::closeReportDialog,
-            onSubmit = viewModel::submitReport
+            onSubmit = viewModel::submitReport,
+            title = if (uiState.reportCommentId != null) "Report Comment" else "Report Post"
+        )
+    }
+
+    uiState.reportSuccessMessage?.let { successMessage ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissReportSuccess,
+            icon = {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("Report submitted") },
+            text = {
+                Text(
+                    if (uiState.reportTargetUsername != null) {
+                        "$successMessage. Would you also like to block @${uiState.reportTargetUsername}?"
+                    } else {
+                        "$successMessage."
+                    }
+                )
+            },
+            confirmButton = {
+                if (uiState.reportTargetUsername != null) {
+                    TextButton(onClick = viewModel::blockReportedUser) {
+                        Text("Block @${uiState.reportTargetUsername}")
+                    }
+                } else {
+                    TextButton(onClick = viewModel::dismissReportSuccess) { Text("OK") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissReportSuccess) { Text("No thanks") }
+            }
         )
     }
 
@@ -1338,7 +1374,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onUnblockUser = viewModel::unblockUser,
             onFollowJosh = viewModel::followJoshAtticus,
             onBlockedQuoteHandlingChange = viewModel::setBlockedQuoteHandling,
-            onShowBlockedRevealButtonChange = viewModel::setShowBlockedRevealButton,
+            onShowBlockedQuoteRevealButtonChange = viewModel::setShowBlockedQuoteRevealButton,
+            onShowBlockedCommentRevealButtonChange = viewModel::setShowBlockedCommentRevealButton,
             frogMessage = uiState.exploreFrogMessage
         )
     }

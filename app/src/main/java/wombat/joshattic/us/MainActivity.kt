@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
                     wombat.joshattic.us.ui.screens.LocalOnViewReposts provides { post ->
                         homeViewModel.openReposts(post)
                     },
-                    wombat.joshattic.us.ui.screens.LocalShowBlockedRevealButton provides uiState.showBlockedRevealButton
+                    wombat.joshattic.us.ui.screens.LocalShowBlockedQuoteRevealButton provides uiState.showBlockedQuoteRevealButton,
+                    wombat.joshattic.us.ui.screens.LocalShowBlockedCommentRevealButton provides uiState.showBlockedCommentRevealButton
                 ) {
                     SplashOverlay {
                         HomeScreen(viewModel = homeViewModel)
