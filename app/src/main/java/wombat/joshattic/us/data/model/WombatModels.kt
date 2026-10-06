@@ -13,7 +13,6 @@ data class User(
     val stats: UserStats?,
     val online: Boolean,
     val permissions: Permissions? = null,
-    // API sends links as objects ({label, url}) or sometimes raw strings; keep both parseable
     val links: List<UserLink?> = emptyList(),
     val history: UserHistory? = null,
     val beta: Boolean = false
@@ -45,7 +44,6 @@ data class Post(
     val reposts: Int,
     val pinned: Boolean? = null,
     val isLoving: Boolean? = null,
-    // In-memory flag: a love toggle request is in flight. Never persisted.
     val loveLoading: Boolean = false
 )
 
@@ -111,10 +109,7 @@ data class Comment(
     val hasReplies: Boolean,
     val top: String? = null,
     val replies: List<Comment> = emptyList(),
-    // In-memory flags: replies fetched lazily on demand; never persisted.
     val repliesLoading: Boolean = false,
-    // In-memory flag: the poster is blocked. Real content is kept so an
-    // explicit "Show" can reveal it; never persisted.
     val blocked: Boolean = false
 )
 

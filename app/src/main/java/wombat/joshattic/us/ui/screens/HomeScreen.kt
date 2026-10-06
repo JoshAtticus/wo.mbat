@@ -125,7 +125,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // System back walks the profile history instead of leaving the app
     BackHandler(enabled = uiState.viewingProfileUsername != null) {
         viewModel.navigateBackFromProfile()
     }
@@ -151,9 +150,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
-            // Sheets (composer, post/wall details) live in their own windows
-            // above this Scaffold, which would bury a snackbar. While one is
-            // open the message renders inline inside it instead.
             val coveredBySheet = uiState.showComposer ||
                 uiState.selectedPost != null ||
                 uiState.viewRepostsPost != null ||
@@ -279,15 +275,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 topBar = {
                     if (!isTablet) {
                         val viewingUser = uiState.viewingProfileUsername
-                        // Match the per-user theming used by ProfileScreen/AccountTab so the
-                        // top bar doesn't sit on an unthemed colour while the page below it is themed
                         val topBarUserColor = when {
                             viewingUser != null -> uiState.viewingProfile?.color
                             uiState.selectedTab == BottomTab.Account -> uiState.accountProfile?.color
                             else -> null
                         }
-                        // Only re-theme when a per-user color exists; passing null to WombatTheme
-                        // would discard the outer custom theme and fall back to the default palette
                         val themedTopBar: @Composable (content: @Composable () -> Unit) -> Unit =
                             if (topBarUserColor != null) {
                                 { content -> WombatTheme(userColor = topBarUserColor, content = content) }
@@ -373,7 +365,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 )) {
                     if (isTablet) {
                         Row(modifier = Modifier.fillMaxSize()) {
-                            // Left side: Navigation Rail
                             WombatNavigationRail(
                                 selectedTab = uiState.selectedTab,
                                 unreadCount = uiState.unreadNotificationCount,
@@ -384,7 +375,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onTabSelected = viewModel::selectTab
                             )
 
-                            // Vertical divider
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
@@ -392,7 +382,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                             )
 
-                            // Left Pane: Current list view
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -644,7 +633,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 }
                             }
 
-                            // Vertical divider
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
@@ -652,7 +640,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                             )
 
-                            // Right Pane: selection details fallback stack
                             Box(
                                 modifier = Modifier
                                     .weight(1.2f)
@@ -806,7 +793,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             }
                         }
                     } else {
-                        // Mobile layout
                         if (uiState.viewingProfileUsername != null) {
                             ProfileScreen(
                                 profile = uiState.viewingProfile,
@@ -1024,21 +1010,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         }
                     }
 
-                    // ── Floating bottom bar (phone only) ────────────────────────────
                     if (!isTablet) {
                         val showFab = uiState.selectedTab == BottomTab.Home && !uiState.isBanned
 
-                        // Single Animatable drives all FAB size transitions, sequenced in a coroutine
-                        // so each animateTo() fully completes before the next starts — no race conditions.
                         val fabAnim = remember { androidx.compose.animation.core.Animatable(if (showFab) 68f else 0f) }
 
                         LaunchedEffect(showFab) {
                             if (showFab) {
-                                // Appear: overshoot to 76, then spring back to 68
                                 fabAnim.animateTo(76f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
                                 fabAnim.animateTo(68f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
                             } else {
-                                // Disappear: expand to 76, then tween smoothly to 0
                                 fabAnim.animateTo(76f, tween(durationMillis = 80))
                                 fabAnim.animateTo(0f, tween(durationMillis = 260))
                             }
@@ -1046,7 +1027,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
 
                         val fabSizeDp = fabAnim.value.dp
 
-                        // Nav bar weight expands to fill space as FAB shrinks
                         val navWeight by animateFloatAsState(
                             targetValue = if (fabAnim.value < 1f) 1f else 0.72f,
                             animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
@@ -1223,8 +1203,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
             loading = uiState.repostsLoading,
             errorMessage = uiState.repostsError,
             onDismiss = viewModel::closeReposts,
-            // Sheets stack: tapping a post opens details on top (one animation)
-            // and dismissing it drops the user back into this list.
             onOpenPost = viewModel::openPost,
             onProfileClick = viewModel::openProfile,
             onMentionClick = viewModel::openProfile,
@@ -1282,7 +1260,6 @@ fun HomeScreen(viewModel: HomeViewModel) {
         )
     }
 
-    // In-App Notification Overlay
     AnimatedVisibility(
         visible = uiState.inAppNotifications && uiState.inAppNotification != null,
         enter = slideInVertically(initialOffsetY = { -it }),

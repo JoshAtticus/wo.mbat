@@ -43,8 +43,6 @@ object DevalueParser {
                         else -> primitive.asString
                     }
                 }
-                // Devalue arrays are lists of indices into the pool — the
-                // element *values* are the indices, not the array positions
                 element.isJsonArray -> element.asJsonArray.map { ref ->
                     if (ref.isJsonPrimitive && ref.asJsonPrimitive.isNumber) resolve(ref.asInt) else null
                 }

@@ -47,8 +47,6 @@ class WearSyncService : WearableListenerService() {
             val request = PutDataMapRequest.create(PATH_AUTH).apply {
                 dataMap.putString(KEY_TOKEN, token ?: "")
                 dataMap.putString(KEY_USERNAME, username ?: "")
-                // Timestamp ensures the Data Layer treats this as new data even if
-                // token/username didn't change (e.g. re-login with same credentials).
                 dataMap.putLong("ts", System.currentTimeMillis())
             }
             dataClient.putDataItem(request.asPutDataRequest().setUrgent())

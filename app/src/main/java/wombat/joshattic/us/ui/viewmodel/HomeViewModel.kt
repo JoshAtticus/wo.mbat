@@ -42,7 +42,6 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // Profiles viewed before the currently open one, so back can walk the chain
     private val profileBackStack = ArrayDeque<String>()
 
     init {
@@ -102,9 +101,7 @@ class HomeViewModel(
     private fun observeUnreadSocketCount() {
         viewModelScope.launch {
             repository.unreadSocketCount.collectLatest { count ->
-                // Always update the badge count from socket directly
                 _uiState.value = _uiState.value.copy(socketUnreadCount = count)
-                // Only trigger a refresh if the count changed meaningfully
                 val currentSize = _uiState.value.unreadNotifications.size
                 if (count > currentSize || (count == 0 && currentSize > 0)) {
                     refreshNotifications()
@@ -164,7 +161,6 @@ class HomeViewModel(
         _uiState.value.accountProfile?.permissions?.banned == true
 
     fun setLoginUsername(username: String) {
-        // Editing the username always restarts the login flow at step one.
         _uiState.value = _uiState.value.copy(
             loginUsername = username,
             loginError = null,
@@ -365,8 +361,6 @@ class HomeViewModel(
                         refreshAccount()
                     }
                     .onFailure { throwable ->
-                        // Never let a failed send destroy the content: stash it
-                        // in drafts so the user can restore and retry later.
                         val currentDrafts = _uiState.value.composerDrafts
                         _uiState.value = _uiState.value.copy(
                             composerDrafts = if (!draft.isBlank() && !currentDrafts.contains(draft)) {
@@ -421,12 +415,10 @@ class HomeViewModel(
         viewModelScope.launch {
             runCatching { repository.loadReposts(post.id) }
                 .onSuccess { reposts ->
-                    // Ignore the result if the user closed the sheet already
                     if (_uiState.value.viewRepostsPost?.id == post.id) {
                         _uiState.value = _uiState.value.copy(reposts = reposts, repostsLoading = false)
                         val session = _uiState.value.session
                         if (session != null) {
-                            // Fill in isLoving so the heart buttons reflect real state
                             runCatching { augmentLoveStatuses(reposts, session) }.onSuccess { augmented ->
                                 if (_uiState.value.viewRepostsPost?.id == post.id) {
                                     _uiState.value = _uiState.value.copy(reposts = augmented)
@@ -515,7 +507,6 @@ class HomeViewModel(
     }
 
     fun setExploreQuery(query: String) {
-        // no longer used for search in explore; kept for compatibility if needed elsewhere
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 
@@ -533,8 +524,8 @@ class HomeViewModel(
             return
         }
         viewModelScope.launch {
-            delay(300L) // debounce
-            if (_uiState.value.exploreSearchQuery != query) return@launch // stale
+            delay(300L)
+            if (_uiState.value.exploreSearchQuery != query) return@launch
             _uiState.value = _uiState.value.copy(exploreSearchLoading = true)
             val session = _uiState.value.session
             val postsResult = runCatching { repository.searchPosts(session, query) }
@@ -553,7 +544,7 @@ class HomeViewModel(
     }
 
     fun loadFrog() {
-        if (_uiState.value.exploreFrogMessage != null) return // already loaded
+        if (_uiState.value.exploreFrogMessage != null) return
         viewModelScope.launch {
             runCatching { repository.getFrog() }
                 .onSuccess { _uiState.value = _uiState.value.copy(exploreFrogMessage = it.frog) }
@@ -570,8 +561,6 @@ class HomeViewModel(
                 repository.loadTrendingPosts(currentSession, timeframe)
             }.onSuccess { response ->
                 val filteredPosts = filterBlockedPosts(response.posts)
-                // Render posts immediately — follow status is resolved in the
-                // background so the trend list never waits on N follow lookups.
                 _uiState.value = _uiState.value.copy(
                     exploreTrendingPosts = filteredPosts,
                     exploreTrendingLoading = false,
@@ -629,7 +618,6 @@ class HomeViewModel(
 
     fun openProfileBypassingBlock(username: String) {
         val normalizedUsername = username.trim()
-        // Remember the profile we're leaving so back can return to it
         _uiState.value.viewingProfileUsername?.let { current ->
             if (!current.equals(normalizedUsername, ignoreCase = true)) {
                 profileBackStack.addLast(current)
@@ -682,7 +670,7 @@ class HomeViewModel(
                 }
                 _uiState.value = _uiState.value.copy(
                     viewingProfile = profile,
-                    viewingProfilePosts = posts, // bypass filter
+                    viewingProfilePosts = posts,
                     viewingProfileLoading = false,
                     viewingProfileIsFollowing = followAndLast.first,
                     viewingProfileLast = followAndLast.second,
@@ -722,7 +710,6 @@ class HomeViewModel(
             closeProfile()
             return
         }
-        // Drop the current username first so it isn't re-pushed while reopening the previous one
         _uiState.value = _uiState.value.copy(viewingProfileUsername = null)
         openProfileBypassingBlock(previous)
     }
@@ -770,8 +757,6 @@ class HomeViewModel(
     }
 
     fun openPostBypassingBlock(post: Post, scrollToCommentId: String? = null) {
-        // If this is a pure repost wrapper (empty content + nested post), open the inner post
-        // so that comments, love counts, and repost counts are loaded for the correct post ID.
         val isPureRepostWrapper = post.repost != null &&
             post.content.replace(Regex("<.*?>"), "").trim().isBlank()
         val effectivePost = if (isPureRepostWrapper) post.repost!! else post
@@ -785,9 +770,7 @@ class HomeViewModel(
             commentReplyParent = null,
             scrollToCommentId = scrollToCommentId
         )
-        // Comments are loaded lazily when user swipes up in the details sheet to expand
 
-        // Verify/augment love status for the effective post if we have a session
         val session = _uiState.value.session
         if (session != null) {
             viewModelScope.launch {
@@ -832,7 +815,6 @@ class HomeViewModel(
     }
 
     fun handleNotificationClick(notification: Notification) {
-        // Mark as read immediately
         if (!notification.read && _uiState.value.markReadWhenOpened) {
             viewModelScope.launch {
                 val session = _uiState.value.session ?: return@launch
@@ -902,11 +884,6 @@ class HomeViewModel(
         )
     }
 
-    // After a reply lands, the reloaded tree hides it behind a collapsed
-    // "See replies" whenever the parent is itself nested. Load the parent
-    // thread's replies and focus it so the sheet re-roots to that thread and
-    // the new comment is visible. Top-level parents already show the reply
-    // inline via the background pre-fetch, so no focus jump is needed.
     private suspend fun revealReplyInThread(
         parentComment: Comment?,
         session: AuthSession?,
@@ -1078,8 +1055,6 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(wallCommentReplyParent = comment)
     }
 
-    // Routes wasteof.money links shared from other apps into the matching in-app view.
-    // Supported: /posts/{id} plus /users/{name} and its /followers, /following, /wall subpaths.
     fun handleDeepLink(uri: android.net.Uri) {
         val segments = uri.pathSegments
         when {
@@ -1178,7 +1153,6 @@ class HomeViewModel(
             val session = _uiState.value.session ?: return@launch
             val notificationIds = _uiState.value.unreadNotifications.map { it.id }
             repository.markNotificationsRead(session, notificationIds)
-            // Reset pagination and reload from page 1
             _uiState.value = _uiState.value.copy(
                 unreadNotificationsPage = 1,
                 unreadNotificationsLast = false,
@@ -1193,7 +1167,6 @@ class HomeViewModel(
     fun loadNextNotificationsPage() {
         val current = _uiState.value
         if (current.notificationsLoadingMore) return
-        // Load more unread first, then read
         val session = current.session ?: return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(notificationsLoadingMore = true)
@@ -1208,7 +1181,6 @@ class HomeViewModel(
                         unreadNotificationsPage = nextPage,
                         unreadNotificationsLast = response.last
                     )
-                    // If we reached the end of unread notifications, fetch page 1 of read notifications
                     if (response.last) {
                         val readResp = runCatching { repository.loadReadNotifications(session, 1) }.getOrNull()
                         if (readResp != null) {
@@ -1460,8 +1432,6 @@ class HomeViewModel(
 
     fun togglePostLove(post: Post) {
         val session = _uiState.value.session ?: return
-        // Love status not augmented yet: ignore taps so we don't toggle blind.
-        // A toggle already in flight: ignore taps so we don't double-fire.
         if (post.isLoving == null || post.loveLoading) return
         setPostLoveLoading(post.id, true)
         viewModelScope.launch {
@@ -1495,7 +1465,6 @@ class HomeViewModel(
                 toastMessage = if (reported) "You've reported this user" else null
             )
 
-            // Background automatic unfollow
             val session = current.session
             if (session != null) {
                 viewModelScope.launch(Dispatchers.IO) {
@@ -1722,7 +1691,6 @@ class HomeViewModel(
     fun submitReport(reason: String) {
         val currentSession = _uiState.value.session ?: return
         val postId = _uiState.value.reportPostId ?: return
-        // assuming isBlocked logic exists in your project context
         if (_uiState.value.blockedUsernames.contains(_uiState.value.selectedPost?.poster?.name?.lowercase())) return
 
         _uiState.value = _uiState.value.copy(reportLoading = true)
@@ -1746,8 +1714,6 @@ class HomeViewModel(
         }
     }
 
-    // Applies a change to one post (including an embedded repost with that id)
-    // everywhere it can appear, so all visible copies stay in sync.
     private fun transformEveryPost(postId: String, transform: (Post) -> Post) {
         val current = _uiState.value
         fun apply(p: Post): Post {
@@ -1762,18 +1728,13 @@ class HomeViewModel(
             exploreTrendingPosts = current.exploreTrendingPosts.map(::apply),
             accountPosts = current.accountPosts.map(::apply),
             viewingProfilePosts = current.viewingProfilePosts.map(::apply),
-            // Keep the reposts sheet in sync so likes toggle live inside it
             reposts = current.reposts.map(::apply),
             viewRepostsPost = current.viewRepostsPost?.let { apply(it) },
-            // Always apply to selectedPost so that liking an embedded repost
-            // (where selectedPost.id != postId but selectedPost.repost.id == postId)
-            // also updates the love state shown in the details sheet.
             selectedPost = current.selectedPost?.let { apply(it) }
         )
     }
 
     private fun updatePostsWithLove(postId: String, newLoves: Int, newIsLoving: Boolean) {
-        // Cache the authoritative result so future loads render liked instantly
         LoveCache.put(postId, newIsLoving)
         transformEveryPost(postId) { p ->
             p.copy(loves = newLoves, isLoving = newIsLoving, loveLoading = false)
@@ -1825,7 +1786,6 @@ class HomeViewModel(
                 }.getOrDefault(post.repost.isLoving ?: false)
             } else null
 
-            // Remember confirmed states so a reload can show liked immediately
             LoveCache.put(post.id, loved)
             post.repost?.let { LoveCache.put(it.id, repostLoved ?: false) }
 
@@ -1841,8 +1801,6 @@ class HomeViewModel(
             posts.map { post -> async { augmentLoveStatus(post, session) } }.awaitAll()
         }
 
-    // Fetch love statuses after posts are already shown, merging each one back
-    // the moment its request returns instead of waiting for the whole batch.
     private fun augmentLovesInBackground(posts: List<Post>, merge: (List<Post>) -> Unit) {
         val session = _uiState.value.session ?: return
         viewModelScope.launch {
@@ -2154,8 +2112,6 @@ class HomeViewModel(
             val filteredReplies = filterBlockedComments(comment.replies ?: emptyList(), blockedUsernames)
             if (isBlocked) {
                 if (filteredReplies.isNotEmpty()) {
-                    // Keep the real content so an explicit per-comment "Show"
-                    // can reveal it; the UI renders the placeholder from the flag.
                     comment.copy(blocked = true, replies = filteredReplies)
                 } else {
                     null
@@ -2178,8 +2134,6 @@ class HomeViewModel(
                 comments = topLevel,
                 commentsLoading = false
             )
-            // Show base comments immediately; fetch each thread's replies in the
-            // background so the list paints without waiting on them.
             fetchTopLevelRepliesInBackground(topLevel) { id, transform ->
                 updatePostComment(id, transform)
             }
@@ -2191,8 +2145,6 @@ class HomeViewModel(
         }
     }
 
-    // Load the first level of replies for every thread that has none yet.
-    // Deeper levels stay unloaded until the user taps "See replies".
     private fun fetchTopLevelRepliesInBackground(
         comments: List<Comment>,
         update: (String, (Comment) -> Comment) -> Unit
@@ -2214,7 +2166,6 @@ class HomeViewModel(
             }
     }
 
-    // User tapped "See replies": fetch the next level of replies for one comment.
     fun loadRepliesForComment(comment: Comment) {
         val session = _uiState.value.session
         if (comment.repliesLoading || (comment.replies ?: emptyList()).isNotEmpty()) return
@@ -2261,8 +2212,6 @@ class HomeViewModel(
         )
     }
 
-    // "See replies" targets nested comments too, so the update has to walk the
-    // reply tree instead of only matching top-level comments.
     private fun updateCommentInTree(
         comment: Comment,
         commentId: String,
@@ -2509,7 +2458,6 @@ class HomeViewModel(
 
     fun onAppResumed(onRefreshTriggered: () -> Unit = {}) {
         val currentTime = System.currentTimeMillis()
-        // Auto refresh if we've been in the background for more than 5 minutes
         if (lastBackgroundTime > 0 && currentTime - lastBackgroundTime > 5 * 60 * 1000) {
             refreshFeed()
             loadExploreTrending()

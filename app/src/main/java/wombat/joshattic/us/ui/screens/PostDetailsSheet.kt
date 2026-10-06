@@ -142,7 +142,7 @@ fun PostDetailsContent(
             }
             val index = comments.indexOfFirst { hasCommentId(it, scrollToCommentId) }
             if (index != -1) {
-                listState.animateScrollToItem(index + 1) // +1 for post header
+                listState.animateScrollToItem(index + 1)
                 onScrollToCommentComplete()
             }
         }
@@ -213,7 +213,6 @@ fun PostDetailsContent(
                     onPostClickById = onPostClickById,
                     blockedUsernames = blockedUsernames,
                     blockedQuoteHandling = blockedQuoteHandling,
-                    // The user explicitly bypassed the block warning to open this post
                     ignoreBlockedPoster = true
                 )
             }
@@ -285,7 +284,6 @@ fun PostDetailsContent(
             }
         }
 
-        // Input area (TextField + Reply button) — imePadding lifts it above the software keyboard
         if (!isBanned) {
             AnimatedVisibility(
                 visible = isReplyBoxVisible,

@@ -86,7 +86,6 @@ import wombat.joshattic.us.ui.state.LoginStep
 import wombat.joshattic.us.ui.theme.WombatTheme
 import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 
-// Pick a friendly sign-in header; different pools for first vs. additional accounts.
 internal fun randomSignInHeader(hasSavedAccounts: Boolean): String {
     val firstAccount = listOf(
         "Hey there!",
@@ -156,11 +155,9 @@ fun AccountTab(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning"
 ) {
-    // Always theme this screen with the signed-in account colour, even when a custom theme is active
     WombatTheme(userColor = profile?.color) {
     val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
-        // Paint the themed background so the parent (custom-theme) scaffold colour doesn't show through
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         state = refreshState,
         isRefreshing = loading,
@@ -168,7 +165,6 @@ fun AccountTab(
     ) {
         val listState = rememberLazyListState()
 
-        // Load more when reaching near the end
         LaunchedEffect(listState, posts.size) {
             snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
                 .collect { lastVisibleIndex ->
@@ -184,14 +180,11 @@ fun AccountTab(
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(
                 top = 12.dp,
-                // 96dp clears the floating bottom bar; the inset keeps it clear of
-                // the system navigation bar too.
                 bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (session != null && !isAddingAccount) {
-                // Profile details card
                 if (profile != null) {
                     val accent = getUserColorSchemeColors(profile.color).first
                     item {
@@ -200,7 +193,6 @@ fun AccountTab(
                         Box(
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // 1. Banner image
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -224,7 +216,6 @@ fun AccountTab(
                                 )
                             }
 
-                            // 2. Discord-style Avatar overlapping half on banner, half on content card below
                             Box(
                                 modifier = Modifier
                                     .padding(start = 16.dp)
@@ -248,7 +239,6 @@ fun AccountTab(
                                 )
                             }
 
-                            // 3. Profile Content Card
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -377,7 +367,6 @@ fun AccountTab(
                                         openLinksInApp = openLinksInApp
                                     )
 
-                                    // Joined Date / History Chip below bio
                                     profile.history?.joined?.let { joinedTime ->
                                         if (joinedTime > 0) {
                                             Spacer(modifier = Modifier.height(8.dp))
@@ -444,7 +433,6 @@ fun AccountTab(
                     }
                 }
 
-                // User's posts under the account details (only after profile available)
                 if (profile != null) {
                     if (!loading && posts.isEmpty()) {
                         item { EmptyStateCard(title = "No posts yet", message = "Pull down to refresh or create your first post.") }
@@ -504,8 +492,6 @@ fun AccountTab(
                                     leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) }
                                 )
                             } else {
-                                // Username already validated in step one; show it
-                                // read-only so the user knows whose password to enter.
                                 OutlinedTextField(
                                     value = loginUsername,
                                     onValueChange = {},
@@ -543,8 +529,6 @@ fun AccountTab(
                                     }
                                 }
                             }
-                            // Username-step errors have no password field to attach to,
-                            // so they render inline below the username box instead.
                             AnimatedVisibility(
                                 visible = loginStep == LoginStep.USERNAME && !loginError.isNullOrBlank(),
                                 enter = fadeIn() + expandVertically(),

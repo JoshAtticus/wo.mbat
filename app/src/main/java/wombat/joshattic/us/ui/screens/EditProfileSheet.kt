@@ -82,7 +82,6 @@ fun EditProfileContent(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -107,7 +106,6 @@ fun EditProfileContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Banner section
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Profile Banner",
@@ -141,7 +139,6 @@ fun EditProfileContent(
                             contentScale = ContentScale.Crop
                         )
 
-                        // Banner actions overlay
                         Row(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
@@ -166,7 +163,6 @@ fun EditProfileContent(
                     }
                 }
 
-                // Profile Picture section
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Profile Picture",
@@ -211,7 +207,6 @@ fun EditProfileContent(
                     }
                 }
 
-                // Bio editor section
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Bio",
@@ -254,13 +249,12 @@ fun EditProfileContent(
             }
         }
 
-        // Loading overlay
         if (loading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable(enabled = false) {}, // Scrim input blocker
+                    .clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
                 Card(

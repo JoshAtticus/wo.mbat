@@ -38,7 +38,6 @@ class NetworkConnectivityObserver(context: Context) {
             }
         }
 
-        // Send initial state
         val isInitiallyConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val activeNetwork = connectivityManager.activeNetwork
             val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)

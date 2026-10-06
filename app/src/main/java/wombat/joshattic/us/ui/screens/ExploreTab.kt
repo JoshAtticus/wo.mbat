@@ -85,19 +85,15 @@ fun ExploreTab(
     onPostClickById: ((String) -> Unit)? = null,
     followedUsernames: Set<String> = emptySet(),
     followLoadingUsernames: Set<String> = emptySet(),
-    // True while the background follow-status lookup is still running; follow
-    // buttons spin instead of showing a possibly-wrong state.
     followStatusLoading: Boolean = false,
     onFollowClick: ((String) -> Unit)? = null,
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
-    // Search
     searchQuery: String = "",
     searchPostResults: List<Post> = emptyList(),
     searchUserResults: List<User> = emptyList(),
     searchLoading: Boolean = false,
     onSearchQueryChange: (String) -> Unit = {},
-    // Timeframe
     selectedTimeframe: String? = null,
     onTimeframeChange: (String?) -> Unit = {}
 ) {
@@ -105,7 +101,6 @@ fun ExploreTab(
     var searchBarExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // ── Search bar ────────────────────────────────────────────────────────
         SearchBar(
             inputField = {
                 SearchBarDefaults.InputField(
@@ -135,7 +130,6 @@ fun ExploreTab(
                 dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
             )
         ) {
-            // ── Search results ──────────────────────────────────────────────
             if (searchLoading) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(32.dp),
@@ -145,7 +139,6 @@ fun ExploreTab(
                 }
             } else if (searchQuery.isNotBlank()) {
                 LazyColumn(contentPadding = PaddingValues(bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) {
-                    // User results row
                     if (searchUserResults.isNotEmpty()) {
                         item {
                             Text(
@@ -191,7 +184,6 @@ fun ExploreTab(
                         }
                     }
 
-                    // Post results
                     if (searchPostResults.isNotEmpty()) {
                         item {
                             Text(
@@ -260,10 +252,8 @@ fun ExploreTab(
             }
         }
 
-        // ── Trending content (hidden while search is expanded) ───────────────
         AnimatedVisibility(visible = !searchBarExpanded, enter = fadeIn(), exit = fadeOut()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Timeframe chips
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

@@ -126,7 +126,6 @@ fun FeedTab(
         }
     }
 
-    // Load more when reaching near the end of the feed
     LaunchedEffect(listState, posts.size) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .collect { lastVisibleIndex ->
@@ -143,15 +142,12 @@ fun FeedTab(
             isRefreshing = loading,
             onRefresh = onRefresh
         ) {
-            // Merge consecutive pure reposts of the same post into one feed entry
             val groupedPosts = remember(posts) { groupConsecutiveReposts(posts) }
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 12.dp),
-                // Clear the floating bottom bar (96dp) plus the system navigation
-                // bar inset, otherwise the bar covers part of the last post.
                 contentPadding = PaddingValues(
                     top = if (showNewPosts && newPostsUsernames.isNotEmpty()) 48.dp else 12.dp,
                     bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()

@@ -148,10 +148,8 @@ fun ProfileScreen(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning"
 ) {
-    // Always theme this screen with the signed-in account colour, even when a custom theme is active
     WombatTheme(userColor = profile?.color) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
-    // Paint the themed background so the parent (custom-theme) scaffold colour doesn't show through
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 12.dp)) {
 
         if (isBlocked) {
@@ -186,7 +184,6 @@ fun ProfileScreen(
 
         val listState = rememberLazyListState()
 
-        // Load more when reaching near the end
         LaunchedEffect(listState, posts.size) {
             snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
                 .collect { lastVisibleIndex ->
@@ -196,7 +193,6 @@ fun ProfileScreen(
                 }
         }
 
-        // Load user's banner with a subtle themed fallback background using their profile colour.
         val accent = getUserColorSchemeColors(profile.color).first
         LazyColumn(
             state = listState,
@@ -204,8 +200,6 @@ fun ProfileScreen(
                 .fillMaxWidth()
                 .weight(1f),
             contentPadding = PaddingValues(
-                // 96dp clears the floating bottom bar; the inset keeps it clear of
-                // the system navigation bar too.
                 bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -216,7 +210,6 @@ fun ProfileScreen(
                 Box(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // 1. Banner image
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -240,7 +233,6 @@ fun ProfileScreen(
                         )
                     }
 
-                    // 2. Discord-style Avatar overlapping half on banner, half on content card below
                     Box(
                         modifier = Modifier
                             .padding(start = 16.dp)
@@ -263,7 +255,6 @@ fun ProfileScreen(
                         )
                     }
 
-                    // 3. Profile Content Card
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -276,7 +267,6 @@ fun ProfileScreen(
                                 .fillMaxWidth()
                                 .padding(top = 12.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
                         ) {
-                            // Top Row: Uniform Circle Icon Buttons (Follow, Wall, More) on the right
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End,
@@ -377,7 +367,6 @@ fun ProfileScreen(
                             openLinksInApp = openLinksInApp
                         )
 
-                        // Joined Date / History Chip below bio
                         profile.history?.joined?.let { joinedTime ->
                             if (joinedTime > 0) {
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -443,7 +432,6 @@ fun ProfileScreen(
             }
             }
 
-            // Posts section with a subtle header
             item {
                 Row(
                     modifier = Modifier

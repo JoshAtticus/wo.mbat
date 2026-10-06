@@ -244,7 +244,6 @@ fun htmlToAnnotated(html: String): AnnotatedString {
                 if (tag == "br" || tag == "br/") {
                     append("\n")
                 } else if (tag == "img") {
-                    // images handled separately via currentImages
                 } else if (isClose) {
                     val idx = openTags.indexOfLast { it.first == tag }
                     if (idx != -1) {
@@ -271,7 +270,6 @@ fun htmlToAnnotated(html: String): AnnotatedString {
             append(html.substring(i, chunkEnd))
             i = chunkEnd
         }
-        // close any unclosed tags
         openTags.forEach { (tag, startPos) ->
             val style = when (tag) {
                 "b", "strong" -> SpanStyle(fontWeight = FontWeight.Bold)
@@ -346,7 +344,6 @@ fun WombatBottomNavigationBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            // Home
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -376,7 +373,6 @@ fun WombatBottomNavigationBar(
                 }
             }
 
-            // Explore
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -406,7 +402,6 @@ fun WombatBottomNavigationBar(
                 }
             }
 
-            // Notifications
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -447,7 +442,6 @@ fun WombatBottomNavigationBar(
                 }
             }
 
-            // Account
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -502,7 +496,6 @@ fun WombatBottomNavigationBar(
     }
 }
 
-// Icon-only status badges for a user; nothing renders when the user has no badges
 @Composable
 fun UserBadges(verified: Boolean, admin: Boolean, beta: Boolean, accentColor: Color? = null) {
     if (!verified && !admin && !beta) return
@@ -766,9 +759,6 @@ fun PostCard(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
     groupedReposters: List<Post> = emptyList(),
-    // Skips the blocked-poster check for the post itself. Used by the details
-    // sheet, where reaching this screen means the user already pressed
-    // "View anyways" — without this the sheet renders nothing at all.
     ignoreBlockedPoster: Boolean = false
 ) {
     if (!ignoreBlockedPoster && blockedUsernames.contains(post.poster.name.lowercase())) {
@@ -816,8 +806,6 @@ fun PostCard(
             }
             PostCard(
                 post = post.repost!!,
-                // When clicking a pure repost, open the inner (actual) post so that
-                // comments and love status are loaded for the correct post ID.
                 onClick = { onPostClick?.invoke(post.repost!!) ?: onClick() },
                 modifier = Modifier,
                 clickable = clickable,
@@ -957,8 +945,6 @@ fun PostCard(
                 val hasPostImages = showImages && imageUrls.isNotEmpty()
                 val openGraphFirst = isOpenGraphPriority(linkPreviewPriority)
                 if (openGraphFirst) {
-                    // OpenGraph priority: large preview above, any post images
-                    // demoted to small tappable squares underneath it.
                     firstLink?.let { link ->
                         OpenGraphPreview(
                             url = link,
@@ -997,8 +983,6 @@ fun PostCard(
                 }
                 post.repost?.let { repostPost ->
                     val isRepostPosterBlocked = blockedUsernames.contains(repostPost.poster.name.lowercase())
-                    // One-time reveal: pressing Show is per post instance and resets
-                    // when the card leaves composition. It never unblocks the user.
                     var quoteRevealed by remember(repostPost.id) { mutableStateOf(false) }
                     if (isRepostPosterBlocked && !quoteRevealed) {
                         if (blockedQuoteHandling == "warning") {
@@ -1083,13 +1067,10 @@ fun PostCard(
                 PostMetric(
                     value = post.loves,
                     label = "loves",
-                    // Cached-loved: show the liked state immediately while status re-verifies
                     icon = if (post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true)) {
                         Icons.Filled.Favorite
                     } else Icons.Filled.FavoriteBorder,
                     isActive = post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true),
-                    // Banned: hard-greyed; otherwise pulsing until love status arrives
-                    // or while a love toggle request is in flight
                     enabled = post.isLoving != null && !isBanned && !post.loveLoading,
                     pulse = (post.isLoving == null || post.loveLoading) && !isBanned,
                     onClick = onLoveClick?.let { { onLoveClick(post) } }
@@ -1129,7 +1110,6 @@ fun PostCard(
                                 onQuoteClick?.invoke(post)
                             }
                         )
-                        // Only offer viewing reposts when the post actually has some
                         val onViewReposts = LocalOnViewReposts.current.takeIf { post.reposts > 0 }
                         if (onViewReposts != null) {
                             HorizontalDivider(
@@ -1230,8 +1210,6 @@ fun CommentThreadContent(
     onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
 ) {
     val isBlockedPlaceholder = comment.blocked
-    // One-time reveal: pressing Show is per comment instance and resets when
-    // the comment leaves composition. It never unblocks the user.
     var commentRevealed by remember(comment.id) { mutableStateOf(false) }
     val isReply = comment.parent != null
     Row(
@@ -1240,7 +1218,6 @@ fun CommentThreadContent(
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Left column: Profile picture and thread line
         Column(
             modifier = Modifier.fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -1278,7 +1255,6 @@ fun CommentThreadContent(
             }
         }
         
-        // Right column: Content + Nested replies
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -1331,7 +1307,6 @@ fun CommentThreadContent(
                 }
             }
             
-            // Content text
             if (isBlockedPlaceholder && !commentRevealed) {
                 Text(
                     text = "This comment is from a user you blocked",
@@ -1368,10 +1343,8 @@ fun CommentThreadContent(
                 }
             }
             
-            // Nested replies list
             val safeReplies = comment.replies ?: emptyList()
             when {
-                // Replies not fetched yet: offer to load them on demand
                 safeReplies.isEmpty() && comment.hasReplies && onLoadReplies != null -> {
                     androidx.compose.material3.TextButton(
                         onClick = { onLoadReplies(comment) },
@@ -1388,7 +1361,7 @@ fun CommentThreadContent(
                     }
                 }
                 safeReplies.isNotEmpty() -> {
-                    val maxDepth = 2 // Cap depth at 2 inline levels
+                    val maxDepth = 2
                     if (depth >= maxDepth) {
                         androidx.compose.material3.TextButton(
                             onClick = { onFocusComment?.invoke(comment) },
@@ -1635,9 +1608,6 @@ fun HtmlText(
 ) {
     val textColor = (color ?: MaterialTheme.colorScheme.onSurface).toArgb()
     val linkColor = (color ?: MaterialTheme.colorScheme.onBackground).toArgb()
-
-    // Density-scaled blockquote stripe/gap sizes so quotes render consistently
-    // on every device instead of using raw pixel constants.
     val density = LocalDensity.current
     val quoteStripeWidthPx = with(density) { QUOTE_STRIPE_WIDTH_DP.dp.roundToPx().coerceAtLeast(1) }
     val quoteGapWidthPx = with(density) { QUOTE_GAP_WIDTH_DP.dp.roundToPx() }
@@ -1675,7 +1645,6 @@ fun HtmlText(
                     spannable.setSpan(clickable, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
             } else {
-                // Non-wombat link: intercept click according to openLinksInApp setting
                 spannable.removeSpan(span)
                 val clickable = object : ClickableSpan() {
                     override fun onClick(widget: View) {
@@ -1719,7 +1688,6 @@ fun HtmlText(
             }
         }
 
-        // Ensure all links (ClickableSpans) are slightly bold
         spannable.getSpans(0, spannable.length, ClickableSpan::class.java).forEach { span ->
             val s = spannable.getSpanStart(span)
             val e = spannable.getSpanEnd(span)
@@ -1728,10 +1696,6 @@ fun HtmlText(
             }
         }
 
-        // Replace default blockquote spans with branded ones.
-        // The platform QuoteSpan only accepts custom stripe/gap widths on API 28+;
-        // below that it falls back to a hairline stripe with no gap. Drawing our own
-        // span keeps quotes looking correct on every supported Android version.
         val brandColor = 0xFF6366F1.toInt()
         spannable.getSpans(0, spannable.length, android.text.style.QuoteSpan::class.java).forEach { span ->
             val start = spannable.getSpanStart(span)
@@ -1759,16 +1723,11 @@ fun HtmlText(
         factory = { context ->
             TextView(context).apply {
                 applyGoogleSansFlexTypeface(this, roundness = 50f)
-                // Use a custom movement method that handles link clicks without scrolling.
-                // LinkMovementMethod internally calls scrollTo() which makes the
-                // TextView scrollable inside notification cards and post cards.
                 movementMethod = object : LinkMovementMethod() {
                     override fun onTouchEvent(widget: TextView, buffer: Spannable, event: android.view.MotionEvent): Boolean {
-                        // Save scroll position before handling
                         val scrollX = widget.scrollX
                         val scrollY = widget.scrollY
                         val result = super.onTouchEvent(widget, buffer, event)
-                        // Reset scroll back to prevent movement method from scrolling
                         widget.scrollTo(scrollX, scrollY)
                         return result
                     }
@@ -1776,7 +1735,6 @@ fun HtmlText(
                 setTextColor(textColor)
                 setLinkTextColor(linkColor)
                 textSize = 16f
-                // Prevent the TextView from scrolling its content
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = View.OVER_SCROLL_NEVER
@@ -1800,7 +1758,6 @@ fun HtmlText(
             textView.setOnClickListener { onClick?.invoke() }
             textView.isClickable = onClick != null
             textView.isFocusable = false
-            // Ensure text doesn't become scrollable
             textView.isVerticalScrollBarEnabled = false
             textView.setHorizontallyScrolling(false)
 
@@ -1836,7 +1793,6 @@ fun PostMetric(
     icon: ImageVector,
     isActive: Boolean = false,
     enabled: Boolean = true,
-    // Pulsing icon while state is still loading; distinct from a hard disable.
     pulse: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
@@ -2122,10 +2078,6 @@ fun stripImages(html: String): String {
     return result
 }
 
-// ---------------------------------------------------------------------
-// OpenGraph link previews
-// ---------------------------------------------------------------------
-
 /** Hosts that are wasteof frontends or otherwise handled by in-app navigation; never link-preview these. */
 private val OPEN_GRAPH_SKIPPED_HOSTS = setOf(
     "wasteof.money",
@@ -2212,23 +2164,8 @@ fun extractFirstLink(html: String): String? {
         .firstOrNull { isOpenGraphEligibleUrl(it) }
 }
 
-// Trailing characters stripped from the end of an auto-linked URL because they
-// most likely belong to the surrounding sentence rather than the URL itself.
 private const val AUTO_LINK_TRAILING_PUNCTUATION = ".,;:!?…»)]}>\"'"
 
-/**
- * Linkifies plain URLs and @mentions in post HTML.
- *
- * This walks the HTML structure instead of running global regexes over the whole
- * string, which fixes two bugs of the old implementation:
- *  1. URLs directly after an opening tag (e.g. "<u>https://...</u>",
- *     "<strong>https://...</strong>") are now linkified. The old regex used a
- *     negative lookbehind that rejected anything preceded by '>' (the closing
- *     angle bracket of the opening tag), so those links stayed dead.
- *  2. URLs containing '@' (e.g. mastodon.social/@user/123) are no longer
- *     corrupted by mention replacement, because mentions are only matched in
- *     plain-text segments — never inside tags, hrefs or existing <a> elements.
- */
 fun autoLinkAndMentions(html: String): String {
     if (!html.contains('<')) return linkifyPlainSegment(html, insideAnchor = false)
 
@@ -2239,7 +2176,6 @@ fun autoLinkAndMentions(html: String): String {
         if (html[i] == '<') {
             val tagEnd = html.indexOf('>', i)
             if (tagEnd == -1) {
-                // Unterminated tag: emit the rest verbatim.
                 sb.append(html, i, html.length)
                 break
             }
@@ -2272,22 +2208,16 @@ private fun linkifyPlainSegment(text: String, insideAnchor: Boolean): String {
     if (insideAnchor) return text
     var result = text
 
-    // @mentions → special href for in-app handling.
-    // Guarded so emails (foo@bar.com) and '@' inside URL paths (/@user/123)
-    // are not treated as mentions.
     val mentionRegex = Regex("""(^|[^A-Za-z0-9_.@/\-])@([A-Za-z0-9_]+)""")
     result = mentionRegex.replace(result) { m ->
         val user = m.groupValues[2]
         "${m.groupValues[1]}<a href=\"wombat://user/$user\">@$user</a>"
     }
 
-    // Plain http/https links. Tags are consumed separately by [autoLinkAndMentions],
-    // so a URL immediately following an opening tag is matched here too.
     val urlRegex = Regex("""(https?://[^\s<>"']+)""", RegexOption.IGNORE_CASE)
     result = urlRegex.replace(result) { m ->
         val full = m.value
         var url = full
-        // Don't swallow trailing punctuation that belongs to the sentence.
         while (url.isNotEmpty() && url.last() in AUTO_LINK_TRAILING_PUNCTUATION) {
             val closer = url.last()
             val opener = when (closer) {
@@ -2296,7 +2226,6 @@ private fun linkifyPlainSegment(text: String, insideAnchor: Boolean): String {
                 '}' -> '{'
                 else -> null
             }
-            // Keep a closing bracket when it is balanced by an opening one in the URL.
             if (opener != null && url.count { it == opener } >= url.count { it == closer }) break
             url = url.dropLast(1)
         }
@@ -2346,7 +2275,6 @@ fun PostImageCarousel(
         return
     }
 
-    // Keying by the images list hash ensures the state resets when the images change (e.g., when a different post is selected)
     val pagerState = key(images) {
         rememberPagerState(pageCount = { images.size })
     }
@@ -2468,7 +2396,6 @@ fun FullScreenImageViewer(
             color = Color.Black
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Image Pager
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
@@ -2478,9 +2405,6 @@ fun FullScreenImageViewer(
                     var scale by remember { mutableStateOf(1f) }
                     var offset by remember { mutableStateOf(Offset.Zero) }
 
-                    // transformable() would consume horizontal drags even at scale 1
-                    // and block the pager from swiping, so zoom/pan is handled here
-                    // manually and only intercepted when pinching or already zoomed.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -2546,7 +2470,6 @@ fun FullScreenImageViewer(
                     }
                 }
 
-                // Top Controls (Close button, Page Counter, Download button)
                 AnimatedVisibility(
                     visible = showUiControls,
                     enter = fadeIn(animationSpec = tween(200)),
@@ -2596,7 +2519,6 @@ fun FullScreenImageViewer(
                     }
                 }
 
-                // Bottom Overlay: Fade-to-Black Gradient with Profile, Post Text & Actions
                 AnimatedVisibility(
                     visible = showUiControls,
                     enter = fadeIn(animationSpec = tween(200)),
@@ -2622,7 +2544,6 @@ fun FullScreenImageViewer(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // (pfp) @username
                             displayUsername?.let { uname ->
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -2642,7 +2563,6 @@ fun FullScreenImageViewer(
                                 }
                             }
 
-                            // Truncated post text (max 2 lines)
                             post?.let { p ->
                                 val cleanText = remember(p.content) {
                                     autoLinkAndMentions(stripImages(p.content))
@@ -2677,13 +2597,11 @@ fun FullScreenImageViewer(
                                     }
                                 }
 
-                                // Action buttons: Like, Comment, Repost adapted for Image Viewer
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(top = 4.dp)
                                 ) {
-                                    // Like Button (cached-loved still renders as liked while verifying)
                                     val pCachedLoved = p.isLoving == null && LoveCache.get(p.id) == true
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -2723,7 +2641,6 @@ fun FullScreenImageViewer(
                                         )
                                     }
 
-                                    // Comment Button
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2750,7 +2667,6 @@ fun FullScreenImageViewer(
                                         )
                                     }
 
-                                    // Repost Button
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2777,7 +2693,6 @@ fun FullScreenImageViewer(
                                         )
                                     }
 
-                                    // Share Button
                                     val shareContext = androidx.compose.ui.platform.LocalContext.current
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,

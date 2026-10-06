@@ -85,7 +85,6 @@ fun CommentComposer(
     var lastSyncedDraft by remember { mutableStateOf("") }
     var currentImages by remember { mutableStateOf(extractImages(draft)) }
     var isUploadingImage by remember { mutableStateOf(false) }
-    // Track batch progress so the UI can show "image 2 of 5" instead of a generic spinner
     var uploadCurrent by remember { mutableStateOf(0) }
     var uploadTotal by remember { mutableStateOf(0) }
     var imageUploadError by remember { mutableStateOf<String?>(null) }
@@ -127,8 +126,6 @@ fun CommentComposer(
             uploadCurrent = 0
             coroutineScope.launch {
                 try {
-                    // Upload sequentially so images append to the draft in picker order,
-                    // and so already-uploaded images survive if a later one fails
                     uris.forEachIndexed { index, uri ->
                         uploadCurrent = index + 1
                         val uploadedUrl = upload(uri)
@@ -262,7 +259,6 @@ fun CommentComposer(
             )
         }
 
-        // Attachment previews, removable before sending
         if (currentImages.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -360,7 +356,6 @@ fun CommentComposer(
                     .weight(1f)
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             )
-                // Big send button pinned to the end (bottom) of the text area
                 FilledIconButton(
                     onClick = onSubmit,
                     enabled = draft.isNotBlank(),

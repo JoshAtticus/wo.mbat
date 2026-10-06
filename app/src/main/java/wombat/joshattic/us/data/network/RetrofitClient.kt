@@ -20,7 +20,6 @@ object RetrofitClient {
         )
         .build()
 
-    // ImgBB can take several minutes to finish processing an upload.
     private val uploadOkHttpClient = okHttpClient.newBuilder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(5, TimeUnit.MINUTES)
@@ -28,7 +27,6 @@ object RetrofitClient {
         .callTimeout(5, TimeUnit.MINUTES)
         .build()
 
-    // Link previews must fail fast so a slow origin site never stalls feed scrolling.
     private val openGraphOkHttpClient = okHttpClient.newBuilder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
@@ -41,8 +39,6 @@ object RetrofitClient {
         .addConverterFactory(GsonConverterFactory.create(GsonBuilder().create()))
         .build()
 
-    // Alpha endpoints must stay unauthenticated (see AlphaApiService), so this
-    // instance deliberately shares the plain okHttpClient with no auth header.
     private val alphaRetrofit = Retrofit.Builder()
         .baseUrl(ALPHA_BASE_URL)
         .client(okHttpClient)

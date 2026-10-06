@@ -66,7 +66,6 @@ fun NotificationsTab(
     val refreshState = rememberPullToRefreshState()
     val listState = rememberLazyListState()
 
-    // Trigger load-more when near end of list
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo }
             .map { visibleItems ->
@@ -94,16 +93,12 @@ fun NotificationsTab(
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(
                 top = 12.dp,
-                // 96dp clears the floating bottom bar; the inset keeps it clear of
-                // the system navigation bar too.
                 bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (isBanned) {
                 item(key = "banned_notice") {
-                    // Styled like an unread notification so the ban reason reads
-                    // as a system message rather than an empty state.
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp),
@@ -239,7 +234,6 @@ fun NotificationsTab(
                     }
                 }
 
-                // Filter out any notifications that might also be in the unread list
                 val filteredRead = readNotifications.filter { read ->
                     unreadNotifications.none { unread -> unread.id == read.id }
                 }.distinctBy { it.id }
@@ -255,7 +249,6 @@ fun NotificationsTab(
                 }
             }
 
-            // Load more indicator
             if (loadingMore) {
                 item {
                     Box(

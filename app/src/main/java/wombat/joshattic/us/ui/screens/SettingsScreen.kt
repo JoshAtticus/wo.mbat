@@ -133,7 +133,6 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .systemBarsPadding()
         ) {
-            // Header bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -175,7 +174,6 @@ fun SettingsScreen(
 
             if (isTablet) {
                 Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    // Left Pane: Categories list
                     Box(
                         modifier = Modifier
                             .width(320.dp)
@@ -188,7 +186,6 @@ fun SettingsScreen(
                         )
                     }
 
-                    // Vertical Divider
                     Box(
                         modifier = Modifier
                             .width(1.dp)
@@ -196,7 +193,6 @@ fun SettingsScreen(
                             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     )
 
-                    // Right Pane: Active Category Details
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -287,7 +283,6 @@ fun SettingsScreen(
                     }
                 }
             } else {
-                // Animated transition between main menu and subcategories (for mobile)
                 AnimatedContent(
                     targetState = uiState.settingsCategory,
                     transitionSpec = {
@@ -369,13 +364,13 @@ private fun SettingsMenu(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Spacer(modifier = Modifier.height(12.dp)) // padding above the first menu
+            Spacer(modifier = Modifier.height(12.dp))
         }
         item {
             CategoryMenuItem(
                 title = "Feed",
                 icon = Icons.Filled.Feed,
-                iconContainerColor = Color(0xFF6366F1), // wasteof colour
+                iconContainerColor = Color(0xFF6366F1),
                 iconColor = Color.White,
                 selected = selectedCategory == SettingsCategory.FEED,
                 onClick = { onCategorySelect(SettingsCategory.FEED) }
@@ -408,7 +403,7 @@ private fun SettingsMenu(
             CategoryMenuItem(
                 title = "Notifications",
                 icon = Icons.Filled.Notifications,
-                iconContainerColor = Color(0xFFEF5350), // red
+                iconContainerColor = Color(0xFFEF5350),
                 iconColor = Color.White,
                 selected = selectedCategory == SettingsCategory.NOTIFICATIONS,
                 onClick = { onCategorySelect(SettingsCategory.NOTIFICATIONS) }
@@ -418,7 +413,7 @@ private fun SettingsMenu(
             CategoryMenuItem(
                 title = "Links",
                 icon = Icons.Filled.Link,
-                iconContainerColor = Color(0xFF008AFF), // blue
+                iconContainerColor = Color(0xFF008AFF),
                 iconColor = Color.White,
                 selected = selectedCategory == SettingsCategory.LINKS,
                 onClick = { onCategorySelect(SettingsCategory.LINKS) }
@@ -428,7 +423,7 @@ private fun SettingsMenu(
             CategoryMenuItem(
                 title = "Blocked Users",
                 icon = Icons.Filled.Block,
-                iconContainerColor = Color(0xFFFFEB3B), // yellow
+                iconContainerColor = Color(0xFFFFEB3B),
                 iconColor = Color.Black,
                 selected = selectedCategory == SettingsCategory.BLOCKED_USERS,
                 onClick = { onCategorySelect(SettingsCategory.BLOCKED_USERS) }
@@ -438,7 +433,7 @@ private fun SettingsMenu(
             CategoryMenuItem(
                 title = "Wear OS",
                 icon = Icons.Filled.Watch,
-                iconContainerColor = Color(0xFFC6FF00), // pixel watch lime
+                iconContainerColor = Color(0xFFC6FF00),
                 iconColor = Color.Black,
                 selected = selectedCategory == SettingsCategory.WEAR_OS,
                 onClick = { onCategorySelect(SettingsCategory.WEAR_OS) }
@@ -509,7 +504,6 @@ private fun CategoryMenuItem(
                 )
             }
             Spacer(modifier = Modifier.width(16.dp))
-            // Title and badge share one weighted row so the arrow always stays right-aligned
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically
@@ -584,7 +578,7 @@ private fun ThemingSettings(
     onCustomThemeColorChange: (String) -> Unit,
     onCustomThemeDynamicChange: (Boolean) -> Unit
 ) {
-    val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2 // Android 12L+
+    val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2
 
     LazyColumn(
         modifier = Modifier
@@ -862,7 +856,6 @@ private fun LinkSettings(
 private fun LinkApprovalCard() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    // null = unknown (pre-Android 12 has no per-domain user approval API)
     var approved by remember { mutableStateOf<Boolean?>(null) }
 
     fun refreshState() {
@@ -871,7 +864,6 @@ private fun LinkApprovalCard() {
                 val manager = context.getSystemService(android.content.pm.verify.domain.DomainVerificationManager::class.java)
                 val state = manager?.getDomainVerificationUserState(context.packageName)
                 val hostState = state?.hostToStateMap?.get("wasteof.money")
-                // DOMAIN_STATE_VERIFIED (2) or DOMAIN_STATE_SELECTED (1) both mean links open in-app
                 hostState == 1 || hostState == 2
             } catch (_: Exception) {
                 null
@@ -909,7 +901,6 @@ private fun LinkApprovalCard() {
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
             Button(onClick = {
-                // Android 12+ has a dedicated per-app page; older versions only have app details
                 val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, Uri.parse("package:${context.packageName}"))
                 } else {
@@ -959,7 +950,6 @@ private fun BlockedUsersSettings(
             )
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Radio options
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().clickable { onBlockedQuoteHandlingChange("warning") }
@@ -1020,7 +1010,6 @@ private fun BlockedUsersSettings(
         }
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Block options card/button at top
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1060,7 +1049,6 @@ private fun BlockedUsersSettings(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            // Blocked users list
             if (blockedUsers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1335,7 +1323,6 @@ private fun AboutSettings(onFollowJosh: () -> Unit, frogMessage: String? = null)
             )
         }
 
-        // 🐸 Secret frog easter egg
         if (frogMessage != null) {
             item {
                 HorizontalDivider(

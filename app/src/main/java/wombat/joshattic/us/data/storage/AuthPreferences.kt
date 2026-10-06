@@ -19,7 +19,7 @@ class AuthPreferences(private val context: Context) {
     private val type = object : TypeToken<List<AuthSession>>() {}.type
 
     private object Keys {
-        val ActiveUsername = stringPreferencesKey("username") // Keep old key for backwards compat
+        val ActiveUsername = stringPreferencesKey("username")
         val Sessions = stringPreferencesKey("sessions")
         val LegacyToken = stringPreferencesKey("token")
     }

@@ -27,7 +27,7 @@ class SettingsPreferences(private val context: Context) {
         val BlockedQuoteHandling = stringPreferencesKey("blocked_quote_handling")
         val ShowBlockedRevealButton = booleanPreferencesKey("show_blocked_reveal_button")
 
-        val ThemeSource = stringPreferencesKey("theme_source") // "account" | "custom"
+        val ThemeSource = stringPreferencesKey("theme_source")
         val CustomThemeColor = stringPreferencesKey("custom_theme_color")
         val CustomThemeDynamic = booleanPreferencesKey("custom_theme_dynamic")
     }

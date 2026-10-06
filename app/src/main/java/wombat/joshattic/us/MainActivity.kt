@@ -24,15 +24,11 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import wombat.joshattic.us.wear.WearSyncService
 
 class MainActivity : ComponentActivity() {
-    // Kept between onCreate and setContent so the deep link can be handed to the ViewModel
-    // once it exists; cleared once consumed so it is only handled a single time.
     private var pendingDeepLink: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-        // Only pick up the link on a fresh launch, not on recreation after rotation,
-        // otherwise the same URL would re-open its view every configuration change
         if (savedInstanceState == null) {
             pendingDeepLink = intent?.extractDeepLink()
         }
@@ -47,7 +43,6 @@ class MainActivity : ComponentActivity() {
             val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository, applicationContext))
             val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
 
-            // Push auth session to the watch based on settings whenever it changes
             val session = uiState.session
             val wearAccount = uiState.wearAccount
             val savedAccounts = uiState.savedAccounts
@@ -64,7 +59,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            // Push watch settings whenever they change
             val wearShowImages = uiState.wearShowImages
             val wearShowProfilePictures = uiState.wearShowProfilePictures
             val wearFeedType = uiState.wearFeedType
@@ -77,16 +71,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            // Handle a wasteof.money link opened from another app once the ViewModel is ready.
-            // Auth may still be loading here, but every routed action fetches its data itself,
-            // so this is safe to fire immediately.
             val deepLink = pendingDeepLink
             pendingDeepLink = null
             if (deepLink != null) {
                 homeViewModel.handleDeepLink(deepLink)
             }
 
-            // Theme: custom theme overrides the account colour; optionally use system Material You (12L+)
             val useCustomTheme = uiState.themeSource == "custom"
             val useDynamic = useCustomTheme && uiState.customThemeDynamic &&
                 android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S_V2
@@ -110,8 +100,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // singleTop: the activity already exists, so the ViewModel is live and can
-        // handle the link immediately
         intent.extractDeepLink()?.let { deepLink ->
             androidx.lifecycle.ViewModelProvider(this)[HomeViewModel::class.java]
                 .handleDeepLink(deepLink)

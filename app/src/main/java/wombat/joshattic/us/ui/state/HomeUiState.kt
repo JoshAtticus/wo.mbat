@@ -17,23 +17,19 @@ data class HomeUiState(
     val readNotifications: List<Notification> = emptyList(),
     val inAppNotification: Notification? = null,
     val hasInitialNotificationsLoaded: Boolean = false,
-    // Pagination for notifications
     val unreadNotificationsPage: Int = 1,
     val unreadNotificationsLast: Boolean = false,
     val readNotificationsPage: Int = 1,
     val readNotificationsLast: Boolean = false,
     val notificationsLoadingMore: Boolean = false,
-    // Total unread count from socket (may exceed loaded page size)
     val socketUnreadCount: Int = 0,
     val accountProfile: User? = null,
     val exploreProfile: User? = null,
     val explorePosts: List<Post> = emptyList(),
     val exploreTrendingPosts: List<Post> = emptyList(),
     val exploreTrendingLoading: Boolean = false,
-    // True while the background pass resolving who the user follows is running;
-    // follow buttons spin until this settles.
     val exploreFollowStatusesLoading: Boolean = false,
-    val exploreTrendingTimeframe: String? = null, // null = API auto-pick
+    val exploreTrendingTimeframe: String? = null,
     val exploreSearchQuery: String = "",
     val exploreSearchActive: Boolean = false,
     val exploreSearchPostResults: List<Post> = emptyList(),
@@ -139,7 +135,7 @@ data class HomeUiState(
     val followLoadingUsernames: Set<String> = emptySet(),
     val blockedQuoteHandling: String = "warning",
     val showBlockedRevealButton: Boolean = false,
-    val themeSource: String = "account", // "account" | "custom"
+    val themeSource: String = "account",
     val customThemeColor: String = "indigo",
     val customThemeDynamic: Boolean = false,
     val blockedWarningTarget: BlockedWarningTarget? = null

@@ -53,7 +53,6 @@ fun RepostsSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
-    // "1 Repost and 2 Quotes", "2 Quotes", "1 Repost" …
     val repostCount = reposts.count { isPureRepost(it) }
     val quoteCount = reposts.size - repostCount
     val headerTitle = when {
@@ -67,8 +66,6 @@ fun RepostsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // Default sheet color matches PostCard's surfaceContainerLow, which
-        // would make the post cards invisible — use the background instead.
         containerColor = MaterialTheme.colorScheme.background
     ) {
         LazyColumn(
@@ -107,7 +104,6 @@ fun RepostsSheet(
                     blockedUsernames = blockedUsernames
                 )
             }
-            // Separator between the original post and the reposts list
             item(key = "separator") {
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),

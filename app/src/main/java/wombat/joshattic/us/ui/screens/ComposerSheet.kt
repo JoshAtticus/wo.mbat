@@ -132,18 +132,13 @@ fun ComposerSheet(
     val coroutineScope = rememberCoroutineScope()
     var imageUploadError by remember { mutableStateOf<String?>(null) }
     var isUploadingImage by remember { mutableStateOf(false) }
-    // Track batch progress so the UI can show "image 2 of 5" instead of a generic spinner
     var uploadCurrent by remember { mutableStateOf(0) }
     var uploadTotal by remember { mutableStateOf(0) }
     var showDraftsDialog by remember { mutableStateOf(false) }
-
-    // Unified HTML draft synchronization states
     var currentImages by remember { mutableStateOf(extractImages(draft)) }
     var lastSyncedDraft by remember { mutableStateOf("") }
     var richEditTextRef by remember { mutableStateOf<RichEditText?>(null) }
     var charCount by remember { mutableStateOf(0) }
-
-    // Active formatting states for toolbar highlights
     var isBoldActive by remember { mutableStateOf(false) }
     var isItalicActive by remember { mutableStateOf(false) }
     var isUnderlineActive by remember { mutableStateOf(false) }
@@ -185,8 +180,6 @@ fun ComposerSheet(
             coroutineScope.launch {
                 try {
                     val updatedImages = currentImages
-                    // Upload sequentially so images append to the draft in picker order,
-                    // and so already-uploaded images survive if a later one fails
                     uris.forEachIndexed { index, uri ->
                         uploadCurrent = index + 1
                         val uploadedUrl = viewModel.uploadImage(context, uri)
@@ -440,7 +433,6 @@ fun ComposerSheet(
                     }
                 }
 
-                // Expressive Floating Formatting Toolbar
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -578,7 +570,6 @@ fun ComposerSheet(
                     )
                 }
 
-                // Styled wrapping container around the rich text editor
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     var isFocused by remember { mutableStateOf(false) }
                     val borderColors = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -692,7 +683,6 @@ fun ComposerSheet(
                     )
                 }
 
-                // Image attachments preview
                 if (currentImages.isNotEmpty()) {
                     Row(
                         modifier = Modifier
@@ -769,9 +759,6 @@ fun ComposerSheet(
     }
 }
 
-// ------------------------------------------------------------------------------------------------
-// Rich Editor Helpers
-// ------------------------------------------------------------------------------------------------
 
 fun <T> hasSpan(
     text: Spanned,
@@ -783,13 +770,6 @@ fun <T> hasSpan(
     if (start < 0 || end < 0) return false
     val spans = text.getSpans(start, end, spanClass)
     return if (start == end) {
-        // Cursor (no selection). A span only counts as "active" if typing here would extend it.
-        // We distinguish three valid-active cases:
-        //  1. Zero-width INCLUSIVE_INCLUSIVE marker sitting exactly at cursor (style-on mode)
-        //  2. Cursor is strictly *inside* the span (not at either edge)
-        //  3. Span ends at cursor AND is INCLUSIVE at its right edge — still open/growing
-        //
-        // A SPAN_EXCLUSIVE_EXCLUSIVE span that merely ends at cursor is "closed" — NOT active.
         spans.any { span ->
             if (!predicate(span)) return@any false
             val s = text.getSpanStart(span)
@@ -797,10 +777,10 @@ fun <T> hasSpan(
             val flags = text.getSpanFlags(span)
             val inclusiveRight = (flags and Spanned.SPAN_INCLUSIVE_INCLUSIVE) == Spanned.SPAN_INCLUSIVE_INCLUSIVE
             when {
-                s == start && e == start -> true           // zero-width marker at cursor
-                s < start && e > start  -> true            // cursor strictly inside span
-                e == start && inclusiveRight -> true       // open span whose end is at cursor
-                else -> false                              // closed span ending here — ignore
+                s == start && e == start -> true
+                s < start && e > start  -> true
+                e == start && inclusiveRight -> true
+                else -> false
             }
         }
     } else {
@@ -828,21 +808,16 @@ fun <T : CharacterStyle> toggleSpan(
         val spans = text.getSpans(start, start, spanClass)
         val activeSpan = spans.firstOrNull(matcher)
         if (activeSpan != null) {
-            // Span is active at cursor — toggle it OFF.
             val spanStart = text.getSpanStart(activeSpan)
             val spanEnd = text.getSpanEnd(activeSpan)
             text.removeSpan(activeSpan)
-            // If the span covers real text before the cursor, preserve it up to the cursor.
-            // This means already-typed styled text stays styled; new typing won't be.
             if (spanStart < start) {
                 text.setSpan(creator(), spanStart, start, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
-            // If the span extends beyond the cursor (rare), preserve that portion too.
             if (spanEnd > start) {
                 text.setSpan(creator(), start, spanEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         } else {
-            // Span is NOT active — toggle it ON. Use INCLUSIVE_INCLUSIVE so typing extends it.
             text.setSpan(creator(), start, start, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
         }
     } else {

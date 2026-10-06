@@ -53,8 +53,6 @@ import wombat.joshattic.us.ui.screens.urlHost
 object OpenGraphPreviewCache {
     private const val MAX_ENTRIES = 128
 
-    // Shared IO scope so in-flight fetches complete and cache their result even
-    // when the card that started them leaves composition during a scroll.
     private val fetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val cache = LinkedHashMap<String, OpenGraphResponse>()
     private val failures = LinkedHashSet<String>()
@@ -152,9 +150,6 @@ fun OpenGraphPreview(
     var unavailable by remember(url) { mutableStateOf(OpenGraphPreviewCache.isKnownFailure(url)) }
     val context = LocalContext.current
 
-    // Fully asynchronous: the request runs on the cache's IO scope (never the
-    // UI thread and never blocking composition); the card simply appears when
-    // the result lands.
     LaunchedEffect(url) {
         if (response == null && !unavailable) {
             val fetched = OpenGraphPreviewCache.getOrFetch(url)
@@ -199,7 +194,6 @@ private fun renderPreview(
     }
 
     if (shouldUseLargePreview(imageUrl != null, hasPostImages, openGraphFirst)) {
-        // Large banner style: full-width preview image with the title overlaid at the bottom.
         Column(modifier = modifier) {
             Box(
                 modifier = Modifier
@@ -244,7 +238,6 @@ private fun renderPreview(
             }
         }
     } else {
-        // Compact style: thumbnail (when available) beside domain / title / description.
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -260,11 +253,6 @@ private fun renderPreview(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (imageUrl != null) {
-                    // Full-height flush thumbnail locked to a 1:1 aspect
-                    // ratio, so it sizes itself off the card height instead
-                    // of a hardcoded width.
-                    // AsyncImage (not Subcompose) because IntrinsicSize.Min
-                    // queries crash subcompose-based layouts at measure time.
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
