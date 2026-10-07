@@ -6,6 +6,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -66,7 +68,6 @@ import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.User
 
 private val TIMEFRAMES = listOf(
-    null to "Best",
     "day" to "Today",
     "week" to "This week",
     "month" to "This month",
@@ -134,8 +135,12 @@ fun ExploreTab(
 
     Column(modifier = Modifier.fillMaxSize()) {
         val searchFocusRequester = remember { FocusRequester() }
-        if (searchBarExpanded) {
-            // Fullscreen search composed directly, so there's no expand animation from a pill
+        // Animated so the fullscreen search slides up over the explore page instead of appearing
+        AnimatedVisibility(
+            visible = searchBarExpanded,
+            enter = slideInVertically(initialOffsetY = { it / 4 }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it / 4 }) + fadeOut()
+        ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
@@ -289,7 +294,8 @@ fun ExploreTab(
                 }
             }
         }
-        } else {
+        }
+        AnimatedVisibility(visible = !searchBarExpanded, enter = fadeIn(), exit = fadeOut()) {
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
