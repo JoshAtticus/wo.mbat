@@ -354,6 +354,7 @@ fun AccountTab(
                                             verified = profile.verified,
                                             admin = profile.permissions?.admin == true,
                                             beta = profile.beta,
+                                            username = profile.name,
                                             accentColor = accent
                                         )
                                     }

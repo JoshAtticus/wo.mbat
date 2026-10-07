@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -97,6 +98,13 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.LocalFlorist
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
+import wombat.joshattic.us.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -187,6 +195,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
@@ -499,32 +508,76 @@ fun WombatBottomNavigationBar(
 }
 
 @Composable
-fun UserBadges(verified: Boolean, admin: Boolean, beta: Boolean, accentColor: Color? = null) {
-    if (!verified && !admin && !beta) return
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        if (verified) {
-            Icon(
-                Icons.Filled.Verified,
-                contentDescription = "Verified",
-                modifier = Modifier.size(18.dp),
-                tint = accentColor ?: MaterialTheme.colorScheme.primary
-            )
+fun UserBadges(verified: Boolean, admin: Boolean, beta: Boolean, username: String, accentColor: Color? = null) {
+    // Tapping any badge opens a bottom sheet listing all of the user's badges
+    var showBadgesSheet by remember { mutableStateOf(false) }
+    val displayName = "@$username"
+    class BadgeInfo(val title: String, val description: String, val icon: @Composable (Modifier) -> Unit)
+    val ownedBadges = buildList {
+        if (verified) add(BadgeInfo("Verified", "$displayName has been personally verified by @jeffalo, exclusive!") { mod ->
+            Icon(Icons.Filled.Verified, contentDescription = null, modifier = mod, tint = accentColor ?: MaterialTheme.colorScheme.primary)
+        })
+        if (admin) add(BadgeInfo("Admin", "$displayName is an administrator on wasteof.money who can take moderation action. Fun fact: There's less than 10 admins on the site.") { mod ->
+            Icon(Icons.Filled.AdminPanelSettings, contentDescription = null, modifier = mod, tint = Color(0xFFFFC107))
+        })
+        if (beta) add(BadgeInfo("Alpha", "$displayName has access to wasteof.money alpha and the wasteof4 api. Only around 4% of users have this, ask an admin for access if you're interested!") { mod ->
+            Icon(Icons.Filled.Science, contentDescription = null, modifier = mod, tint = accentColor ?: MaterialTheme.colorScheme.primary)
+        })
+        if (username == "joshatticus") add(BadgeInfo("wo.mbat", "$displayName is the creator of wo.mbat, which you're using right now!") { mod ->
+            Icon(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = mod, tint = accentColor ?: MaterialTheme.colorScheme.primary)
+        })
+        if (username == "eris") add(BadgeInfo("eris", "$displayName is awesome!") { mod ->
+            Icon(painterResource(R.drawable.ic_tulip), contentDescription = null, modifier = mod, tint = Color(0xFFB388FF))
+        })
+        // Tnix and ethernet badges use the multicolor chud blob, so they can't be tinted
+        if (username == "tnix" || username == "teanicks") add(BadgeInfo("Tnix", "$displayName is awesome!") { mod ->
+            Icon(painterResource(R.drawable.ic_chud), contentDescription = null, modifier = mod, tint = Color.Unspecified)
+        })
+        if (username == "ethernet") add(BadgeInfo("ethernet", "$displayName is not WiFi") { mod ->
+            Icon(painterResource(R.drawable.ic_chud), contentDescription = null, modifier = mod, tint = Color.Unspecified)
+        })
+    }
+    val click = Modifier.clickable(
+        indication = null,
+        interactionSource = remember { MutableInteractionSource() }
+    ) { showBadgesSheet = true }
+    if (ownedBadges.isNotEmpty()) Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        ownedBadges.forEach { badge ->
+            Box(modifier = click) { badge.icon(Modifier.size(18.dp)) }
         }
-        if (admin) {
-            Icon(
-                Icons.Filled.AdminPanelSettings,
-                contentDescription = "Admin",
-                modifier = Modifier.size(18.dp),
-                tint = Color(0xFFFFC107)
-            )
-        }
-        if (beta) {
-            Icon(
-                Icons.Filled.Science,
-                contentDescription = "Beta tester",
-                modifier = Modifier.size(18.dp),
-                tint = accentColor ?: MaterialTheme.colorScheme.primary
-            )
+    }
+    if (showBadgesSheet) {
+        ModalBottomSheet(onDismissRequest = { showBadgesSheet = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "Badges",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                ownedBadges.forEach { badge ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        badge.icon(Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(badge.title, fontWeight = FontWeight.Bold)
+                            Text(
+                                badge.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
         }
     }
 }
@@ -1061,6 +1114,7 @@ fun PostCard(
                     isActive = post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true),
                     enabled = post.isLoving != null && !isBanned && !post.loveLoading,
                     pulse = (post.isLoving == null || post.loveLoading) && !isBanned,
+                    isChud = loveEasterEgg(post.content),
                     onClick = onLoveClick?.let { { onLoveClick(post) } },
                     shape = RoundedCornerShape(28.dp)
                 )
@@ -1895,6 +1949,23 @@ fun HtmlText(
     )
 }
 
+// Matches "chud" only when it appears as a standalone word in post bodies
+private val chudWordRegex = Regex("(?i)(^|[^\\p{L}\\p{N}])chud([^\\p{L}\\p{N}]|$)")
+// Matches "wo.mbat" only when it appears as a standalone word in post bodies
+private val wombatWordRegex = Regex("(?i)(^|[^A-Za-z0-9])wo\\.mbat([^A-Za-z0-9]|$)")
+
+// Like easter egg keyword that appears first in the post body ("chud" or
+// "wombat" uses the wo.mbat logo), or none
+internal fun loveEasterEgg(content: String): String? {
+    val chudIdx = chudWordRegex.find(content)?.range?.first ?: Int.MAX_VALUE
+    val wombatIdx = wombatWordRegex.find(content)?.range?.first ?: Int.MAX_VALUE
+    return when {
+        chudIdx == Int.MAX_VALUE && wombatIdx == Int.MAX_VALUE -> null
+        chudIdx <= wombatIdx -> "chud"
+        else -> "wombat"
+    }
+}
+
 @Composable
 fun PostMetric(
     value: Int,
@@ -1903,6 +1974,8 @@ fun PostMetric(
     isActive: Boolean = false,
     enabled: Boolean = true,
     pulse: Boolean = false,
+    // "isChud"... or "wombat". Whatever you do, do NOT rename this.
+    isChud: String? = null,
     onClick: (() -> Unit)? = null,
     shape: androidx.compose.ui.graphics.Shape = CircleShape
 ) {
@@ -1910,46 +1983,93 @@ fun PostMetric(
     val isLoveMetric = label == "loves"
     val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
 
-    val containerColor = if (!enabled && !pulse) {
-        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
-    } else if (isActive) {
-        if (isLoveMetric) {
-            if (isDarkTheme) Color(0xFF5C1D24) else Color(0xFFFEE2E2)
-        } else {
-            MaterialTheme.colorScheme.primaryContainer
+    // Easter egg: liking a post containing "chud" as its own word plays the
+    // same like animation while loading, then shows the yellow chud blob until
+    // 2.5s after the like completes, then fades back to the red heart. Runs
+    // only on an actual tap, never from reloaded like status.
+    var chudPending by remember { mutableStateOf(false) }
+    var chudActive by remember { mutableStateOf(false) }
+    // Wait for the like request to finish loading before starting the chud
+    // phase, so the usual loading spinner is still visible.
+    LaunchedEffect(chudPending, pulse) {
+        if (!chudPending || pulse) return@LaunchedEffect
+        chudActive = true
+        chudPending = false
+    }
+    LaunchedEffect(chudActive) {
+        if (chudActive) {
+            delay(2500)
+            chudActive = false
         }
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val chudMode = isChud != null && chudActive
+
+    val rawContainerColor = when {
+        chudMode && isChud == "chud" -> if (isDarkTheme) Color(0xFF3E3300) else Color(0xFFFFF3C4)
+        chudMode && isChud == "wombat" -> if (isDarkTheme) Color(0xFF2E2B52) else Color(0xFFE3E5FF)
+        !enabled && !pulse -> {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+        }
+        isActive -> {
+            if (isLoveMetric) {
+                if (isDarkTheme) Color(0xFF5C1D24) else Color(0xFFFEE2E2)
+            } else {
+                MaterialTheme.colorScheme.primaryContainer
+            }
+        }
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
 
-    val contentColor = if (!enabled && !pulse) {
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-    } else if (isActive) {
-        if (isLoveMetric) {
-            if (isDarkTheme) Color(0xFFFF8A80) else Color(0xFFEF4444)
-        } else {
-            MaterialTheme.colorScheme.primary
+    val rawContentColor = when {
+        chudMode && isChud == "chud" -> Color(0xFFB8860B)
+        chudMode && isChud == "wombat" -> if (isDarkTheme) Color(0xFFA5A7FF) else Color(0xFF5B5EA8)
+        !enabled && !pulse -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        isActive -> {
+            if (isLoveMetric) {
+                if (isDarkTheme) Color(0xFFFF8A80) else Color(0xFFEF4444)
+            } else {
+                MaterialTheme.colorScheme.primary
+            }
         }
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+
+    // Fade between the yellow chud look and the normal red heart look
+    val containerColor by animateColorAsState(rawContainerColor, tween(300), label = "MetricContainerColor")
+    val contentColor by animateColorAsState(rawContentColor, tween(300), label = "MetricContentColor")
 
     var animMode by remember { mutableStateOf(0) }
-    val iconScale by animateFloatAsState(
-        targetValue = if (isActive) 1.35f else 1.0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "MetricIconScale"
-    )
+    // Pop the icon bigger on activation, hold for a moment, then shrink back
+    // to normal instead of staying enlarged while it stays active.
+    val iconScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(isActive, chudMode) {
+        if (isActive || chudMode) {
+            iconScale.snapTo(1f)
+            iconScale.animateTo(1.35f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+            delay(1000)
+            iconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+        } else {
+            iconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+        }
+    }
     val iconRotation by animateFloatAsState(
         targetValue = if (isActive && animMode == 1) 360f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "MetricIconRotation"
     )
-    val iconOffsetY by animateFloatAsState(
-        targetValue = if (isActive && animMode == 2) -4f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "MetricIconOffsetY"
-    )
+    // Same one-shot treatment for the vertical bounce: rise up, then settle
+    // back down instead of staying lifted while active.
+    val iconOffsetY = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(isActive, animMode) {
+        if (isActive && animMode == 2) {
+            iconOffsetY.snapTo(0f)
+            iconOffsetY.animateTo(-4f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+            delay(1000)
+            iconOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+        } else {
+            iconOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+        }
+    }
 
     Surface(
         shape = shape,
@@ -1967,6 +2087,8 @@ fun PostMetric(
                     if (!isActive) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         animMode = (0..2).random()
+                        // Trigger the isChud easter egg only on a fresh like tap
+                        if (isLoveMetric && isChud != null) chudPending = true
                     } else {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     }
@@ -1979,26 +2101,42 @@ fun PostMetric(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            if (pulse) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = contentColor
-                )
-            } else {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .graphicsLayer {
-                            scaleX = iconScale
-                            scaleY = iconScale
-                            rotationZ = iconRotation
-                            translationY = iconOffsetY
-                        },
-                    tint = contentColor
-                )
+            androidx.compose.animation.Crossfade(
+                targetState = chudMode,
+                animationSpec = tween(300),
+                label = "MetricIconCrossfade"
+            ) { chud ->
+                if (chud) {
+                    Icon(
+                        // isChud keeps the blob's own colors; the wo.mbat logo
+                        // is tinted to match its container text color
+                        painter = painterResource(if (isChud == "wombat") R.drawable.ic_logo else R.drawable.ic_chud),
+                        contentDescription = label,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .graphicsLayer {
+                                scaleX = iconScale.value
+                                scaleY = iconScale.value
+                                rotationZ = iconRotation
+                                translationY = iconOffsetY.value
+                            },
+                        if (isChud == "wombat") contentColor else Color.Unspecified
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .graphicsLayer {
+                                scaleX = iconScale.value
+                                scaleY = iconScale.value
+                                rotationZ = iconRotation
+                                translationY = iconOffsetY.value
+                            },
+                        tint = contentColor
+                    )
+                }
             }
             Text(
                 text = value.toString(),
@@ -2735,41 +2873,92 @@ fun FullScreenImageViewer(
                                     modifier = Modifier.padding(top = 4.dp)
                                 ) {
                                     val pCachedLoved = p.isLoving == null && LoveCache.get(p.id) == true
+                                    // Like easter egg: whichever keyword comes first in
+                                    // the body ("chud" blob or wo.mbat logo) takes over the
+                                    // heart once the like finishes loading, then fades back.
+                                    val pEgg = remember(p.id) { loveEasterEgg(p.content) }
+                                    var pChudPending by remember { mutableStateOf(false) }
+                                    var pChudActive by remember { mutableStateOf(false) }
+                                    LaunchedEffect(pChudPending, p.loveLoading) {
+                                        if (!pChudPending || p.loveLoading) return@LaunchedEffect
+                                        pChudActive = true
+                                        pChudPending = false
+                                    }
+                                    LaunchedEffect(pChudActive) {
+                                        if (pChudActive) {
+                                            delay(2500)
+                                            pChudActive = false
+                                        }
+                                    }
+                                    val pChudMode = pChudActive && pEgg != null
+                                    val pBackgroundColor by animateColorAsState(
+                                        when {
+                                            pChudMode && pEgg == "wombat" -> Color(0xFFC5C8FF)
+                                            pChudMode -> Color(0xFFFFC107)
+                                            p.isLoving == null && !pCachedLoved -> Color.White.copy(alpha = 0.08f)
+                                            else -> Color.White.copy(alpha = 0.18f)
+                                        },
+                                        tween(300),
+                                        label = "InlineLikeBackgroundColor"
+                                    )
+                                    val pTextColor by animateColorAsState(
+                                        if (pChudMode && pEgg == "wombat") Color(0xFF2E2B52) else if (pChudMode) Color(0xFF3E3300) else Color.White,
+                                        tween(300),
+                                        label = "InlineLikeTextColor"
+                                    )
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = if (p.isLoving == null && !pCachedLoved) 0.08f else 0.18f))
+                                            .background(pBackgroundColor)
                                             .clickable(enabled = p.isLoving != null && !p.loveLoading) {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                if (p.isLoving != true && pEgg != null) pChudPending = true
                                                 onLoveClick?.invoke(p)
                                             }
                                             .padding(horizontal = 14.dp, vertical = 8.dp)
                                     ) {
-                                        if (p.loveLoading) {
-                                            androidx.compose.material3.CircularProgressIndicator(
-                                                modifier = Modifier.size(18.dp),
-                                                strokeWidth = 2.dp,
-                                                color = Color.White
-                                            )
-                                        } else {
-                                            Icon(
-                                                imageVector = if (p.isLoving == true || pCachedLoved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                                contentDescription = "Love",
-                                                tint = when {
-                                                    p.isLoving == true || pCachedLoved -> Color(0xFFFF4081)
-                                                    p.isLoving == null -> Color.White.copy(alpha = 0.5f)
-                                                    else -> Color.White
-                                                },
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                                        androidx.compose.animation.Crossfade(
+                                            targetState = p.loveLoading,
+                                            animationSpec = tween(300),
+                                            label = "InlineLikeLoading"
+                                        ) { loading ->
+                                            androidx.compose.animation.Crossfade(
+                                                targetState = pChudMode,
+                                                animationSpec = tween(300),
+                                                label = "InlineLikeIcon"
+                                            ) { chud ->
+                                                when {
+                                                    loading -> androidx.compose.material3.CircularProgressIndicator(
+                                                        modifier = Modifier.size(18.dp),
+                                                        strokeWidth = 2.dp,
+                                                        color = Color.White
+                                                    )
+                                                    chud -> Icon(
+                                                        painter = painterResource(if (pEgg == "wombat") R.drawable.ic_logo else R.drawable.ic_chud),
+                                                        contentDescription = "Love",
+                                                        tint = if (pEgg == "wombat") Color(0xFF5B5EA8) else Color.Unspecified,
+                                                        modifier = Modifier.size(22.dp)
+                                                    )
+                                                    else -> Icon(
+                                                        imageVector = if (p.isLoving == true || pCachedLoved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                                        contentDescription = "Love",
+                                                        tint = when {
+                                                            p.isLoving == true || pCachedLoved -> Color(0xFFFF4081)
+                                                            p.isLoving == null -> Color.White.copy(alpha = 0.5f)
+                                                            else -> Color.White
+                                                        },
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                         Text(
                                             text = p.loves.toString(),
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            color = pTextColor
                                         )
                                     }
 

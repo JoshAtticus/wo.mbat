@@ -87,6 +87,7 @@ fun ProfileHeader(profile: User) {
                             verified = profile.verified,
                             admin = profile.permissions?.admin == true,
                             beta = profile.beta,
+                            username = profile.name,
                             accentColor = getUserColorSchemeColors(profile.color).first
                         )
                     }
@@ -354,6 +355,7 @@ fun ProfileScreen(
                                     verified = profile.verified,
                                     admin = profile.permissions?.admin == true,
                                     beta = profile.beta,
+                                    username = profile.name,
                                     accentColor = accent
                                 )
                             }
