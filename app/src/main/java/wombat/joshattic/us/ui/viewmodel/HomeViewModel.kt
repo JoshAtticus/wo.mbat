@@ -143,6 +143,12 @@ class HomeViewModel(
             commentsLoading = false,
             commentReplyParent = null,
             focusedComment = null,
+            // Reset explore search so reopening the tab starts fresh
+            exploreSearchQuery = "",
+            exploreSearchActive = false,
+            exploreSearchPostResults = emptyList(),
+            exploreSearchUserResults = emptyList(),
+            exploreSearchLoading = false,
             feedPage = 1,
             feedLast = false,
             accountPage = 1,
@@ -530,12 +536,29 @@ class HomeViewModel(
             val session = _uiState.value.session
             val postsResult = runCatching { repository.searchPosts(session, query) }
             val usersResult = runCatching { repository.searchUsers(session, query) }
+            val postResults = postsResult.getOrNull()?.results?.let { filterBlockedPosts(it) }
             _uiState.value = _uiState.value.copy(
                 exploreSearchLoading = false,
-                exploreSearchPostResults = postsResult.getOrNull()?.results?.let { filterBlockedPosts(it) } ?: _uiState.value.exploreSearchPostResults,
-                exploreSearchUserResults = usersResult.getOrNull()?.results ?: _uiState.value.exploreSearchUserResults
+                exploreSearchPostResults = postResults ?: _uiState.value.exploreSearchPostResults,
+                exploreSearchUserResults = usersResult.getOrNull()?.results ?: _uiState.value.exploreSearchUserResults,
+                // Results show follow buttons, so flag statuses as loading until they're fetched
+                exploreFollowStatusesLoading = session != null && !postResults.isNullOrEmpty()
             )
+            if (session != null && !postResults.isNullOrEmpty()) {
+                loadExploreFollowStatuses(postResults, session)
+            }
         }
+    }
+
+    // Commits the current query to history — called on keyboard search action or result tap
+    fun saveExploreSearchToHistory() {
+        val query = _uiState.value.exploreSearchQuery.trim()
+        if (query.isEmpty()) return
+        viewModelScope.launch { repository.settingsPreferences.addSearchQuery(query) }
+    }
+
+    fun clearExploreSearchHistory() {
+        viewModelScope.launch { repository.settingsPreferences.clearSearchHistory() }
     }
 
     fun setExploreTrendingTimeframe(timeframe: String?) {
@@ -2448,6 +2471,11 @@ class HomeViewModel(
 
     private fun observeSettings() {
         val prefs = repository.settingsPreferences
+        viewModelScope.launch {
+            prefs.searchHistory.collectLatest { value ->
+                _uiState.value = _uiState.value.copy(searchHistory = value)
+            }
+        }
         viewModelScope.launch {
             prefs.showImagesInFeed.collectLatest { value ->
                 _uiState.value = _uiState.value.copy(showImagesInFeed = value)

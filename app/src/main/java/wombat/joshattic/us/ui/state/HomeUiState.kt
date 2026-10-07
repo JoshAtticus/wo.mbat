@@ -29,6 +29,7 @@ data class HomeUiState(
     val exploreTrendingPosts: List<Post> = emptyList(),
     val exploreTrendingLoading: Boolean = false,
     val exploreFollowStatusesLoading: Boolean = false,
+    val searchHistory: List<String> = emptyList(),
     val exploreTrendingTimeframe: String? = null,
     val exploreSearchQuery: String = "",
     val exploreSearchActive: Boolean = false,

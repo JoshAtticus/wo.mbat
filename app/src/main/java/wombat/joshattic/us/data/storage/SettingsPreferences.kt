@@ -32,6 +32,9 @@ class SettingsPreferences(private val context: Context) {
         val ThemeSource = stringPreferencesKey("theme_source")
         val CustomThemeColor = stringPreferencesKey("custom_theme_color")
         val CustomThemeDynamic = booleanPreferencesKey("custom_theme_dynamic")
+
+        // Stored newest-first, joined by newlines
+        val SearchHistory = stringPreferencesKey("search_history")
     }
 
     val showImagesInFeed: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.ShowImagesInFeed] ?: true }
@@ -57,6 +60,30 @@ class SettingsPreferences(private val context: Context) {
     val themeSource: Flow<String> = context.settingsDataStore.data.map { it[Keys.ThemeSource] ?: "account" }
     val customThemeColor: Flow<String> = context.settingsDataStore.data.map { it[Keys.CustomThemeColor] ?: "indigo" }
     val customThemeDynamic: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.CustomThemeDynamic] ?: false }
+
+    val searchHistory: Flow<List<String>> = context.settingsDataStore.data.map { prefs ->
+        prefs[Keys.SearchHistory]?.split('\n')?.filter { it.isNotBlank() } ?: emptyList()
+    }
+
+    suspend fun addSearchQuery(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return
+        context.settingsDataStore.edit { prefs ->
+            val current = prefs[Keys.SearchHistory]
+                ?.split('\n')
+                ?.filter { it.isNotBlank() }
+                .orEmpty()
+            // Newest first, deduped, capped at 10
+            prefs[Keys.SearchHistory] =
+                (listOf(trimmed) + current.filterNot { it.equals(trimmed, ignoreCase = true) })
+                    .take(10)
+                    .joinToString("\n")
+        }
+    }
+
+    suspend fun clearSearchHistory() {
+        context.settingsDataStore.edit { it.remove(Keys.SearchHistory) }
+    }
 
     suspend fun setShowImagesInFeed(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.ShowImagesInFeed] = value }

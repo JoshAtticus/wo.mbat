@@ -2,10 +2,13 @@
 
 package wombat.joshattic.us.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,25 +30,35 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -93,6 +106,9 @@ fun ExploreTab(
     searchPostResults: List<Post> = emptyList(),
     searchUserResults: List<User> = emptyList(),
     searchLoading: Boolean = false,
+    searchHistory: List<String> = emptyList(),
+    onClearSearchHistory: () -> Unit = {},
+    onSaveSearch: () -> Unit = {},
     onSearchQueryChange: (String) -> Unit = {},
     selectedTimeframe: String? = null,
     onTimeframeChange: (String?) -> Unit = {}
@@ -100,36 +116,56 @@ fun ExploreTab(
     val refreshState = rememberPullToRefreshState()
     var searchBarExpanded by remember { mutableStateOf(false) }
 
+    // Back press closes search instead of leaving the app
+    BackHandler(enabled = searchBarExpanded) {
+        searchBarExpanded = false
+        onSearchQueryChange("")
+    }
+    // Collapse when the query is cleared externally (e.g. re-selecting the explore tab)
+    var hadQuery by remember { mutableStateOf(false) }
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank()) {
+            hadQuery = true
+        } else if (hadQuery) {
+            hadQuery = false
+            searchBarExpanded = false
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        SearchBar(
-            inputField = {
-                SearchBarDefaults.InputField(
-                    query = searchQuery,
-                    onQueryChange = {
-                        onSearchQueryChange(it)
-                        if (it.isNotBlank()) searchBarExpanded = true
-                    },
-                    onSearch = {},
-                    expanded = searchBarExpanded,
-                    onExpandedChange = { searchBarExpanded = it },
-                    placeholder = { Text("Search posts and people…") },
-                    leadingIcon = {
-                        Icon(Icons.Filled.Search, contentDescription = null)
-                    }
-                )
-            },
-            expanded = searchBarExpanded,
-            onExpandedChange = { searchBarExpanded = it },
-            windowInsets = WindowInsets(0.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = if (searchBarExpanded) 0.dp else 16.dp)
-                .padding(bottom = if (searchBarExpanded) 0.dp else 4.dp),
-            colors = SearchBarDefaults.colors(
-                containerColor = if (searchBarExpanded) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceContainerHigh,
-                dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-            )
-        ) {
+        val searchFocusRequester = remember { FocusRequester() }
+        if (searchBarExpanded) {
+            // Fullscreen search composed directly, so there's no expand animation from a pill
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    val keyboardController = LocalSoftwareKeyboardController.current
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .focusRequester(searchFocusRequester),
+                        placeholder = { Text("Search posts and people…") },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.extraLarge,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            // Keyboard tick — commit the search to history and drop the keyboard
+                            onSaveSearch()
+                            keyboardController?.hide()
+                        }),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        )
+                    )
+                    LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
             if (searchLoading) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(32.dp),
@@ -161,6 +197,7 @@ fun ExploreTab(
                                             .width(68.dp)
                                             .clickable {
                                                 searchBarExpanded = false
+                                                onSaveSearch()
                                                 onProfileClick(user.name)
                                             }
                                     ) {
@@ -205,7 +242,7 @@ fun ExploreTab(
                             Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                                 PostCard(
                                     post = post,
-                                    onClick = { searchBarExpanded = false; onOpenPost(post) },
+                                    onClick = { searchBarExpanded = false; onSaveSearch(); onOpenPost(post) },
                                     truncated = true,
                                     currentUsername = currentUsername,
                                     savedAccounts = savedAccounts,
@@ -248,6 +285,34 @@ fun ExploreTab(
                             }
                         }
                     }
+                }
+                }
+            }
+        }
+        } else {
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clickable { searchBarExpanded = true }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "Search posts and people…",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

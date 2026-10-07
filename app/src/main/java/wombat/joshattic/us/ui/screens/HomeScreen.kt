@@ -534,6 +534,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 searchPostResults = uiState.exploreSearchPostResults,
                                                 searchUserResults = uiState.exploreSearchUserResults,
                                                 searchLoading = uiState.exploreSearchLoading,
+                                                searchHistory = uiState.searchHistory,
+                                                onClearSearchHistory = viewModel::clearExploreSearchHistory,
+                                                onSaveSearch = viewModel::saveExploreSearchToHistory,
                                                 onSearchQueryChange = viewModel::setExploreSearchQuery,
                                                 selectedTimeframe = uiState.exploreTrendingTimeframe,
                                                 onTimeframeChange = viewModel::setExploreTrendingTimeframe
@@ -944,6 +947,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         searchPostResults = uiState.exploreSearchPostResults,
                                         searchUserResults = uiState.exploreSearchUserResults,
                                         searchLoading = uiState.exploreSearchLoading,
+                                        searchHistory = uiState.searchHistory,
+                                        onClearSearchHistory = viewModel::clearExploreSearchHistory,
+                                        onSaveSearch = viewModel::saveExploreSearchToHistory,
                                         onSearchQueryChange = viewModel::setExploreSearchQuery,
                                         selectedTimeframe = uiState.exploreTrendingTimeframe,
                                         onTimeframeChange = viewModel::setExploreTrendingTimeframe
