@@ -1145,12 +1145,13 @@ fun CommentCard(
     onLoadReplies: ((Comment) -> Unit)? = null,
     showImages: Boolean = true,
     onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
-    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> }
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> },
+    modifier: Modifier = Modifier
 ) {
     val isReply = comment.parent != null
     if (!isReply) {
         Card(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = tween(300)),
             shape = RoundedCornerShape(16.dp),
@@ -1196,7 +1197,8 @@ fun CommentCard(
             onLoadReplies = onLoadReplies,
             showImages = showImages,
             onImageClick = onImageClick,
-            onCommentImageClick = onCommentImageClick
+            onCommentImageClick = onCommentImageClick,
+            modifier = modifier
         )
     }
 }
@@ -1218,7 +1220,8 @@ fun CommentThreadContent(
     onLoadReplies: ((Comment) -> Unit)? = null,
     showImages: Boolean = true,
     onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
-    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> }
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> },
+    modifier: Modifier = Modifier
 ) {
     val isBlockedPlaceholder = comment.blocked
     var commentRevealed by remember(comment.id) { mutableStateOf(false) }
@@ -1231,13 +1234,8 @@ fun CommentThreadContent(
     val canManage = normalizedCurrentUsername != null &&
         normalizedCurrentUsername.equals(comment.poster.name.trim().removePrefix("@"), ignoreCase = true)
 
-    LaunchedEffect(comment.repliesLoading, safeReplies.size, depth) {
-        if (depth >= 2 && !comment.repliesLoading && safeReplies.isNotEmpty()) {
-            onFocusComment?.invoke(comment)
-        }
-    }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1482,7 +1480,9 @@ fun CommentThreadContent(
                         ) {
                             Column(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(top = 4.dp)
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    .animateContentSize()
                             ) {
                                 safeReplies.forEach { reply ->
                                     CommentCard(

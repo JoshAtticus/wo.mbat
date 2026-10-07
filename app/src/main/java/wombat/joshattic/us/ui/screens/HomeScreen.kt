@@ -699,6 +699,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             blockedUsernames = uiState.blockedUsernames,
                                             blockedQuoteHandling = uiState.blockedQuoteHandling,
                                             errorMessage = uiState.errorMessage,
+                                            isSending = uiState.commentSending,
                                             onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                                         )
                                     }
@@ -729,6 +730,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                              onClearFocusComment = viewModel::clearFocusComment,
                                              onLoadReplies = viewModel::loadWallRepliesForComment,
                                              errorMessage = uiState.errorMessage,
+                                             isSending = uiState.commentSending,
                                              onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                                         )
                                     }
@@ -1199,6 +1201,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                  viewModel.openFullScreenImages(images, index, uiState.session?.username)
                                              },
                          errorMessage = uiState.errorMessage,
+                         isSending = uiState.commentSending,
                          onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                      )
                  }

@@ -768,6 +768,7 @@ class HomeViewModel(
             commentsLoading = false,
             commentReplyParent = null,
             focusedComment = null,
+            focusBackStack = emptyList(),
             scrollToCommentId = scrollToCommentId
         )
 
@@ -866,13 +867,16 @@ class HomeViewModel(
             commentDraft = "",
             commentsLoading = false,
             commentReplyParent = null,
-            focusedComment = null
+            focusedComment = null,
+            focusBackStack = emptyList()
         )
     }
 
     fun focusComment(comment: Comment?) {
-        _uiState.value = _uiState.value.copy(
+        val current = _uiState.value
+        _uiState.value = current.copy(
             focusedComment = comment,
+            focusBackStack = rememberFocus(current, comment),
             commentReplyParent = comment
         )
     }
@@ -880,17 +884,41 @@ class HomeViewModel(
     // Wall threads track their reply parent separately; without setting it here the wall
     // composer submits top-level comments that can never appear inside the focused thread.
     fun focusWallComment(comment: Comment?) {
-        _uiState.value = _uiState.value.copy(
+        val current = _uiState.value
+        _uiState.value = current.copy(
             focusedComment = comment,
+            focusBackStack = rememberFocus(current, comment),
             wallCommentReplyParent = comment
         )
     }
 
+    // Entering a nested thread remembers the current one so back steps out one level at a time
+    private fun rememberFocus(current: HomeUiState, comment: Comment?): List<Comment> {
+        val existing = current.focusedComment ?: return current.focusBackStack
+        if (existing.id == comment?.id) return current.focusBackStack
+        return current.focusBackStack + existing
+    }
+
     fun clearFocusComment() {
-        _uiState.value = _uiState.value.copy(
-            focusedComment = null,
-            commentReplyParent = null,
-            wallCommentReplyParent = null
+        val current = _uiState.value
+        val stack = current.focusBackStack
+        if (stack.isEmpty()) {
+            _uiState.value = current.copy(
+                focusedComment = null,
+                commentReplyParent = null,
+                wallCommentReplyParent = null
+            )
+            return
+        }
+        val previous = stack.last()
+        val resolved = findCommentById(current.comments, previous.id)
+            ?: findCommentById(current.wallComments, previous.id)
+            ?: previous
+        _uiState.value = current.copy(
+            focusedComment = resolved,
+            focusBackStack = stack.dropLast(1),
+            commentReplyParent = if (current.viewingWallUsername != null) current.commentReplyParent else resolved,
+            wallCommentReplyParent = if (current.viewingWallUsername != null) resolved else current.wallCommentReplyParent
         )
     }
 
@@ -1084,8 +1112,10 @@ class HomeViewModel(
             val parentComment = _uiState.value.commentReplyParent ?: _uiState.value.focusedComment
             val parent = parentComment?.id
             val createResult = runCatching {
+                _uiState.value = _uiState.value.copy(commentSending = true)
                 repository.createComment(session, selectedPost.id, formattedHtml, parent)
             }
+            _uiState.value = _uiState.value.copy(commentSending = false)
             createResult.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
                     errorMessage = throwable.friendlyMessage(default = "Unable to post comment")
@@ -1121,7 +1151,8 @@ class HomeViewModel(
             wallCommentsLast = false,
             wallCommentDraft = "",
             wallCommentReplyParent = null,
-            focusedComment = null
+            focusedComment = null,
+            focusBackStack = emptyList()
         )
         loadWallCommentsPage(username, 1)
     }
@@ -1135,7 +1166,9 @@ class HomeViewModel(
             wallCommentsLast = false,
             wallCommentDraft = "",
             wallCommentReplyParent = null,
-            focusedComment = null
+            focusedComment = null,
+            focusBackStack = emptyList(),
+            commentSending = false
         )
     }
 
@@ -1213,7 +1246,11 @@ class HomeViewModel(
             // Fall back to the open thread so comments typed in a focused thread land there
             val parentComment = _uiState.value.wallCommentReplyParent ?: _uiState.value.focusedComment
             val parent = parentComment?.id
-            runCatching { repository.createWallComment(session, username, formattedHtml, parent) }
+            runCatching {
+                _uiState.value = _uiState.value.copy(commentSending = true)
+                repository.createWallComment(session, username, formattedHtml, parent)
+            }
+                .also { _uiState.value = _uiState.value.copy(commentSending = false) }
                 .onSuccess { created ->
                     // The create call has completed, so the comment exists server-side. Insert it
                     // locally instead of refetching: wall GETs can lag behind writes, and page 1

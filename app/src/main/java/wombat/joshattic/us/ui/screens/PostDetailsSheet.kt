@@ -11,7 +11,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -109,6 +111,7 @@ fun PostDetailsContent(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
     errorMessage: String? = null,
+    isSending: Boolean = false,
     modifier: Modifier = Modifier,
     onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
@@ -269,12 +272,41 @@ fun PostDetailsContent(
             }
 
             if (!loading && displayComments.isNotEmpty()) {
-                items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
+                if (focusedComment != null) {
+                    // Thread views render one card, so thread switches need an explicit
+                    // transition; LazyColumn animateItem only animates list add/remove.
+                    item(key = "focused-thread") {
+                        AnimatedContent(
+                            targetState = focusedComment,
+                            transitionSpec = {
+                                (fadeIn() + slideInHorizontally(initialOffsetX = { it / 6 })) togetherWith
+                                    (fadeOut() + slideOutHorizontally(targetOffsetX = { -it / 6 }))
+                            },
+                            label = "threadContentTransition"
+                        ) { thread ->
+                            CommentCard(
+                                comment = thread,
+                                isBanned = isBanned,
+                                currentUsername = currentUsername,
+                                onReply = onReplyToComment,
+                                onDeleteComment = onDeleteComment,
+                                onReportComment = onReportComment,
+                                onProfileClick = handleProfileClick,
+                                onMentionClick = handleMentionClick,
+                                onPostClick = onPostClickById,
+                                openLinksInApp = openLinksInApp,
+                                depth = 0,
+                                onFocusComment = onFocusComment,
+                                onLoadReplies = onLoadReplies,
+                                showImages = showImages,
+                                onImageClick = { images, index -> onImageClick(images, index, null) },
+                                onCommentImageClick = onCommentImageClick,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                } else {
+                    items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
                         CommentCard(
                             comment = comment,
                             isBanned = isBanned,
@@ -291,7 +323,8 @@ fun PostDetailsContent(
                             onLoadReplies = onLoadReplies,
                             showImages = showImages,
                             onImageClick = { images, index -> onImageClick(images, index, null) },
-                            onCommentImageClick = onCommentImageClick
+                            onCommentImageClick = onCommentImageClick,
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -326,7 +359,11 @@ fun PostDetailsContent(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                        AnimatedVisibility(visible = replyingTo != null) {
+                        AnimatedVisibility(
+                            visible = replyingTo != null,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -369,6 +406,7 @@ fun PostDetailsContent(
                             else "Write a reply...",
                             onUploadImage = onUploadImage,
                             onImageClick = onComposerImageClick,
+                            isSending = isSending,
                             modifier = Modifier.fillMaxWidth()
                         )                    }
                 }
@@ -422,6 +460,7 @@ fun PostDetailsSheet(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
     errorMessage: String? = null,
+    isSending: Boolean = false,
     onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -478,6 +517,7 @@ fun PostDetailsSheet(
             showCloseButton = false,
             focusedComment = focusedComment,
             onFocusComment = onFocusComment,
+            isSending = isSending,
             onClearFocusComment = onClearFocusComment,
             onLoadReplies = onLoadReplies,
             blockedUsernames = blockedUsernames,

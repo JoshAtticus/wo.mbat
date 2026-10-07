@@ -77,6 +77,7 @@ fun CommentComposer(
     placeholder: String,
     onUploadImage: (suspend (Uri) -> String)? = null,
     onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    isSending: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -442,17 +443,25 @@ fun CommentComposer(
                 }
                 FilledIconButton(
                     onClick = onSubmit,
-                    enabled = draft.isNotBlank() && plainDraft.length <= maxCharacterCount,
+                    enabled = !isSending && draft.isNotBlank() && plainDraft.length <= maxCharacterCount,
                     modifier = Modifier
                         .padding(end = 8.dp)
                         .padding(bottom = 8.dp)
                         .size(40.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (isSending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }

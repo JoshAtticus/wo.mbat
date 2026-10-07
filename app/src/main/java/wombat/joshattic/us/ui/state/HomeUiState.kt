@@ -73,6 +73,8 @@ data class HomeUiState(
     val composeOriginalContent: String? = null,
     val commentReplyParent: Comment? = null,
     val focusedComment: Comment? = null,
+    val focusBackStack: List<Comment> = emptyList(),
+    val commentSending: Boolean = false,
     val scrollToCommentId: String? = null,
     val showEditProfile: Boolean = false,
     val editProfileBio: String = "",

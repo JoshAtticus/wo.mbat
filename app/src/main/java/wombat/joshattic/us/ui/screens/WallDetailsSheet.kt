@@ -11,7 +11,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -93,6 +95,7 @@ fun WallDetailsContent(
     onClearFocusComment: () -> Unit = {},
     onLoadReplies: (Comment) -> Unit = {},
     errorMessage: String? = null,
+    isSending: Boolean = false,
     modifier: Modifier = Modifier,
     onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
@@ -219,12 +222,38 @@ fun WallDetailsContent(
                 }
             }
 
-            items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
+            if (focusedComment != null) {
+                // Thread views render one card, so thread switches need an explicit transition;
+                // LazyColumn animateItem only animates list add/remove, not this swap.
+                item(key = "focused-thread") {
+                    AnimatedContent(
+                        targetState = focusedComment,
+                        transitionSpec = {
+                            (fadeIn() + slideInHorizontally(initialOffsetX = { it / 6 })) togetherWith
+                                (fadeOut() + slideOutHorizontally(targetOffsetX = { -it / 6 }))
+                        },
+                        label = "wallThreadContentTransition"
+                    ) { thread ->
+                        CommentCard(
+                            comment = thread,
+                            isBanned = isBanned,
+                            currentUsername = currentUsername,
+                            onReply = onReplyToComment,
+                            onDeleteComment = onDeleteComment,
+                            onReportComment = onReportComment,
+                            onProfileClick = handleProfileClick,
+                            onPostClick = onPostClickById,
+                            openLinksInApp = openLinksInApp,
+                            depth = 0,
+                            onFocusComment = onFocusComment,
+                            onLoadReplies = onLoadReplies,
+                            onCommentImageClick = onCommentImageClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            } else {
+                items(displayComments.distinctBy { it.id }, key = { it.id }) { comment ->
                     CommentCard(
                         comment = comment,
                         isBanned = isBanned,
@@ -238,7 +267,8 @@ fun WallDetailsContent(
                         depth = 0,
                         onFocusComment = onFocusComment,
                         onLoadReplies = onLoadReplies,
-                        onCommentImageClick = onCommentImageClick
+                        onCommentImageClick = onCommentImageClick,
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
@@ -282,7 +312,11 @@ fun WallDetailsContent(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                        if (replyingTo != null) {
+                        AnimatedVisibility(
+                            visible = replyingTo != null,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -291,7 +325,7 @@ fun WallDetailsContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Replying to @${replyingTo.poster.name}",
+                                    text = "Replying to @${replyingTo?.poster?.name ?: ""}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -312,6 +346,7 @@ fun WallDetailsContent(
                             placeholder = if (replyingTo != null) "Write a reply..." else "Post a message...",
                             onUploadImage = onUploadImage,
                             onImageClick = onComposerImageClick,
+                            isSending = isSending,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -348,6 +383,7 @@ fun WallDetailsSheet(
     onClearFocusComment: () -> Unit = {},
     onLoadReplies: (Comment) -> Unit = {},
     errorMessage: String? = null,
+    isSending: Boolean = false,
     onUploadImage: (suspend (android.net.Uri) -> String)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -390,6 +426,7 @@ fun WallDetailsSheet(
             onClearFocusComment = onClearFocusComment,
             onLoadReplies = onLoadReplies,
             errorMessage = errorMessage,
+            isSending = isSending,
             onUploadImage = onUploadImage
         )
     }
