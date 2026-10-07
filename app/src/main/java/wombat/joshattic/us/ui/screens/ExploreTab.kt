@@ -110,6 +110,7 @@ fun ExploreTab(
     searchHistory: List<String> = emptyList(),
     onClearSearchHistory: () -> Unit = {},
     onSaveSearch: () -> Unit = {},
+    onOpenAdvancedSearch: () -> Unit = {},
     onSearchQueryChange: (String) -> Unit = {},
     selectedTimeframe: String? = null,
     onTimeframeChange: (String?) -> Unit = {}
@@ -171,6 +172,13 @@ fun ExploreTab(
                         )
                     )
                     LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
+                    /** Advanced search (disabled rn because it's broken and bad)
+                    TextButton(
+                        onClick = onOpenAdvancedSearch,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Text("Advanced search")
+                    } */
             if (searchLoading) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(32.dp),

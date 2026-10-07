@@ -557,6 +557,14 @@ class HomeViewModel(
         viewModelScope.launch { repository.settingsPreferences.addSearchQuery(query) }
     }
 
+    fun openAdvancedSearch() {
+        _uiState.value = _uiState.value.copy(advancedSearchOpen = true)
+    }
+
+    fun closeAdvancedSearch() {
+        _uiState.value = _uiState.value.copy(advancedSearchOpen = false)
+    }
+
     fun clearExploreSearchHistory() {
         viewModelScope.launch { repository.settingsPreferences.clearSearchHistory() }
     }

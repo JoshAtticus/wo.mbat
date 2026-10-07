@@ -30,6 +30,7 @@ data class HomeUiState(
     val exploreTrendingLoading: Boolean = false,
     val exploreFollowStatusesLoading: Boolean = false,
     val searchHistory: List<String> = emptyList(),
+    val advancedSearchOpen: Boolean = false,
     val exploreTrendingTimeframe: String? = "day",
     val exploreSearchQuery: String = "",
     val exploreSearchActive: Boolean = false,

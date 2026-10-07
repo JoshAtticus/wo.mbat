@@ -537,6 +537,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 searchHistory = uiState.searchHistory,
                                                 onClearSearchHistory = viewModel::clearExploreSearchHistory,
                                                 onSaveSearch = viewModel::saveExploreSearchToHistory,
+                                                onOpenAdvancedSearch = viewModel::openAdvancedSearch,
                                                 onSearchQueryChange = viewModel::setExploreSearchQuery,
                                                 selectedTimeframe = uiState.exploreTrendingTimeframe,
                                                 onTimeframeChange = viewModel::setExploreTrendingTimeframe
@@ -950,6 +951,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         searchHistory = uiState.searchHistory,
                                         onClearSearchHistory = viewModel::clearExploreSearchHistory,
                                         onSaveSearch = viewModel::saveExploreSearchToHistory,
+                                        onOpenAdvancedSearch = viewModel::openAdvancedSearch,
                                         onSearchQueryChange = viewModel::setExploreSearchQuery,
                                         selectedTimeframe = uiState.exploreTrendingTimeframe,
                                         onTimeframeChange = viewModel::setExploreTrendingTimeframe
@@ -1406,6 +1408,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
             frogMessage = uiState.exploreFrogMessage
         )
     }
+
+        if (uiState.advancedSearchOpen) {
+            AdvancedSearchScreen(
+                onClose = viewModel::closeAdvancedSearch,
+                onOpenPostById = viewModel::openPostById,
+                onProfileClick = viewModel::openProfile
+            )
+        }
         }
 }
 }
