@@ -28,6 +28,7 @@ import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.Permissions
 import wombat.joshattic.us.data.model.Post
+import wombat.joshattic.us.data.model.Poster
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.ui.state.BottomTab
@@ -766,6 +767,7 @@ class HomeViewModel(
             comments = emptyList(),
             commentsLoading = false,
             commentReplyParent = null,
+            focusedComment = null,
             scrollToCommentId = scrollToCommentId
         )
 
@@ -875,10 +877,20 @@ class HomeViewModel(
         )
     }
 
+    // Wall threads track their reply parent separately; without setting it here the wall
+    // composer submits top-level comments that can never appear inside the focused thread.
+    fun focusWallComment(comment: Comment?) {
+        _uiState.value = _uiState.value.copy(
+            focusedComment = comment,
+            wallCommentReplyParent = comment
+        )
+    }
+
     fun clearFocusComment() {
         _uiState.value = _uiState.value.copy(
             focusedComment = null,
-            commentReplyParent = null
+            commentReplyParent = null,
+            wallCommentReplyParent = null
         )
     }
 
@@ -888,7 +900,16 @@ class HomeViewModel(
         getComments: () -> List<Comment>,
         update: (String, (Comment) -> Comment) -> Unit
     ) {
-        if (parentComment == null || parentComment.parent == null) return
+        if (parentComment == null || parentComment.parent == null) {
+            // Even without jumping threads the focused snapshot must be re-resolved,
+            // otherwise replies made inside a focused thread never render there.
+            _uiState.value = _uiState.value.copy(
+                focusedComment = _uiState.value.focusedComment?.let { focused ->
+                    findCommentById(getComments(), focused.id) ?: focused
+                }
+            )
+            return
+        }
         val parentId = parentComment.id
         val freshParent = findCommentById(getComments(), parentId) ?: return
         if ((freshParent.replies ?: emptyList()).isEmpty() && freshParent.hasReplies) {
@@ -914,10 +935,31 @@ class HomeViewModel(
         return null
     }
 
+    private fun addCommentToTree(comments: List<Comment>, newComment: Comment): List<Comment> {
+        val parentId = newComment.parent ?: return comments + newComment
+        var inserted = false
+        val updated = comments.map { comment ->
+            when {
+                comment.id == parentId -> {
+                    inserted = true
+                    comment.copy(replies = (comment.replies ?: emptyList()) + newComment)
+                }
+                !comment.replies.isNullOrEmpty() -> {
+                    val replies = addCommentToTree(comment.replies, newComment)
+                    if (replies != comment.replies) inserted = true
+                    comment.copy(replies = replies)
+                }
+                else -> comment
+            }
+        }
+        return if (inserted) updated else comments + newComment
+    }
+
     fun openFullScreenImages(images: List<String>, index: Int, post: Post?) {
         _uiState.value = _uiState.value.copy(
             fullScreenImages = images,
             fullScreenPost = post,
+            fullScreenComment = null,
             fullScreenImageUsername = post?.poster?.name,
             initialFullScreenImageIndex = index
         )
@@ -927,7 +969,18 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(
             fullScreenImages = images,
             fullScreenPost = null,
+            fullScreenComment = null,
             fullScreenImageUsername = username,
+            initialFullScreenImageIndex = index
+        )
+    }
+
+    fun openFullScreenCommentImages(images: List<String>, index: Int, comment: Comment) {
+        _uiState.value = _uiState.value.copy(
+            fullScreenImages = images,
+            fullScreenPost = null,
+            fullScreenComment = comment,
+            fullScreenImageUsername = comment.poster.name,
             initialFullScreenImageIndex = index
         )
     }
@@ -945,6 +998,7 @@ class HomeViewModel(
         _uiState.value = _uiState.value.copy(
             fullScreenImages = null,
             fullScreenPost = null,
+            fullScreenComment = null,
             fullScreenImageUsername = null,
             initialFullScreenImageIndex = 0
         )
@@ -959,10 +1013,18 @@ class HomeViewModel(
         viewModelScope.launch {
             runCatching { repository.deleteComment(session, comment.id) }
                 .onSuccess {
+                    val newComments = removeCommentFromTree(_uiState.value.comments, comment.id)
+                    val newWallComments = removeCommentFromTree(_uiState.value.wallComments, comment.id)
+                    val focused = _uiState.value.focusedComment
                     _uiState.value = _uiState.value.copy(
-                        comments = removeCommentFromTree(_uiState.value.comments, comment.id),
-                        wallComments = removeCommentFromTree(_uiState.value.wallComments, comment.id),
-                        focusedComment = if (_uiState.value.focusedComment?.id == comment.id) null else _uiState.value.focusedComment,
+                        comments = newComments,
+                        wallComments = newWallComments,
+                        // Re-resolve the focused thread so deleted replies vanish from it too
+                        focusedComment = when {
+                            focused == null -> null
+                            focused.id == comment.id -> null
+                            else -> findCommentById(newComments, focused.id) ?: findCommentById(newWallComments, focused.id)
+                        },
                         commentReplyParent = if (_uiState.value.commentReplyParent?.id == comment.id) null else _uiState.value.commentReplyParent,
                         wallCommentReplyParent = if (_uiState.value.wallCommentReplyParent?.id == comment.id) null else _uiState.value.wallCommentReplyParent,
                         toastMessage = "Comment deleted"
@@ -1018,26 +1080,35 @@ class HomeViewModel(
                 "<p dir=\"ltr\">$lineBreaks</p>"
             }
 
-            val parentComment = _uiState.value.commentReplyParent
+            // Fall back to the open thread so comments typed in a focused thread land there
+            val parentComment = _uiState.value.commentReplyParent ?: _uiState.value.focusedComment
             val parent = parentComment?.id
-            runCatching { repository.createComment(session, selectedPost.id, formattedHtml, parent) }
-                .onSuccess {
+            val createResult = runCatching {
+                repository.createComment(session, selectedPost.id, formattedHtml, parent)
+            }
+            createResult.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = throwable.friendlyMessage(default = "Unable to post comment")
+                )
+            }
+            if (createResult.isSuccess) {
+                val createdComment = createResult.getOrNull()
+                _uiState.value = _uiState.value.copy(
+                    commentDraft = "",
+                    commentReplyParent = null
+                )
+                loadComments(selectedPost.id)
+                if (createdComment != null && findCommentById(_uiState.value.comments, createdComment.id) == null) {
                     _uiState.value = _uiState.value.copy(
-                        commentDraft = "",
-                        commentReplyParent = null
-                    )
-                    loadComments(selectedPost.id)
-                    revealReplyInThread(
-                        parentComment,
-                        session,
-                        getComments = { _uiState.value.comments }
-                    ) { id, transform -> updatePostComment(id, transform) }
-                }
-                .onFailure { throwable ->
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = throwable.friendlyMessage(default = "Unable to post comment")
+                        comments = addCommentToTree(_uiState.value.comments, createdComment)
                     )
                 }
+                revealReplyInThread(
+                    parentComment,
+                    session,
+                    getComments = { _uiState.value.comments }
+                ) { id, transform -> updatePostComment(id, transform) }
+            }
         }
     }
 
@@ -1049,7 +1120,8 @@ class HomeViewModel(
             wallCommentsPage = 1,
             wallCommentsLast = false,
             wallCommentDraft = "",
-            wallCommentReplyParent = null
+            wallCommentReplyParent = null,
+            focusedComment = null
         )
         loadWallCommentsPage(username, 1)
     }
@@ -1138,15 +1210,32 @@ class HomeViewModel(
                 "<p dir=\"ltr\">$lineBreaks</p>"
             }
 
-            val parentComment = _uiState.value.wallCommentReplyParent
+            // Fall back to the open thread so comments typed in a focused thread land there
+            val parentComment = _uiState.value.wallCommentReplyParent ?: _uiState.value.focusedComment
             val parent = parentComment?.id
             runCatching { repository.createWallComment(session, username, formattedHtml, parent) }
-                .onSuccess {
+                .onSuccess { created ->
+                    // The create call has completed, so the comment exists server-side. Insert it
+                    // locally instead of refetching: wall GETs can lag behind writes, and page 1
+                    // holds the oldest comments, so a fresh one would never show up there anyway.
+                    val createdComment = Comment(
+                        id = created.id,
+                        poster = Poster(
+                            id = _uiState.value.accountProfile?.id ?: session.username,
+                            name = session.username,
+                            color = _uiState.value.accountProfile?.color ?: "#5865f2"
+                        ),
+                        parent = parent,
+                        content = formattedHtml,
+                        time = System.currentTimeMillis(),
+                        hasReplies = false,
+                        top = parentComment?.let { it.top ?: it.id }
+                    )
                     _uiState.value = _uiState.value.copy(
                         wallCommentDraft = "",
-                        wallCommentReplyParent = null
+                        wallCommentReplyParent = null,
+                        wallComments = addCommentToTree(_uiState.value.wallComments, createdComment)
                     )
-                    loadWallCommentsPage(username, 1).join()
                     revealReplyInThread(
                         parentComment,
                         session,

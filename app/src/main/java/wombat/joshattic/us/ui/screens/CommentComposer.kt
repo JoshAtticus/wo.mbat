@@ -76,6 +76,7 @@ fun CommentComposer(
     onSubmit: () -> Unit,
     placeholder: String,
     onUploadImage: (suspend (Uri) -> String)? = null,
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -286,7 +287,12 @@ fun CommentComposer(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 currentImages.forEachIndexed { index, url ->
-                    Box(modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp))) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onImageClick(currentImages, index) }
+                    ) {
                         SubcomposeAsyncImage(
                             model = url,
                             contentDescription = "Attached image",

@@ -681,6 +681,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             scrollToCommentId = uiState.scrollToCommentId,
                                             onScrollToCommentComplete = viewModel::clearScrollToComment,
                                             onImageClick = viewModel::openFullScreenImages,
+                                            onCommentImageClick = viewModel::openFullScreenCommentImages,
                                             onRepostClick = { viewModel.submitRepost(it.id) },
                                             onQuoteClick = { viewModel.openQuoteComposer(it.id) },
                                             currentUsername = uiState.session?.username,
@@ -724,7 +725,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             openLinksInApp = uiState.openLinksInApp,
                                             onPostClickById = viewModel::openPostById,
                                              focusedComment = uiState.focusedComment,
-                                             onFocusComment = viewModel::focusComment,
+                                             onFocusComment = viewModel::focusWallComment,
                                              onClearFocusComment = viewModel::clearFocusComment,
                                              onLoadReplies = viewModel::loadWallRepliesForComment,
                                              errorMessage = uiState.errorMessage,
@@ -1160,6 +1161,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                          blockedQuoteHandling = uiState.blockedQuoteHandling,
                          errorMessage = uiState.errorMessage,
                          onReportComment = { comment -> viewModel.openCommentReportDialog(comment.id, comment.poster.name) },
+                        onImageClick = viewModel::openFullScreenImages,
+                        onCommentImageClick = viewModel::openFullScreenCommentImages,
+                        onComposerImageClick = { images, index ->
+                            viewModel.openFullScreenImages(images, index, uiState.session?.username)
+                        },
                          onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                      )
                  }
@@ -1185,9 +1191,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         openLinksInApp = uiState.openLinksInApp,
                         onPostClickById = viewModel::openPostById,
                          focusedComment = uiState.focusedComment,
-                         onFocusComment = viewModel::focusComment,
+                         onFocusComment = viewModel::focusWallComment,
                          onClearFocusComment = viewModel::clearFocusComment,
                          onLoadReplies = viewModel::loadWallRepliesForComment,
+                                             onCommentImageClick = viewModel::openFullScreenCommentImages,
+                                             onComposerImageClick = { images, index ->
+                                                 viewModel.openFullScreenImages(images, index, uiState.session?.username)
+                                             },
                          errorMessage = uiState.errorMessage,
                          onUploadImage = { uri -> viewModel.uploadImage(context, uri) }
                      )
@@ -1241,12 +1251,20 @@ fun HomeScreen(viewModel: HomeViewModel) {
             images = images,
             initialIndex = uiState.initialFullScreenImageIndex,
             post = uiState.fullScreenPost,
+            comment = uiState.fullScreenComment,
             username = uiState.fullScreenImageUsername,
             onDismiss = viewModel::closeFullScreenImages,
             onLoveClick = viewModel::togglePostLove,
             onCommentClick = viewModel::openPost,
             onRepostClick = { post -> viewModel.submitRepost(post.id) },
-            onProfileClick = viewModel::openProfile
+            onProfileClick = viewModel::openProfile,
+            onCommentReply = { comment ->
+                if (comment.post != null) {
+                    viewModel.setCommentReplyParent(comment)
+                } else {
+                    viewModel.setWallCommentReplyParent(comment)
+                }
+            }
         )
     }
 

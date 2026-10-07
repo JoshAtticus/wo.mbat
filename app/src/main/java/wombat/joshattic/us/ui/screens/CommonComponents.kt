@@ -1144,7 +1144,8 @@ fun CommentCard(
     onFocusComment: ((Comment) -> Unit)? = null,
     onLoadReplies: ((Comment) -> Unit)? = null,
     showImages: Boolean = true,
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> }
 ) {
     val isReply = comment.parent != null
     if (!isReply) {
@@ -1173,7 +1174,8 @@ fun CommentCard(
                     onFocusComment = onFocusComment,
                     onLoadReplies = onLoadReplies,
                     showImages = showImages,
-                    onImageClick = onImageClick
+                    onImageClick = onImageClick,
+                    onCommentImageClick = onCommentImageClick
                 )
             }
         }
@@ -1193,7 +1195,8 @@ fun CommentCard(
             onFocusComment = onFocusComment,
             onLoadReplies = onLoadReplies,
             showImages = showImages,
-            onImageClick = onImageClick
+            onImageClick = onImageClick,
+            onCommentImageClick = onCommentImageClick
         )
     }
 }
@@ -1214,7 +1217,8 @@ fun CommentThreadContent(
     onFocusComment: ((Comment) -> Unit)?,
     onLoadReplies: ((Comment) -> Unit)? = null,
     showImages: Boolean = true,
-    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> },
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> }
 ) {
     val isBlockedPlaceholder = comment.blocked
     var commentRevealed by remember(comment.id) { mutableStateOf(false) }
@@ -1362,7 +1366,7 @@ fun CommentThreadContent(
                     Spacer(modifier = Modifier.height(4.dp))
                     PostImageSquares(
                         images = commentImageUrls,
-                        onImageClick = onImageClick,
+                        onImageClick = { images, index -> onCommentImageClick(images, index, comment) },
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }
@@ -1496,7 +1500,8 @@ fun CommentThreadContent(
                                         onFocusComment = onFocusComment,
                                         onLoadReplies = onLoadReplies,
                                         showImages = showImages,
-                                        onImageClick = onImageClick
+                                        onImageClick = onImageClick,
+                                        onCommentImageClick = onCommentImageClick
                                     )
                                 }
                             }
@@ -2461,10 +2466,12 @@ fun FullScreenImageViewer(
     images: List<String>,
     initialIndex: Int,
     post: Post? = null,
+    comment: Comment? = null,
     username: String? = null,
     onDismiss: () -> Unit,
     onLoveClick: ((Post) -> Unit)? = null,
     onCommentClick: ((Post) -> Unit)? = null,
+    onCommentReply: ((Comment) -> Unit)? = null,
     onRepostClick: ((Post) -> Unit)? = null,
     onProfileClick: ((String) -> Unit)? = null
 ) {
@@ -2472,7 +2479,7 @@ fun FullScreenImageViewer(
     val safeInitialIndex = initialIndex.coerceIn(0, (images.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialIndex, pageCount = { images.size })
     val haptic = LocalHapticFeedback.current
-    val displayUsername = username ?: post?.poster?.name
+    val displayUsername = username ?: post?.poster?.name ?: comment?.poster?.name
     var showUiControls by remember { mutableStateOf(true) }
     var isZoomedIn by remember { mutableStateOf(false) }
 
@@ -2685,6 +2692,39 @@ fun FullScreenImageViewer(
                                                         onCommentClick?.invoke(p)
                                                     }
                                             )
+                                        }
+
+                                        comment?.let { c ->
+                                            val cleanText = remember(c.content) {
+                                                autoLinkAndMentions(stripImages(c.content))
+                                            }
+                                            if (cleanText.isNotBlank()) {
+                                                HtmlText(
+                                                    html = cleanText,
+                                                    color = Color.White,
+                                                    maxLines = 4,
+                                                    openLinksInApp = true,
+                                                    onMentionClick = { mention ->
+                                                        onDismiss()
+                                                        onProfileClick?.invoke(mention)
+                                                    }
+                                                )
+                                            }
+                                            if (onCommentReply != null) {
+                                                androidx.compose.material3.TextButton(
+                                                    onClick = {
+                                                        onDismiss()
+                                                        onCommentReply(c)
+                                                    },
+                                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                                        contentColor = Color.White
+                                                    )
+                                                ) {
+                                                    Icon(Icons.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Reply")
+                                                }
+                                            }
                                         }
                                     }
                                 }

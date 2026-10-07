@@ -86,6 +86,8 @@ fun WallDetailsContent(
     onProfileClick: (String) -> Unit = {},
     openLinksInApp: Boolean = true,
     onPostClickById: ((String) -> Unit)? = null,
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> },
+    onComposerImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
@@ -235,7 +237,8 @@ fun WallDetailsContent(
                         openLinksInApp = openLinksInApp,
                         depth = 0,
                         onFocusComment = onFocusComment,
-                        onLoadReplies = onLoadReplies
+                        onLoadReplies = onLoadReplies,
+                        onCommentImageClick = onCommentImageClick
                     )
                 }
             }
@@ -308,6 +311,7 @@ fun WallDetailsContent(
                             onSubmit = onSubmit,
                             placeholder = if (replyingTo != null) "Write a reply..." else "Post a message...",
                             onUploadImage = onUploadImage,
+                            onImageClick = onComposerImageClick,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -337,6 +341,8 @@ fun WallDetailsSheet(
     onProfileClick: (String) -> Unit = {},
     openLinksInApp: Boolean = true,
     onPostClickById: ((String) -> Unit)? = null,
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> },
+    onComposerImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     focusedComment: Comment? = null,
     onFocusComment: (Comment) -> Unit = {},
     onClearFocusComment: () -> Unit = {},
@@ -377,6 +383,8 @@ fun WallDetailsSheet(
             onProfileClick = onProfileClick,
             openLinksInApp = openLinksInApp,
             onPostClickById = onPostClickById,
+            onCommentImageClick = onCommentImageClick,
+            onComposerImageClick = onComposerImageClick,
             focusedComment = focusedComment,
             onFocusComment = onFocusComment,
             onClearFocusComment = onClearFocusComment,

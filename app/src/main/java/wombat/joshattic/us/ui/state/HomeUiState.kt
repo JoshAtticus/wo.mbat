@@ -81,6 +81,7 @@ data class HomeUiState(
     val profileCacheBuster: Long = 0L,
     val fullScreenImages: List<String>? = null,
     val fullScreenPost: Post? = null,
+    val fullScreenComment: Comment? = null,
     val fullScreenImageUsername: String? = null,
     val initialFullScreenImageIndex: Int = 0,
     val isBanned: Boolean = false,

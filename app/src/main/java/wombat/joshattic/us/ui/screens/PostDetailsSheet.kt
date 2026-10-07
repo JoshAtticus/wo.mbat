@@ -85,6 +85,8 @@ fun PostDetailsContent(
     onLoveClick: ((Post) -> Unit)? = null,
     onPostClick: ((Post) -> Unit)? = null,
     onImageClick: (List<String>, Int, Post?) -> Unit = { _, _, _ -> },
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> },
+    onComposerImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onReportPost: ((Post) -> Unit)? = null,
     scrollToCommentId: String? = null,
@@ -288,7 +290,8 @@ fun PostDetailsContent(
                             onFocusComment = onFocusComment,
                             onLoadReplies = onLoadReplies,
                             showImages = showImages,
-                            onImageClick = { images, index -> onImageClick(images, index, null) }
+                            onImageClick = { images, index -> onImageClick(images, index, null) },
+                            onCommentImageClick = onCommentImageClick
                         )
                     }
                 }
@@ -365,6 +368,7 @@ fun PostDetailsContent(
                             placeholder = if (replyingTo != null) "Reply to @${replyingTo.poster.name}..."
                             else "Write a reply...",
                             onUploadImage = onUploadImage,
+                            onImageClick = onComposerImageClick,
                             modifier = Modifier.fillMaxWidth()
                         )                    }
                 }
@@ -395,6 +399,8 @@ fun PostDetailsSheet(
     onLoveClick: (Post) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
     onImageClick: (List<String>, Int, Post?) -> Unit = { _, _, _ -> },
+    onCommentImageClick: (List<String>, Int, Comment) -> Unit = { _, _, _ -> },
+    onComposerImageClick: (List<String>, Int) -> Unit = { _, _ -> },
     onBlockUser: ((String) -> Unit)? = null,
     onReportPost: ((Post) -> Unit)? = null,
     scrollToCommentId: String? = null,
@@ -453,6 +459,8 @@ fun PostDetailsSheet(
             onLoveClick = onLoveClick,
             onPostClick = onPostClick,
             onImageClick = onImageClick,
+            onCommentImageClick = onCommentImageClick,
+            onComposerImageClick = onComposerImageClick,
             onBlockUser = onBlockUser,
             onReportPost = onReportPost,
             scrollToCommentId = scrollToCommentId,
