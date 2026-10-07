@@ -4,7 +4,7 @@ wo.mbat is an awesome (soon-to-be WOMP-compatible) wasteof.money client for Andr
 (I think the name is genius because it's wo.m which is wasteof.money and the mascot for wasteof.money is the wom bat, which is actually a bat and not a wombat but that doesn't matter it's too late to rebrand)
 
 > [!NOTE]
-> *The Wear OS app requires Google Play Services and Android 11 or later on both devices
+> *The Wear OS app is not standalone and requires a phone with Google Play Services and Android 11
 
 ## download
 You can get it from [Google Play](https://play.google.com/store/apps/details?id=wombat.joshattic.us) or GitHub Releases
