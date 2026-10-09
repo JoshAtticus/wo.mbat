@@ -118,6 +118,8 @@ fun OpenGraphPreview(
     hasPostImages: Boolean,
     openLinksInApp: Boolean = true,
     openGraphFirst: Boolean = false,
+    // womp linkPreviewSize: "large"/"small" force the size, null/auto = client decides
+    previewSize: String? = null,
     modifier: Modifier = Modifier
 ) {
     var response by remember(url) { mutableStateOf(OpenGraphPreviewCache.get(url)) }
@@ -138,7 +140,7 @@ fun OpenGraphPreview(
     val description = metadata.description?.trim()?.takeIf { it.isNotEmpty() }
     val imageUrl = metadata.image?.trim()?.takeIf { it.isNotEmpty() }
     if (title == null && description == null && imageUrl == null) return
-    renderPreview(url, domain, title, description, imageUrl, hasPostImages, openGraphFirst, openLinksInApp, context, modifier)
+    renderPreview(url, domain, title, description, imageUrl, hasPostImages, openGraphFirst, openLinksInApp, context, previewSize, modifier)
 }
 
 @Composable
@@ -152,6 +154,7 @@ private fun renderPreview(
     openGraphFirst: Boolean,
     openLinksInApp: Boolean,
     context: android.content.Context,
+    previewSize: String?,
     modifier: Modifier
 ) {
     val openLink: () -> Unit = {
@@ -167,7 +170,12 @@ private fun renderPreview(
         }
     }
 
-    if (shouldUseLargePreview(imageUrl != null, hasPostImages, openGraphFirst)) {
+    val useLarge = when (previewSize?.lowercase()) {
+        "large" -> true
+        "small" -> false
+        else -> shouldUseLargePreview(imageUrl != null, hasPostImages, openGraphFirst)
+    }
+    if (useLarge) {
         Column(modifier = modifier) {
             Box(
                 modifier = Modifier

@@ -31,6 +31,7 @@ import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.Poster
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.repository.WombatRepository
+import wombat.joshattic.us.data.network.Womp
 import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.state.HomeUiState
 import wombat.joshattic.us.ui.state.BlockedWarningTarget
@@ -337,7 +338,9 @@ class HomeViewModel(
                     session
                 }
 
-                runCatching { repository.editPost(targetSession, editPostId, draft) }
+                // womp: refresh/attach our client metadata, preserving other clients' metadata
+                val editHtml = Womp.attach(draft, originalHtml = _uiState.value.composeOriginalContent)
+                runCatching { repository.editPost(targetSession, editPostId, editHtml) }
                     .onSuccess { updatedPost ->
                         _uiState.value = _uiState.value.copy(
                             showComposer = false,
@@ -345,7 +348,7 @@ class HomeViewModel(
                             composeEditPostId = null,
                             composeEditPostAuthor = null
                         )
-                        updatePostInState(updatedPost, fallbackId = editPostId, fallbackContent = draft)
+                        updatePostInState(updatedPost, fallbackId = editPostId, fallbackContent = editHtml)
                     }
                     .onFailure { throwable ->
                         _uiState.value = _uiState.value.copy(
@@ -356,7 +359,7 @@ class HomeViewModel(
                         )
                     }
             } else {
-                runCatching { repository.createPost(session, draft, repostId) }
+                runCatching { repository.createPost(session, Womp.attach(draft), repostId) }
                     .onSuccess {
                         _uiState.value = _uiState.value.copy(
                             showComposer = false,

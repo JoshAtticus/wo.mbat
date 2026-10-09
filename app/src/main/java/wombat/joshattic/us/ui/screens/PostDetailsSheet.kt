@@ -220,7 +220,8 @@ fun PostDetailsContent(
                     onPostClickById = onPostClickById,
                     blockedUsernames = blockedUsernames,
                     blockedQuoteHandling = blockedQuoteHandling,
-                    ignoreBlockedPoster = true
+                    ignoreBlockedPoster = true,
+                    showClientMetadata = true
                 )
             }
 

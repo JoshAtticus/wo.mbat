@@ -231,6 +231,7 @@ import wombat.joshattic.us.ui.theme.getUserColorSchemeColors
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import wombat.joshattic.us.ui.components.BrandedQuoteSpan
 import wombat.joshattic.us.ui.components.OpenGraphPreview
+import wombat.joshattic.us.data.network.Womp
 import wombat.joshattic.us.ui.components.isOpenGraphPriority
 import wombat.joshattic.us.ui.components.QUOTE_GAP_WIDTH_DP
 import wombat.joshattic.us.ui.components.QUOTE_STRIPE_WIDTH_DP
@@ -798,7 +799,9 @@ fun PostCard(
     blockedUsernames: Set<String> = emptySet(),
     blockedQuoteHandling: String = "warning",
     groupedReposters: List<Post> = emptyList(),
-    ignoreBlockedPoster: Boolean = false
+    ignoreBlockedPoster: Boolean = false,
+    // womp: client name/version is only shown in the post details view
+    showClientMetadata: Boolean = false
 ) {
     if (!ignoreBlockedPoster && blockedUsernames.contains(post.poster.name.lowercase())) {
         Spacer(modifier = Modifier.size(0.dp))
@@ -816,6 +819,10 @@ fun PostCard(
     val imageUrls = remember(post.content) { extractImages(post.content) }
     val displayContent = remember(post.content) { autoLinkAndMentions(stripImages(post.content)) }
     val firstLink = remember(post.content) { extractFirstLink(post.content) }
+    val wompMeta = remember(post.content) { Womp.parse(post.content) }
+    val clientMetadataLabel = if (showClientMetadata) wompMeta?.clientLabel() else null
+    // like easter eggs must only match post body text, never the attached womp metadata
+    val easterEgg = remember(post.content) { loveEasterEgg(Womp.stripMetadata(post.content)) }
     var menuExpanded by remember { mutableStateOf(false) }
 
     val isPureRepost = remember(post) { isPureRepost(post) }
@@ -912,7 +919,12 @@ fun PostCard(
                                 )
                             }
                         }
-                        Text(formatTime(post.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            // womp: client name/version shown after a dot next to the timestamp in details
+                            clientMetadataLabel?.let { "${formatTime(post.time)} · $it" } ?: formatTime(post.time),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
                 
@@ -985,13 +997,17 @@ fun PostCard(
                 }
                 val hasPostImages = showImages && imageUrls.isNotEmpty()
                 val openGraphFirst = isOpenGraphPriority(linkPreviewPriority)
+                // womp: posters can disable Open Graph previews and pick a preview size per post
+                val openGraphAllowed = wompMeta?.enableOpenGraph != false
+                val wompPreviewSize = wompMeta?.linkPreviewSize
                 if (openGraphFirst) {
-                    firstLink?.let { link ->
+                    if (openGraphAllowed) firstLink?.let { link ->
                         OpenGraphPreview(
                             url = link,
                             hasPostImages = hasPostImages,
                             openGraphFirst = true,
                             openLinksInApp = openLinksInApp,
+                            previewSize = wompPreviewSize,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -1013,11 +1029,12 @@ fun PostCard(
                             isDetailView = !truncated
                         )
                     }
-                    firstLink?.let { link ->
+                    if (openGraphAllowed) firstLink?.let { link ->
                         OpenGraphPreview(
                             url = link,
                             hasPostImages = hasPostImages,
                             openLinksInApp = openLinksInApp,
+                            previewSize = wompPreviewSize,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -1114,7 +1131,7 @@ fun PostCard(
                     isActive = post.isLoving == true || (post.isLoving == null && LoveCache.get(post.id) == true),
                     enabled = post.isLoving != null && !isBanned && !post.loveLoading,
                     pulse = (post.isLoving == null || post.loveLoading) && !isBanned,
-                    isChud = loveEasterEgg(post.content),
+                    isChud = easterEgg,
                     onClick = onLoveClick?.let { { onLoveClick(post) } },
                     shape = RoundedCornerShape(28.dp)
                 )
@@ -2876,7 +2893,7 @@ fun FullScreenImageViewer(
                                     // Like easter egg: whichever keyword comes first in
                                     // the body ("chud" blob or wo.mbat logo) takes over the
                                     // heart once the like finishes loading, then fades back.
-                                    val pEgg = remember(p.id) { loveEasterEgg(p.content) }
+                                    val pEgg = remember(p.id, p.content) { loveEasterEgg(Womp.stripMetadata(p.content)) }
                                     var pChudPending by remember { mutableStateOf(false) }
                                     var pChudActive by remember { mutableStateOf(false) }
                                     LaunchedEffect(pChudPending, p.loveLoading) {
