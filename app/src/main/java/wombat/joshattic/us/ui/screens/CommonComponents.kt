@@ -3089,6 +3089,7 @@ fun ReportDialog(
         "Personal Information",
         "Impersonation",
         "Intentional Misinformation",
+        "Child Safety",
         "Other"
     )
     var selectedPreset by remember { mutableStateOf(presets.first()) }
