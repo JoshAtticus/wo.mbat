@@ -1335,6 +1335,16 @@ private fun AboutSettings(onFollowJosh: () -> Unit, frogMessage: String? = null)
                 onClick = { uriHandler.openUri("https://joshattic.us") }
             )
         }
+
+        item {
+            CategoryMenuItem(
+                title = "Child Safety Standards",
+                icon = Icons.Filled.Info,
+                iconContainerColor = Color(0xFF16A34A),
+                iconColor = Color.White,
+                onClick = { uriHandler.openUri("https://wombat.joshattic.us/child-safety") }
+            )
+        }
         
         item {
             CategoryMenuItem(
