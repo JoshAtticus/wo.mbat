@@ -1,5 +1,5 @@
 # wo.mbat
-wo.mbat is an awesome (soon-to-be WOMP-compatible) wasteof.money client for Android, Wear OS*, Chrome OS and GooglebookOS built with Jetpack Compose! (and the spiritual successor to wasteof for Android). **Works on Android 6+ and Wear OS 3+.**
+wo.mbat is an awesome womp-compatible wasteof.money client for Android, Wear OS*, Chrome OS and GooglebookOS built with Jetpack Compose! (and the spiritual successor to wasteof for Android). **Works on Android 6+ and Wear OS 3+.**
 
 (I think the name is genius because it's wo.m which is wasteof.money and the mascot for wasteof.money is the wom bat, which is actually a bat and not a wombat but that doesn't matter it's too late to rebrand)
 
