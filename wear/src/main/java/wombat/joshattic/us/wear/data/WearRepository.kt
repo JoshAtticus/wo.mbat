@@ -48,17 +48,17 @@ class WearRepository(
         return rootComments.map { loadRepliesRecursively(it, session) }
     }
 
-    private suspend fun loadRepliesRecursively(comment: Comment, session: AuthSession?): Comment {
-        if (!comment.hasReplies) return comment.copy(replies = comment.replies ?: emptyList())
+    private suspend fun loadRepliesRecursively(comment: Comment, session: AuthSession?, depth: Int = 0): Comment {
+        if (!comment.hasReplies || depth >= 3) return comment.copy(replies = comment.replies ?: emptyList())
         val allReplies = mutableListOf<Comment>()
         var page = 1
-        while (true) {
+        while (page <= 5) {
             val resp = runCatching { api.getCommentReplies(comment.id, page, session?.token) }.getOrNull() ?: break
             allReplies.addAll(resp.comments)
             if (resp.last) break
             page++
         }
-        val loaded = allReplies.map { loadRepliesRecursively(it, session) }
+        val loaded = allReplies.map { loadRepliesRecursively(it, session, depth + 1) }
         return comment.copy(replies = loaded)
     }
 

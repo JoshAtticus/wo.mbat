@@ -1591,10 +1591,12 @@ fun NotificationCard(
     openLinksInApp: Boolean = true,
     onMentionClick: ((String) -> Unit)? = null,
     onPostClick: ((String) -> Unit)? = null,
+    onProfileClick: ((String) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val type = notification.type.lowercase()
     val actorName = notification.data.actor?.name ?: if (type == "admin_notification") "Admin" else "Unknown user"
+    val canOpenProfile = onProfileClick != null && notification.data.actor != null
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1616,7 +1618,11 @@ fun NotificationCard(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box {
+                Box(
+                    modifier = if (canOpenProfile) {
+                        Modifier.clickable { onProfileClick?.invoke(actorName) }
+                    } else Modifier
+                ) {
                     ProfilePicture(username = actorName, size = 42.dp)
                     if (!notification.read) {
                         Box(
@@ -1635,7 +1641,10 @@ fun NotificationCard(
                         actorName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = if (canOpenProfile) {
+                            Modifier.clickable { onProfileClick?.invoke(actorName) }
+                        } else Modifier
                     )
                     Text(
                         text = notificationLabel(notification.type),
@@ -2119,12 +2128,20 @@ fun PostMetric(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             androidx.compose.animation.Crossfade(
-                targetState = chudMode,
+                targetState = if (pulse) 2 else if (chudMode) 1 else 0,
                 animationSpec = tween(300),
                 label = "MetricIconCrossfade"
-            ) { chud ->
-                if (chud) {
-                    Icon(
+            ) { mode ->
+                when (mode) {
+                    2 -> {
+                        // Love status is resolving or a toggle is in flight
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = contentColor
+                        )
+                    }
+                    1 -> Icon(
                         // isChud keeps the blob's own colors; the wo.mbat logo
                         // is tinted to match its container text color
                         painter = painterResource(if (isChud == "wombat") R.drawable.ic_logo else R.drawable.ic_chud),
@@ -2139,8 +2156,7 @@ fun PostMetric(
                             },
                         if (isChud == "wombat") contentColor else Color.Unspecified
                     )
-                } else {
-                    Icon(
+                    else -> Icon(
                         imageVector = icon,
                         contentDescription = label,
                         modifier = Modifier

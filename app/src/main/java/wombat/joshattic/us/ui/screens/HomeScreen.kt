@@ -469,11 +469,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                                 onLoadNextPage = viewModel::loadNextFeedPage,
                                                 onRepostClick = { 
-                                                    viewModel.submitRepost(it.id) {
+                                                    viewModel.submitRepost(it) {
                                                         coroutineScope.launch { feedListState.animateScrollToItem(0) }
                                                     }
                                                 },
-                                                onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                                onQuoteClick = { viewModel.openQuoteComposer(it) },
                                                 currentUsername = uiState.session?.username,
                                                 savedAccounts = uiState.savedAccounts,
                                                 onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
@@ -512,11 +512,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 },
                                                 onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                                 onRepostClick = { 
-                                                    viewModel.submitRepost(it.id) {
+                                                    viewModel.submitRepost(it) {
                                                         coroutineScope.launch { exploreListState.animateScrollToItem(0) }
                                                     }
                                                 },
-                                                onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                                onQuoteClick = { viewModel.openQuoteComposer(it) },
                                                 currentUsername = uiState.session?.username,
                                                 onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                                 onEditPost = viewModel::openEditComposer,
@@ -557,7 +557,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 onLoadNextPage = viewModel::loadNextNotificationsPage,
                                                 openLinksInApp = uiState.openLinksInApp,
                                                 onMentionClick = { viewModel.openProfile(it) },
-                                                onPostClickById = viewModel::openPostById
+                                                onPostClickById = viewModel::openPostById,
+                                                onProfileClick = viewModel::openProfile
                                             )
                                             BottomTab.Account -> AccountTab(
                                                 session = uiState.session,
@@ -592,8 +593,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 onLoveClick = viewModel::togglePostLove,
                                                 onImageClick = viewModel::openFullScreenImages,
                                                 onLoadNextPage = viewModel::loadNextAccountPage,
-                                                onRepostClick = { viewModel.submitRepost(it.id) },
-                                                onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                                onRepostClick = { viewModel.submitRepost(it) },
+                                                onQuoteClick = { viewModel.openQuoteComposer(it) },
                                                 currentUsername = uiState.session?.username,
                                                 onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                                 onShowFollowers = viewModel::showFollowers,
@@ -686,8 +687,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onScrollToCommentComplete = viewModel::clearScrollToComment,
                                             onImageClick = viewModel::openFullScreenImages,
                                             onCommentImageClick = viewModel::openFullScreenCommentImages,
-                                            onRepostClick = { viewModel.submitRepost(it.id) },
-                                            onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                            onRepostClick = { viewModel.submitRepost(it) },
+                                            onQuoteClick = { viewModel.openQuoteComposer(it) },
                                             currentUsername = uiState.session?.username,
                                             onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                             onEditPost = viewModel::openEditComposer,
@@ -769,8 +770,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             onLoveClick = viewModel::togglePostLove,
                                             onImageClick = viewModel::openFullScreenImages,
                                             onLoadNextPage = viewModel::loadNextProfilePage,
-                                            onRepostClick = { viewModel.submitRepost(it.id) },
-                                            onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                            onRepostClick = { viewModel.submitRepost(it) },
+                                            onQuoteClick = { viewModel.openQuoteComposer(it) },
                                  savedAccounts = uiState.savedAccounts,
                                             onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                             onShowFollowers = viewModel::showFollowers,
@@ -841,8 +842,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 onLoveClick = viewModel::togglePostLove,
                                 onImageClick = viewModel::openFullScreenImages,
                                 onLoadNextPage = viewModel::loadNextProfilePage,
-                                onRepostClick = { viewModel.submitRepost(it.id) },
-                                onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                onRepostClick = { viewModel.submitRepost(it) },
+                                onQuoteClick = { viewModel.openQuoteComposer(it) },
                                 savedAccounts = uiState.savedAccounts,
                                 onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                 onShowFollowers = viewModel::showFollowers,
@@ -882,11 +883,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                         onLoadNextPage = viewModel::loadNextFeedPage,
                                         onRepostClick = { 
-                                            viewModel.submitRepost(it.id) {
+                                            viewModel.submitRepost(it) {
                                                 coroutineScope.launch { feedListState.animateScrollToItem(0) }
                                             }
                                         },
-                                        onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                        onQuoteClick = { viewModel.openQuoteComposer(it) },
                                         currentUsername = uiState.session?.username,
                                         savedAccounts = uiState.savedAccounts,
                                         onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
@@ -925,11 +926,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         },
                                         onReportPost = { post -> viewModel.openReportDialog(post.id, post.poster.name) },
                                         onRepostClick = { 
-                                            viewModel.submitRepost(it.id) {
+                                            viewModel.submitRepost(it) {
                                                 coroutineScope.launch { exploreListState.animateScrollToItem(0) }
                                             }
                                         },
-                                        onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                        onQuoteClick = { viewModel.openQuoteComposer(it) },
                                         currentUsername = uiState.session?.username,
                                         savedAccounts = uiState.savedAccounts,
                                         onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
@@ -971,7 +972,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         onLoadNextPage = viewModel::loadNextNotificationsPage,
                                         openLinksInApp = uiState.openLinksInApp,
                                         onMentionClick = { viewModel.openProfile(it) },
-                                        onPostClickById = viewModel::openPostById
+                                        onPostClickById = viewModel::openPostById,
+                                        onProfileClick = viewModel::openProfile
                                     )
                                     BottomTab.Account -> AccountTab(
                                         session = uiState.session,
@@ -1006,8 +1008,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         onLoveClick = viewModel::togglePostLove,
                                         onImageClick = viewModel::openFullScreenImages,
                                         onLoadNextPage = viewModel::loadNextAccountPage,
-                                        onRepostClick = { viewModel.submitRepost(it.id) },
-                                        onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                                        onRepostClick = { viewModel.submitRepost(it) },
+                                        onQuoteClick = { viewModel.openQuoteComposer(it) },
                                         currentUsername = uiState.session?.username,
                                         onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                                         onShowFollowers = viewModel::showFollowers,
@@ -1129,9 +1131,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     currentUsername = uiState.composeEditPostAuthor ?: uiState.session?.username,
                     onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                     isEditing = uiState.composeEditPostId != null,
-                     viewModel = viewModel,
+                    viewModel = viewModel,
                      savedAccounts = uiState.savedAccounts,
                      onSwitchAccount = { session -> viewModel.switchAccount(session.username) },
+                    repostOf = uiState.composeRepostPost,
                      errorMessage = uiState.errorMessage
                  )
              }
@@ -1152,6 +1155,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         onMentionClick = { username ->
                             viewModel.openProfile(username)
                         },
+                        onProfileClick = viewModel::openProfile,
+                        onPostClick = viewModel::openPost,
                         replyingTo = uiState.commentReplyParent,
                         onCancelReply = { viewModel.setCommentReplyParent(null) },
                         onReplyToComment = viewModel::setCommentReplyParent,
@@ -1159,9 +1164,10 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         savedAccounts = uiState.savedAccounts,
                         onDeletePost = { viewModel.deletePost(it.id, it.poster.name) },
                         onEditPost = viewModel::openEditComposer,
+                        onDeleteComment = viewModel::deleteComment,
                         onLoveClick = viewModel::togglePostLove,
-                        onRepostClick = { viewModel.submitRepost(it.id) },
-                        onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+                        onRepostClick = { viewModel.submitRepost(it) },
+                        onQuoteClick = { viewModel.openQuoteComposer(it) },
                         showImages = uiState.showImagesInFeed,
                         openLinksInApp = uiState.openLinksInApp,
                         linkPreviewPriority = uiState.linkPreviewPriority,
@@ -1231,8 +1237,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onProfileClick = viewModel::openProfile,
             onMentionClick = viewModel::openProfile,
             onLoveClick = viewModel::togglePostLove,
-            onRepostClick = { viewModel.submitRepost(it.id) },
-            onQuoteClick = { viewModel.openQuoteComposer(it.id) },
+            onRepostClick = { viewModel.submitRepost(it) },
+            onQuoteClick = { viewModel.openQuoteComposer(it) },
             currentUsername = uiState.session?.username,
             savedAccounts = uiState.savedAccounts,
             onImageClick = viewModel::openFullScreenImages,
@@ -1270,7 +1276,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onDismiss = viewModel::closeFullScreenImages,
             onLoveClick = viewModel::togglePostLove,
             onCommentClick = viewModel::openPost,
-            onRepostClick = { post -> viewModel.submitRepost(post.id) },
+            onRepostClick = { post -> viewModel.submitRepost(post) },
             onProfileClick = viewModel::openProfile,
             onCommentReply = { comment ->
                 if (comment.post != null) {
@@ -1345,6 +1351,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 openLinksInApp = uiState.openLinksInApp,
                 onMentionClick = { viewModel.openProfile(it) },
                 onPostClick = viewModel::openPostById,
+                onProfileClick = viewModel::openProfile,
                 onClick = { viewModel.handleNotificationClick(notif) }
             )
             

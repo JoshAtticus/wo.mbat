@@ -95,7 +95,7 @@ fun CommentComposer(
     var editorScrollY by remember { mutableStateOf(0) }
     var editorContentHeight by remember { mutableStateOf(0) }
     var editorHeight by remember { mutableStateOf(0) }
-    val plainDraft = HtmlCompat.fromHtml(stripImages(draft), HtmlCompat.FROM_HTML_MODE_COMPACT).toString()
+    val plainDraft = HtmlCompat.fromHtml(stripImages(draft), HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
     val maxCharacterCount = 12_000
 
     fun updateFormattingStates(editText: android.widget.EditText) {
@@ -111,8 +111,10 @@ fun CommentComposer(
 
     fun updateDraft(editText: android.widget.EditText, images: List<String>) {
         val text = editText.text ?: return
-        val textHtml = convertStrikethroughToSTag(
-            HtmlCompat.toHtml(cleanSpannedForHtml(text), HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+        val textHtml = stripEmptyParagraphs(
+            convertStrikethroughToSTag(
+                HtmlCompat.toHtml(cleanSpannedForHtml(text), HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+            )
         )
         val imgTags = images.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
         val combinedHtml = if (imgTags.isBlank()) textHtml else "$textHtml\n$imgTags"
@@ -399,9 +401,10 @@ fun CommentComposer(
                 update = { editText ->
                     if (draft != lastSyncedDraft) {
                         lastSyncedDraft = draft
-                        currentImages = extractImages(draft)
-                        val spanned = HtmlCompat.fromHtml(stripImages(draft), HtmlCompat.FROM_HTML_MODE_COMPACT)
-                        val cleanSpanned = trimTrailingNewlines(spanned)
+                        if (!isUploadingImage) {
+                            currentImages = extractImages(draft)
+                        }
+                        val cleanSpanned = parseEditorHtml(stripImages(draft))
                         if (editText.text.toString() != cleanSpanned.toString()) {
                             editText.setText(cleanSpanned)
                             editText.setSelection(cleanSpanned.length)

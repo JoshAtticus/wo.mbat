@@ -35,6 +35,13 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material.PositionIndicator
+import androidx.wear.compose.material.Scaffold
+import androidx.wear.compose.material.TimeText
+import androidx.wear.compose.material.Vignette
+import androidx.wear.compose.material.VignettePosition
 import wombat.joshattic.us.wear.WearUiState
 
 @Composable
@@ -45,6 +52,7 @@ fun ComposeScreen(
     onCancel: () -> Unit
 ) {
     var draft by remember { mutableStateOf("") }
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
     
     val KEY_POST = "post_text"
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -63,12 +71,16 @@ fun ComposeScreen(
     }
 
     fun launchInput() {
-        val remoteInput = RemoteInput.Builder(KEY_POST)
-            .setLabel("Write post...")
-            .build()
-        val intent = androidx.wear.input.RemoteInputIntentHelper.createActionRemoteInputIntent()
-        androidx.wear.input.RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
-        launcher.launch(intent)
+        try {
+            val remoteInput = RemoteInput.Builder(KEY_POST)
+                .setLabel("Write post...")
+                .build()
+            val intent = androidx.wear.input.RemoteInputIntentHelper.createActionRemoteInputIntent()
+            androidx.wear.input.RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
+            launcher.launch(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("ComposeScreen", "Error launching post input", e)
+        }
     }
 
     // Auto-launch input when opening the screen
@@ -85,15 +97,24 @@ fun ComposeScreen(
         }
     }
 
-    // ScalingLazyColumn so the confirmation stays centered when short, but
-    // becomes scrollable when a long draft would otherwise overflow the
-    // circular screen and clip the text / buttons at the bezel
-    ScalingLazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp),
-        scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 0.75f)
+    Scaffold(
+        timeText = { TimeText() },
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
+        vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) }
     ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            autoCentering = null,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 36.dp, bottom = 48.dp),
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 0.5f,
+                edgeAlpha = 0.0f,
+                minTransitionArea = 0.2f,
+                maxTransitionArea = 0.35f
+            )
+        ) {
         if (draft.isEmpty()) {
             item {
                 Text(
@@ -177,4 +198,5 @@ fun ComposeScreen(
             }
         }
     }
+}
 }

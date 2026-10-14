@@ -134,6 +134,12 @@ data class CreateCommentRequest(val content: String, val parent: String? = null)
 
 data class CreateWallCommentResponse(val ok: String, val id: String)
 
+data class CreateCommentResponse(val ok: String, val id: String)
+
+data class CreatePostResponse(val ok: String, val id: String)
+
+data class EditPostResponse(val ok: String, val new: Post)
+
 data class AuthSession(
     val token: String,
     val username: String

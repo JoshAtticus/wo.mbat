@@ -76,28 +76,34 @@ class WearViewModel(
 
     init {
         // Query existing data on startup in case it was pushed before the app was running
-        val dataClient = com.google.android.gms.wearable.Wearable.getDataClient(context)
-        dataClient.dataItems.addOnSuccessListener { dataItems ->
-            for (item in dataItems) {
-                if (item.uri.path == wombat.joshattic.us.wear.data.WearAuthListenerService.PATH_AUTH) {
-                    val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
-                    val token = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_TOKEN, "")
-                    val username = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_USERNAME, "")
-                    if (!token.isNullOrEmpty() && !username.isNullOrEmpty()) {
+        runCatching {
+            val dataClient = com.google.android.gms.wearable.Wearable.getDataClient(context)
+            dataClient.dataItems.addOnSuccessListener { dataItems ->
+                for (item in dataItems) {
+                    if (item.uri.path == wombat.joshattic.us.wear.data.WearAuthListenerService.PATH_AUTH) {
+                        val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
+                        val token = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_TOKEN, "")
+                        val username = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_USERNAME, "")
+                        if (!token.isNullOrEmpty() && !username.isNullOrEmpty()) {
+                            viewModelScope.launch {
+                                wombat.joshattic.us.wear.data.WearAuthPreferences(context).saveSession(token, username)
+                            }
+                        }
+                    } else if (item.uri.path == wombat.joshattic.us.wear.data.WearAuthListenerService.PATH_SETTINGS) {
+                        val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
+                        val showImages = dataMap.getBoolean(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_SHOW_IMAGES, false)
+                        val showPfp = dataMap.getBoolean(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_SHOW_PFP, true)
+                        val feedType = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_FEED_TYPE, "Home")
                         viewModelScope.launch {
-                            wombat.joshattic.us.wear.data.WearAuthPreferences(context).saveSession(token, username)
+                            settingsPreferences.saveSettings(showImages, showPfp, feedType)
                         }
                     }
-                } else if (item.uri.path == wombat.joshattic.us.wear.data.WearAuthListenerService.PATH_SETTINGS) {
-                    val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
-                    val showImages = dataMap.getBoolean(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_SHOW_IMAGES, false)
-                    val showPfp = dataMap.getBoolean(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_SHOW_PFP, true)
-                    val feedType = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_FEED_TYPE, "Home")
-                    viewModelScope.launch {
-                        settingsPreferences.saveSettings(showImages, showPfp, feedType)
-                    }
                 }
+            }.addOnFailureListener {
+                android.util.Log.w("WearViewModel", "Failed to query initial Wearable dataItems", it)
             }
+        }.onFailure {
+            android.util.Log.w("WearViewModel", "Failed to get Wearable DataClient", it)
         }
 
         // Observe session changes from the Data Layer listener
@@ -175,7 +181,8 @@ class WearViewModel(
                     }
                 }
             }.onFailure { e ->
-                _uiState.update { it.copy(feedLoading = false, errorMessage = e.message) }
+                android.util.Log.w("WearViewModel", "Failed to load feed", e)
+                _uiState.update { it.copy(feedLoading = false) }
             }
         }
     }
@@ -200,15 +207,40 @@ class WearViewModel(
             }.onSuccess { comments ->
                 _uiState.update { it.copy(comments = comments, commentsLoading = false) }
             }.onFailure { e ->
-                _uiState.update { it.copy(commentsLoading = false, errorMessage = e.message) }
+                android.util.Log.w("WearViewModel", "Failed to load comments", e)
+                _uiState.update { it.copy(commentsLoading = false) }
             }
         }
     }
 
     fun closePost() = _uiState.update { it.copy(selectedPost = null, comments = emptyList()) }
 
+    fun refreshSession() {
+        runCatching {
+            val dataClient = com.google.android.gms.wearable.Wearable.getDataClient(context)
+            dataClient.dataItems.addOnSuccessListener { dataItems ->
+                for (item in dataItems) {
+                    if (item.uri.path == wombat.joshattic.us.wear.data.WearAuthListenerService.PATH_AUTH) {
+                        val dataMap = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
+                        val token = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_TOKEN, "")
+                        val username = dataMap.getString(wombat.joshattic.us.wear.data.WearAuthListenerService.KEY_USERNAME, "")
+                        if (!token.isNullOrEmpty() && !username.isNullOrEmpty()) {
+                            viewModelScope.launch {
+                                wombat.joshattic.us.wear.data.WearAuthPreferences(context).saveSession(token, username)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fun toggleLove(post: Post) {
-        val session = _uiState.value.session ?: return
+        val session = _uiState.value.session
+        if (session == null) {
+            _uiState.update { it.copy(errorMessage = "Log in on phone to love posts") }
+            return
+        }
         viewModelScope.launch {
             runCatching { repository.toggleLove(session, post.id) }
                 .onSuccess { response ->
@@ -236,7 +268,11 @@ class WearViewModel(
     }
 
     fun submitPost(text: String) {
-        val session = _uiState.value.session ?: return
+        val session = _uiState.value.session
+        if (session == null) {
+            _uiState.update { it.copy(errorMessage = "Log in on phone to post") }
+            return
+        }
         _uiState.update { it.copy(isPosting = true, errorMessage = null) }
         viewModelScope.launch {
             runCatching { repository.createPost(session, "<p>$text</p>") }
@@ -252,26 +288,36 @@ class WearViewModel(
                     }
                     loadFeed(refresh = true)
                 }.onFailure { e ->
-                    _uiState.update { it.copy(isPosting = false, errorMessage = e.message ?: "Couldn't post") }
+                    android.util.Log.e("WearViewModel", "Failed to create post", e)
+                    _uiState.update { it.copy(isPosting = false, errorMessage = formatErrorMessage(e, "Couldn't send post")) }
                 }
         }
     }
 
     fun submitRepost(postId: String) {
-        val session = _uiState.value.session ?: return
+        val session = _uiState.value.session
+        if (session == null) {
+            _uiState.update { it.copy(errorMessage = "Log in on phone to repost") }
+            return
+        }
         viewModelScope.launch {
             runCatching { repository.createRepost(session, postId) }
                 .onSuccess {
                     _uiState.update { it.copy(postSuccess = true) }
                     loadFeed(refresh = true)
                 }.onFailure { e ->
-                    _uiState.update { it.copy(errorMessage = e.message) }
+                    android.util.Log.e("WearViewModel", "Failed to repost", e)
+                    _uiState.update { it.copy(errorMessage = formatErrorMessage(e, "Couldn't repost")) }
                 }
         }
     }
 
     fun submitQuote(postId: String, text: String) {
-        val session = _uiState.value.session ?: return
+        val session = _uiState.value.session
+        if (session == null) {
+            _uiState.update { it.copy(errorMessage = "Log in on phone to quote") }
+            return
+        }
         _uiState.update { it.copy(isPosting = true, errorMessage = null) }
         viewModelScope.launch {
             runCatching { repository.createQuote(session, postId, "<p>$text</p>") }
@@ -287,13 +333,18 @@ class WearViewModel(
                     }
                     loadFeed(refresh = true)
                 }.onFailure { e ->
-                    _uiState.update { it.copy(isPosting = false, errorMessage = e.message ?: "Couldn't post") }
+                    android.util.Log.e("WearViewModel", "Failed to quote post", e)
+                    _uiState.update { it.copy(isPosting = false, errorMessage = formatErrorMessage(e, "Couldn't post")) }
                 }
         }
     }
 
     fun submitComment(postId: String, text: String, parentId: String? = null) {
-        val session = _uiState.value.session ?: return
+        val session = _uiState.value.session
+        if (session == null) {
+            _uiState.update { it.copy(errorMessage = "Log in on phone to comment") }
+            return
+        }
         viewModelScope.launch {
             runCatching { 
                 repository.createComment(session, postId, text, parentId)
@@ -301,7 +352,8 @@ class WearViewModel(
                 val comments = repository.loadComments(session, id)
                 _uiState.update { it.copy(comments = comments) }
             }.onFailure { e ->
-                _uiState.update { it.copy(errorMessage = e.message) }
+                android.util.Log.e("WearViewModel", "Failed to comment", e)
+                _uiState.update { it.copy(errorMessage = formatErrorMessage(e, "Couldn't send reply")) }
             }
         }
     }
@@ -314,7 +366,8 @@ class WearViewModel(
                 .onSuccess { notifs ->
                     _uiState.update { it.copy(notifications = notifs, notificationsLoading = false) }
                 }.onFailure { e ->
-                    _uiState.update { it.copy(notificationsLoading = false, errorMessage = e.message) }
+                    android.util.Log.w("WearViewModel", "Failed to load notifications", e)
+                    _uiState.update { it.copy(notificationsLoading = false) }
                 }
         }
     }
@@ -427,7 +480,8 @@ class WearViewModel(
                         )
                     }
                 }.onFailure { e ->
-                    _uiState.update { it.copy(exploreLoading = false, errorMessage = e.message) }
+                    android.util.Log.w("WearViewModel", "Failed to load explore feed", e)
+                    _uiState.update { it.copy(exploreLoading = false) }
                 }
         }
     }
@@ -440,7 +494,8 @@ class WearViewModel(
                 .onSuccess { resp ->
                     _uiState.update { it.copy(exploreFeed = resp.results, exploreLoading = false, exploreHasMore = !resp.last, searchPage = 2) }
                 }.onFailure { e ->
-                    _uiState.update { it.copy(exploreLoading = false, errorMessage = e.message) }
+                    android.util.Log.w("WearViewModel", "Failed to search explore posts", e)
+                    _uiState.update { it.copy(exploreLoading = false, errorMessage = formatErrorMessage(e, "Search failed")) }
                 }
         }
     }
@@ -491,6 +546,31 @@ class WearViewModel(
                 p
             }
         }.awaitAll()
+    }
+
+    private fun formatErrorMessage(e: Throwable, fallback: String = "Network error"): String {
+        val rootCause = generateSequence(e) { it.cause }.lastOrNull() ?: e
+        return when {
+            rootCause is java.net.UnknownHostException || e is java.net.UnknownHostException ->
+                "No internet connection"
+            rootCause is java.net.SocketTimeoutException || e is java.net.SocketTimeoutException ->
+                "Connection timed out"
+            rootCause is java.security.cert.CertificateNotYetValidException ||
+            rootCause is java.security.cert.CertificateExpiredException ||
+            rootCause is java.security.cert.CertPathValidatorException ||
+            rootCause.message?.contains("CertPathValidatorException") == true ->
+                "Check device date & time"
+            rootCause is javax.net.ssl.SSLException || e is javax.net.ssl.SSLException ->
+                "Secure connection error"
+            else -> {
+                val msg = rootCause.localizedMessage ?: rootCause.message ?: e.message
+                if (msg.isNullOrBlank() || msg.startsWith("java.") || msg.startsWith("javax.")) {
+                    fallback
+                } else {
+                    msg.take(45)
+                }
+            }
+        }
     }
 
     companion object {

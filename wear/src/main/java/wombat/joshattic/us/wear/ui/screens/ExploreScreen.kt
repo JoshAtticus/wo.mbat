@@ -30,6 +30,11 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+import androidx.wear.compose.material.PositionIndicator
+import androidx.wear.compose.material.Scaffold
+import androidx.wear.compose.material.Vignette
+import androidx.wear.compose.material.VignettePosition
 import wombat.joshattic.us.wear.WearUiState
 import wombat.joshattic.us.wear.data.model.Post
 
@@ -52,7 +57,7 @@ fun ExploreScreen(
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
 
     val KEY_SEARCH = "search_query"
     val searchLauncher = rememberLauncherForActivityResult(
@@ -68,26 +73,37 @@ fun ExploreScreen(
     }
 
     fun launchSearch() {
-        val remoteInput = RemoteInput.Builder(KEY_SEARCH)
-            .setLabel("Search posts…")
-            .build()
-        val intent = androidx.wear.input.RemoteInputIntentHelper.createActionRemoteInputIntent()
-        androidx.wear.input.RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
-        searchLauncher.launch(intent)
+        try {
+            val remoteInput = RemoteInput.Builder(KEY_SEARCH)
+                .setLabel("Search posts…")
+                .build()
+            val intent = androidx.wear.input.RemoteInputIntentHelper.createActionRemoteInputIntent()
+            androidx.wear.input.RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
+            searchLauncher.launch(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("ExploreScreen", "Error launching search input", e)
+        }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        TimeText()
-
+    Scaffold(
+        timeText = { TimeText() },
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
+        vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) }
+    ) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             autoCentering = null,
-            contentPadding = PaddingValues(top = 32.dp, bottom = 48.dp),
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 0.75f)
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 36.dp, bottom = 48.dp),
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 0.5f,
+                edgeAlpha = 0.0f,
+                minTransitionArea = 0.2f,
+                maxTransitionArea = 0.35f
+            )
         ) {
             // ── Search chip (always visible, 2-wide / full-width) ────────────
-            item {
+            item(key = "explore_search_chip") {
                 val activeQuery = uiState.searchQuery
                 Chip(
                     onClick = { launchSearch() },
@@ -119,7 +135,7 @@ fun ExploreScreen(
 
             // "Clear search" chip when a search is active
             if (uiState.searchQuery != null) {
-                item {
+                item(key = "explore_clear_search") {
                     Chip(
                         onClick = onClearSearch,
                         modifier = Modifier
@@ -137,7 +153,7 @@ fun ExploreScreen(
                 }
             } else {
                 // Section label
-                item {
+                item(key = "explore_trending_label") {
                     Text(
                         text = "Trending",
                         style = MaterialTheme.typography.caption1,
@@ -150,7 +166,7 @@ fun ExploreScreen(
 
             // ── Feed / search results ────────────────────────────────────────
             if (uiState.exploreLoading && uiState.exploreFeed.isEmpty()) {
-                item {
+                item(key = "explore_loading") {
                     Box(
                         Modifier.fillMaxWidth().padding(24.dp),
                         contentAlignment = Alignment.Center
@@ -159,7 +175,7 @@ fun ExploreScreen(
                     }
                 }
             } else if (uiState.exploreFeed.isEmpty()) {
-                item {
+                item(key = "explore_empty") {
                     Box(
                         Modifier.fillMaxWidth().padding(16.dp),
                         contentAlignment = Alignment.Center
@@ -173,7 +189,7 @@ fun ExploreScreen(
                 }
             }
 
-            items(uiState.exploreFeed.distinctBy { it.id }, key = { it.id }) { post ->
+            items(uiState.exploreFeed.distinctBy { it.id }, key = { "explore_${it.id}" }) { post ->
                 WearPostCard(
                     post = post,
                     showImages = uiState.showImages,
@@ -184,7 +200,7 @@ fun ExploreScreen(
             }
 
             if (uiState.exploreHasMore && uiState.exploreFeed.isNotEmpty()) {
-                item {
+                item(key = "explore_load_more") {
                     Chip(
                         onClick = onLoadMore,
                         label = { Text("Load more", style = MaterialTheme.typography.body2) },

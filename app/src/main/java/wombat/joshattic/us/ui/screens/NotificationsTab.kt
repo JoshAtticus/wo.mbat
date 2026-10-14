@@ -61,7 +61,8 @@ fun NotificationsTab(
     banReason: String? = null,
     openLinksInApp: Boolean = true,
     onMentionClick: ((String) -> Unit)? = null,
-    onPostClickById: ((String) -> Unit)? = null
+    onPostClickById: ((String) -> Unit)? = null,
+    onProfileClick: ((String) -> Unit)? = null
 ) {
     val refreshState = rememberPullToRefreshState()
     val listState = rememberLazyListState()
@@ -205,6 +206,7 @@ fun NotificationsTab(
                     openLinksInApp = openLinksInApp,
                     onMentionClick = onMentionClick,
                     onPostClick = onPostClickById,
+                    onProfileClick = onProfileClick,
                     onClick = { onNotificationClick(notification) }
                 )
             }
@@ -244,6 +246,7 @@ fun NotificationsTab(
                         openLinksInApp = openLinksInApp,
                         onMentionClick = onMentionClick,
                         onPostClick = onPostClickById,
+                        onProfileClick = onProfileClick,
                         onClick = { onNotificationClick(notification) }
                     )
                 }

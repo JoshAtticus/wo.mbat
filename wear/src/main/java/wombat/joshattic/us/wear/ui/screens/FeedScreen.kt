@@ -50,6 +50,12 @@ import wombat.joshattic.us.wear.data.model.Post
 import java.text.DateFormat
 import java.util.Date
 
+import androidx.wear.compose.material.PositionIndicator
+import androidx.wear.compose.material.Scaffold
+import androidx.wear.compose.material.Vignette
+import androidx.wear.compose.material.VignettePosition
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+
 @Composable
 fun FeedScreen(
     uiState: WearUiState,
@@ -58,22 +64,25 @@ fun FeedScreen(
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        TimeText()
-
+    Scaffold(
+        timeText = { TimeText() },
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
+        vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) }
+    ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             ScalingLazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                // Disable autoCentering so the first item starts near the top instead of the center
                 autoCentering = null,
-                // Add top padding so it doesn't overlap the clock and clears the sharp top curve
-                contentPadding = PaddingValues(top = 32.dp, bottom = 48.dp),
-                // Gentle scaling only — edgeScale = 0.4 crushed the first card into a
-                // sliver at the top bezel, which made the feed look pre-scrolled on open
-                scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 0.75f)
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 50.dp, bottom = 48.dp),
+                scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                    edgeScale = 0.5f,
+                    edgeAlpha = 0.0f,
+                    minTransitionArea = 0.2f,
+                    maxTransitionArea = 0.35f
+                )
             ) {
                 val distinctFeed = uiState.feed.distinctBy { it.id }
                 
@@ -82,8 +91,8 @@ fun FeedScreen(
                         (post.content?.replace(Regex("<.*?>"), "")?.trim()?.isBlank() ?: true) &&
                         !(post.content?.contains("<img", ignoreCase = true) ?: false)
 
-                    if (isPureRepost) {
-                        item(key = "${post.id}_repost") {
+                    if (isPureRepost && post.repost != null) {
+                        item(key = "${post.id}_repost_header") {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -98,14 +107,14 @@ fun FeedScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    "@${post.poster.name} reposted",
+                                    "@${post.poster?.name ?: "Unknown"} reposted",
                                     style = MaterialTheme.typography.caption3,
                                     color = MaterialTheme.colors.primary,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
                         }
-                        item(key = post.repost!!.id) {
+                        item(key = "${post.id}_repost_card") {
                             WearPostCard(
                                 post = post.repost,
                                 showImages = uiState.showImages,
@@ -115,7 +124,7 @@ fun FeedScreen(
                             )
                         }
                     } else {
-                        item(key = post.id) {
+                        item(key = "${post.id}_card") {
                             WearPostCard(
                                 post = post,
                                 showImages = uiState.showImages,
@@ -128,7 +137,7 @@ fun FeedScreen(
                 }
 
                 if (uiState.feedHasMore && uiState.feed.isNotEmpty()) {
-                    item {
+                    item(key = "feed_load_more") {
                         Chip(
                             onClick = onLoadMore,
                             label = { Text("Load more", style = MaterialTheme.typography.body2) },
@@ -166,12 +175,14 @@ fun WearPostCard(
         post.content?.stripHtml() ?: ""
     }
 
+    val authorName = post.poster?.name ?: "Unknown"
+    val repostAuthorName = post.repost?.poster?.name ?: "Unknown"
+
     Chip(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            // 20 dp each side ensures cards don't clip at the circular bezel edges
-            .padding(horizontal = 20.dp, vertical = 2.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         colors = ChipDefaults.chipColors(
             backgroundColor = MaterialTheme.colors.surface
         ),
@@ -181,13 +192,13 @@ fun WearPostCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = if (onAuthorClick != null)
-                        Modifier.clickable { onAuthorClick(post.poster.name) }
+                        Modifier.clickable { onAuthorClick(authorName) }
                     else Modifier
                 ) {
                     if (showPfp) {
                         SubcomposeAsyncImage(
-                            model = "https://wasteof-image-proxy.tnix.dev/${post.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
-                            contentDescription = post.poster.name,
+                            model = "https://wasteof-image-proxy.tnix.dev/$authorName?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
+                            contentDescription = authorName,
                             loading = {
                                 CircularProgressIndicator(
                                     modifier = Modifier.padding(2.dp),
@@ -201,7 +212,7 @@ fun WearPostCard(
                         Spacer(modifier = Modifier.width(6.dp))
                     }
                     Text(
-                        text = post.poster.name,
+                        text = authorName,
                         style = MaterialTheme.typography.caption1,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.onSurface,
@@ -234,12 +245,12 @@ fun WearPostCard(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = if (onAuthorClick != null)
-                                    Modifier.clickable { onAuthorClick(post.repost.poster.name) }
+                                    Modifier.clickable { onAuthorClick(repostAuthorName) }
                                 else Modifier
                             ) {
                                 if (showPfp) {
                                     SubcomposeAsyncImage(
-                                        model = "https://wasteof-image-proxy.tnix.dev/${post.repost.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
+                                        model = "https://wasteof-image-proxy.tnix.dev/$repostAuthorName?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                                         contentDescription = null,
                                         loading = {
                                             CircularProgressIndicator(
@@ -252,7 +263,7 @@ fun WearPostCard(
                                     Spacer(Modifier.width(4.dp))
                                 }
                                 Text(
-                                    post.repost.poster.name,
+                                    repostAuthorName,
                                     style = MaterialTheme.typography.caption3,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colors.onSurface
@@ -344,15 +355,15 @@ fun WearPostCard(
     )
 }
 
-/** Strip HTML tags to plain text for watch display. */
-fun String.stripHtml(): String = replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
-    .replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "\n\n<p")
-    .replace(Regex("<[^>]+>"), "")
-    .replace("&amp;", "&")
-    .replace("&lt;", "<")
-    .replace("&gt;", ">")
-    .replace("&quot;", "\"")
-    .trim()
+fun String?.stripHtml(): String = this?.replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+    ?.replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "\n\n<p")
+    ?.replace(Regex("<[^>]+>"), "")
+    ?.replace("&amp;", "&")
+    ?.replace("&lt;", "<")
+    ?.replace("&gt;", ">")
+    ?.replace("&quot;", "\"")
+    ?.replace("&#39;", "'")
+    ?.trim() ?: ""
 
 fun extractImages(html: String): List<String> {
     val imgRegex = """<img[^>]*src=["']([^"']+)["'][^>]*>""".toRegex(RegexOption.IGNORE_CASE)

@@ -13,12 +13,15 @@ import androidx.compose.material.icons.rounded.Refresh
 
 @Composable
 fun WearOfflineScreen(onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(12.dp),
-        contentAlignment = Alignment.Center
+    Scaffold(
+        timeText = { TimeText() }
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -62,4 +65,5 @@ fun WearOfflineScreen(onRetry: () -> Unit) {
             }
         }
     }
+}
 }

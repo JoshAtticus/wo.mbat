@@ -37,6 +37,12 @@ import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import coil.compose.SubcomposeAsyncImage
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+import androidx.wear.compose.material.PositionIndicator
+import androidx.wear.compose.material.Scaffold
+import androidx.wear.compose.material.TimeText
+import androidx.wear.compose.material.Vignette
+import androidx.wear.compose.material.VignettePosition
 import wombat.joshattic.us.wear.WearUiState
 import wombat.joshattic.us.wear.data.model.Post
 import wombat.joshattic.us.wear.data.model.User
@@ -46,10 +52,6 @@ import java.util.Locale
 
 /**
  * Profile screen for any user (own profile or someone else's).
- *
- * The profile picture fills the first "page" as a full-screen image with:
- *  - A top gradient (transparent→black) so the watch clock stays readable
- *  - A bottom gradient (transparent→black) that the @username + bio float over
  *
  * Scrolling down reveals: joined date, follower/following/post count pills,
  * then the user's posts rendered as standard [WearPostCard]s.
@@ -61,27 +63,29 @@ fun ProfileScreen(
     onLoveClick: (Post) -> Unit,
     onLoadMorePosts: () -> Unit
 ) {
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
     val profile = uiState.profileUser
     val username = uiState.profileUsername ?: uiState.session?.username ?: ""
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // No TimeText() — the profile picture header fills the screen and the
-        // clock widget from the watch face shows through the OS chrome layer.
-
+    Scaffold(
+        timeText = { TimeText() },
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
+        vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) }
+    ) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 28.dp),
-            // Start with zero auto-centering so the pfp header fills the screen
             autoCentering = null,
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 36.dp, bottom = 48.dp),
             scalingParams = androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults.scalingParams(
-                edgeScale = 0.85f,
-                edgeAlpha = 0.5f
+                edgeScale = 0.5f,
+                edgeAlpha = 0.0f,
+                minTransitionArea = 0.2f,
+                maxTransitionArea = 0.35f
             )
         ) {
-            // ── Header: full-screen profile picture ─────────────────────────
-            item {
+            // ── Header: profile picture card ────────────────────────────────
+            item(key = "profile_header") {
                 ProfileHeaderItem(
                     username = username,
                     bio = profile?.bio,
@@ -91,14 +95,14 @@ fun ProfileScreen(
 
             // ── Stats row: joined / followers / following / posts ────────────
             if (profile != null) {
-                item {
+                item(key = "profile_stats") {
                     ProfileStatsSection(profile)
                 }
             }
 
             // ── Posts ────────────────────────────────────────────────────────
             if (uiState.profileLoading && uiState.profilePosts.isEmpty() && profile != null) {
-                item {
+                item(key = "profile_loading") {
                     Box(
                         Modifier.fillMaxWidth().padding(20.dp),
                         contentAlignment = Alignment.Center
@@ -107,7 +111,7 @@ fun ProfileScreen(
                     }
                 }
             } else if (uiState.profilePosts.isNotEmpty()) {
-                item {
+                item(key = "profile_posts_title") {
                     Text(
                         text = "Posts",
                         style = MaterialTheme.typography.caption1,
@@ -116,7 +120,7 @@ fun ProfileScreen(
                         modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
                     )
                 }
-                items(uiState.profilePosts.distinctBy { it.id }, key = { it.id }) { post ->
+                items(uiState.profilePosts.distinctBy { it.id }, key = { "profile_post_${it.id}" }) { post ->
                     WearPostCard(
                         post = post,
                         showImages = uiState.showImages,
@@ -126,7 +130,7 @@ fun ProfileScreen(
                     )
                 }
                 if (uiState.profilePostsHasMore) {
-                    item {
+                    item(key = "profile_load_more") {
                         Chip(
                             onClick = onLoadMorePosts,
                             label = { Text("Load more", style = MaterialTheme.typography.body2) },
@@ -146,11 +150,11 @@ private fun ProfileHeaderItem(
     bio: String?,
     isLoading: Boolean
 ) {
-    // Match the screen height so it fills the first "page" before scroll
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(192.dp)
+            .height(160.dp)
+            .clip(RoundedCornerShape(24.dp))
     ) {
         SubcomposeAsyncImage(
             model = "https://wasteof-image-proxy.tnix.dev/$username?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",

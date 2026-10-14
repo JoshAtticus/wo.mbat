@@ -6,10 +6,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.wearable.Wearable
 import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.data.repository.WombatRepository
@@ -26,21 +26,28 @@ import wombat.joshattic.us.wear.WearSyncService
 class MainActivity : ComponentActivity() {
     private var pendingDeepLink: Uri? = null
 
+    // Lazy so applicationContext is only touched after attach; shared by setContent
+    // and onNewIntent so the ViewModel is always created with the custom factory.
+    private val repository: WombatRepository by lazy {
+        WombatRepository(
+            apiService = RetrofitClient.apiService,
+            authPreferences = AuthPreferences(applicationContext),
+            blockedUsersDatabase = BlockedUsersDatabase(applicationContext),
+            settingsPreferences = SettingsPreferences(applicationContext)
+        )
+    }
+    private val homeViewModel: HomeViewModel by viewModels {
+        HomeViewModel.factory(repository, applicationContext)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) {
             pendingDeepLink = intent?.extractDeepLink()
         }
-        val repository = WombatRepository(
-            apiService = RetrofitClient.apiService,
-            authPreferences = AuthPreferences(applicationContext),
-            blockedUsersDatabase = BlockedUsersDatabase(applicationContext),
-            settingsPreferences = SettingsPreferences(applicationContext)
-        )
         enableEdgeToEdge()
         setContent {
-            val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository, applicationContext))
             val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
 
             val session = uiState.session
@@ -102,8 +109,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         intent.extractDeepLink()?.let { deepLink ->
-            androidx.lifecycle.ViewModelProvider(this)[HomeViewModel::class.java]
-                .handleDeepLink(deepLink)
+            homeViewModel.handleDeepLink(deepLink)
         }
     }
 

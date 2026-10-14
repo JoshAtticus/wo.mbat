@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(gradlew.bat:*)",
+      "Shell(./gradlew:*)",
+      "Shell(c:\\Users\\Josh\\AndroidStudioProjects\\wombat\\gradlew.bat:*)",
+      "powershell"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

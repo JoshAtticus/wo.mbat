@@ -18,7 +18,9 @@ import wombat.joshattic.us.data.model.UpdateBioRequest
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
+import wombat.joshattic.us.data.model.CreateCommentResponse
 import wombat.joshattic.us.data.model.CreatePostRequest
+import wombat.joshattic.us.data.model.CreatePostResponse
 import wombat.joshattic.us.data.model.CreateWallCommentResponse
 import wombat.joshattic.us.data.model.FeedResponse
 import wombat.joshattic.us.data.model.FollowersResponse
@@ -28,6 +30,7 @@ import wombat.joshattic.us.data.model.LoveToggleResponse
 import wombat.joshattic.us.data.model.Notification
 import wombat.joshattic.us.data.model.NotificationResponse
 import wombat.joshattic.us.data.model.Permissions
+import wombat.joshattic.us.data.model.Poster
 import wombat.joshattic.us.data.model.Post
 import wombat.joshattic.us.data.model.SearchPostsResponse
 import wombat.joshattic.us.data.model.SearchUsersResponse
@@ -99,11 +102,11 @@ class WombatRepository(
         body.use { response -> DevalueParser.parseReposts(response.string()) }
     }
 
-    suspend fun loadComments(session: AuthSession?, postId: String) =
-        apiService.getComments(postId = postId, token = session?.token)
+    suspend fun loadComments(session: AuthSession?, postId: String): CommentResponse =
+        apiService.getComments(postId = postId, token = session?.token).sanitized()
 
     suspend fun loadCommentReplies(session: AuthSession?, commentId: String, page: Int = 1): CommentResponse =
-        apiService.getCommentReplies(commentId, page, session?.token)
+        apiService.getCommentReplies(commentId, page, session?.token).sanitized()
 
     suspend fun loadTrendingPosts(session: AuthSession?, timeframe: String? = null): FeedResponse {
         return apiService.getTrendingPosts(session?.token, timeframe)
@@ -139,7 +142,7 @@ class WombatRepository(
         return apiService.getReadNotifications(token, page)
     }
 
-    suspend fun createPost(session: AuthSession, htmlContent: String, repostId: String? = null): Post {
+    suspend fun createPost(session: AuthSession, htmlContent: String, repostId: String? = null): CreatePostResponse {
         return apiService.makePost(
             token = session.token,
             request = CreatePostRequest(post = htmlContent, repost = repostId)
@@ -151,7 +154,7 @@ class WombatRepository(
             token = session.token,
             postId = postId,
             request = EditPostRequest(post = htmlContent)
-        )
+        ).new
     }
 
     suspend fun deletePost(session: AuthSession, postId: String) {
@@ -166,7 +169,7 @@ class WombatRepository(
         )
     }
 
-    suspend fun createComment(session: AuthSession, postId: String, content: String, parent: String?): Comment {
+    suspend fun createComment(session: AuthSession, postId: String, content: String, parent: String?): CreateCommentResponse {
         return apiService.makeComment(
             postId = postId,
             token = session.token,
@@ -187,7 +190,7 @@ class WombatRepository(
     }
 
     suspend fun loadWallComments(session: AuthSession?, username: String, page: Int = 1): CommentResponse {
-        return apiService.getWallComments(username = username, page = page, token = session?.token)
+        return apiService.getWallComments(username = username, page = page, token = session?.token).sanitized()
     }
 
     suspend fun createWallComment(session: AuthSession, username: String, content: String, parentId: String?): CreateWallCommentResponse {
@@ -299,6 +302,20 @@ class WombatRepository(
         if (!response.success) throw Exception("Image upload failed")
         return response.url
     }
+
+    // Gson hands us nulls for non-null Kotlin types when the server omits fields
+    // (e.g. deleted users come back with poster: null), so substitute a placeholder
+    // at the boundary before anything reaches the UI or blocked-user filtering.
+    @Suppress("USELESS_ELVIS")
+    private fun Comment.sanitized(): Comment =
+        copy(
+            poster = poster ?: Poster(id = "", name = "unknown", color = "gray"),
+            replies = (replies ?: emptyList()).map { it.sanitized() }
+        )
+
+    @Suppress("USELESS_ELVIS")
+    private fun CommentResponse.sanitized(): CommentResponse =
+        copy(comments = (comments ?: emptyList()).map { it.sanitized() })
 
     companion object {
         private const val DEFAULT_GUEST_USER = "jeffalo"

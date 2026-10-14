@@ -264,6 +264,7 @@ class HomeViewModel(
             showComposer = nextVisible,
             selectedPost = if (nextVisible) null else _uiState.value.selectedPost,
             composeRepostId = if (!nextVisible) null else _uiState.value.composeRepostId,
+            composeRepostPost = if (!nextVisible) null else _uiState.value.composeRepostPost,
             composeEditPostId = if (!nextVisible) null else _uiState.value.composeEditPostId,
             composeEditPostAuthor = if (!nextVisible) null else _uiState.value.composeEditPostAuthor,
             composeOriginalContent = if (!nextVisible) null else _uiState.value.composeOriginalContent
@@ -271,13 +272,22 @@ class HomeViewModel(
     }
 
     fun openEditComposer(post: Post) {
+        // Editing a pure repost wrapper targets the wrapped post itself
+        val target = if (post.repost != null &&
+            post.content.replace(Regex("<.*?>"), "").trim().isBlank()
+        ) {
+            post.repost!!
+        } else {
+            post
+        }
         _uiState.value = _uiState.value.copy(
             showComposer = true,
-            composeDraft = post.content,
-            composeOriginalContent = post.content,
-            composeEditPostId = post.id,
-            composeEditPostAuthor = post.poster.name,
+            composeDraft = target.content,
+            composeOriginalContent = target.content,
+            composeEditPostId = target.id,
+            composeEditPostAuthor = target.poster.name,
             composeRepostId = null,
+            composeRepostPost = null,
             selectedPost = null
         )
     }
@@ -365,6 +375,7 @@ class HomeViewModel(
                             showComposer = false,
                             composeDraft = "",
                             composeRepostId = null,
+                            composeRepostPost = null,
                             scrollToTop = true
                         )
                         refreshFeed()
@@ -386,12 +397,14 @@ class HomeViewModel(
         }
     }
 
-    fun submitRepost(postId: String, onSuccess: () -> Unit = {}) {
+    fun submitRepost(post: Post, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             val session = _uiState.value.session ?: return@launch
-            runCatching { repository.createPost(session, "", postId) }
+            runCatching { repository.createPost(session, "", post.id) }
                 .onSuccess {
-                    _uiState.value = _uiState.value.copy(toastMessage = "Reposted!")
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = "Reposted post from @${post.poster.name}"
+                    )
                     refreshFeed()
                     refreshAccount()
                     onSuccess()
@@ -407,10 +420,11 @@ class HomeViewModel(
         }
     }
 
-    fun openQuoteComposer(postId: String) {
+    fun openQuoteComposer(post: Post) {
         _uiState.value = _uiState.value.copy(
             showComposer = true,
-            composeRepostId = postId,
+            composeRepostId = post.id,
+            composeRepostPost = post,
             selectedPost = null
         )
     }
@@ -1156,15 +1170,36 @@ class HomeViewModel(
                 )
             }
             if (createResult.isSuccess) {
-                val createdComment = createResult.getOrNull()
+                val created = createResult.getOrNull()
                 _uiState.value = _uiState.value.copy(
                     commentDraft = "",
                     commentReplyParent = null
                 )
                 loadComments(selectedPost.id)
-                if (createdComment != null && findCommentById(_uiState.value.comments, createdComment.id) == null) {
+                // The create endpoint only returns {ok, id}, so reconstruct the comment
+                // locally (mirroring submitWallComment) instead of inserting a skeleton
+                // object whose poster/content would be null.
+                if (created != null && findCommentById(_uiState.value.comments, created.id) == null) {
+                    val createdComment = Comment(
+                        id = created.id,
+                        poster = Poster(
+                            id = _uiState.value.accountProfile?.id ?: session.username,
+                            name = session.username,
+                            color = _uiState.value.accountProfile?.color ?: "#5865f2"
+                        ),
+                        parent = parent,
+                        content = formattedHtml,
+                        time = System.currentTimeMillis(),
+                        hasReplies = false,
+                        top = parentComment?.let { it.top ?: it.id }
+                    )
                     _uiState.value = _uiState.value.copy(
-                        comments = addCommentToTree(_uiState.value.comments, createdComment)
+                        // Comment lists are newest-first; prepend fallback top-level inserts
+                        comments = if (parent == null) {
+                            listOf(createdComment) + _uiState.value.comments
+                        } else {
+                            addCommentToTree(_uiState.value.comments, createdComment)
+                        }
                     )
                 }
                 revealReplyInThread(
@@ -1305,7 +1340,13 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(
                         wallCommentDraft = "",
                         wallCommentReplyParent = null,
-                        wallComments = addCommentToTree(_uiState.value.wallComments, createdComment)
+                        // The wall API returns newest-first, so a new top-level comment
+                        // belongs at the top of the list, not below the oldest entries.
+                        wallComments = if (parent == null) {
+                            listOf(createdComment) + _uiState.value.wallComments
+                        } else {
+                            addCommentToTree(_uiState.value.wallComments, createdComment)
+                        }
                     )
                     revealReplyInThread(
                         parentComment,

@@ -17,7 +17,10 @@ import wombat.joshattic.us.data.model.EditPostRequest
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
 import wombat.joshattic.us.data.model.CreateCommentRequest
+import wombat.joshattic.us.data.model.CreateCommentResponse
 import wombat.joshattic.us.data.model.CreatePostRequest
+import wombat.joshattic.us.data.model.CreatePostResponse
+import wombat.joshattic.us.data.model.EditPostResponse
 import wombat.joshattic.us.data.model.FeedResponse
 import wombat.joshattic.us.data.model.FollowToggleResponse
 import wombat.joshattic.us.data.model.LoginRequest
@@ -74,7 +77,7 @@ interface ApiService {
     suspend fun makePost(
         @Header("authorization") token: String,
         @Body request: CreatePostRequest
-    ): Post
+    ): CreatePostResponse
 
     @POST("posts/{id}/reposts")
     suspend fun createRepost(@Header("Authorization") token: String, @Path("id") postId: String): Post
@@ -87,7 +90,7 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Path("id") postId: String,
         @Body request: EditPostRequest
-    ): Post
+    ): EditPostResponse
 
     @POST("posts/{post_id}/report")
     suspend fun reportPost(
@@ -137,7 +140,7 @@ interface ApiService {
         @Path("post_id") postId: String,
         @Header("authorization") token: String,
         @Body request: CreateCommentRequest
-    ): Comment
+    ): CreateCommentResponse
 
     @POST("comments/{comment_id}/report")
     suspend fun reportComment(

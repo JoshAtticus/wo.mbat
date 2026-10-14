@@ -36,6 +36,12 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import coil.compose.SubcomposeAsyncImage
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
+import androidx.wear.compose.material.PositionIndicator
+import androidx.wear.compose.material.Scaffold
+import androidx.wear.compose.material.Vignette
+import androidx.wear.compose.material.VignettePosition
 import wombat.joshattic.us.wear.WearUiState
 import wombat.joshattic.us.wear.data.model.Notification
 
@@ -44,36 +50,47 @@ fun NotificationsScreen(
     uiState: WearUiState,
     onNotificationClick: (Notification) -> Unit
 ) {
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        TimeText()
-
+    Scaffold(
+        timeText = { TimeText() },
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
+        vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) }
+    ) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            // Start at the top instead of centering the header mid-screen
             autoCentering = null,
-            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp)
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 36.dp, bottom = 48.dp),
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 0.5f,
+                edgeAlpha = 0.0f,
+                minTransitionArea = 0.2f,
+                maxTransitionArea = 0.35f
+            )
         ) {
-            item {
-                Text(
-                    text = "Notifications",
-                    style = MaterialTheme.typography.caption1,
-                    color = MaterialTheme.colors.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
+            item(key = "notif_header") {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Notifications",
+                        style = MaterialTheme.typography.caption1,
+                        color = MaterialTheme.colors.primary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
             }
 
             if (uiState.notificationsLoading && uiState.notifications.isEmpty()) {
-                item {
+                item(key = "notif_loading") {
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                 }
             } else if (uiState.notifications.isEmpty()) {
-                item {
+                item(key = "notif_empty") {
                     Text(
                         "No unread notifications",
                         style = MaterialTheme.typography.caption2,
@@ -87,14 +104,14 @@ fun NotificationsScreen(
             val readNotifs = uiState.notifications.filter { it.read }.distinctBy { it.id }
 
             if (unreadNotifs.isNotEmpty()) {
-                items(unreadNotifs, key = { it.id }) { notif ->
+                items(unreadNotifs, key = { "unread_${it.id}" }) { notif ->
                     NotificationItem(notif, onNotificationClick)
                 }
             }
 
             if (readNotifs.isNotEmpty()) {
                 if (unreadNotifs.isNotEmpty()) {
-                    item {
+                    item(key = "prev_header") {
                         Text(
                             text = "Previous",
                             style = MaterialTheme.typography.caption2,
@@ -109,7 +126,7 @@ fun NotificationsScreen(
                     unreadNotifs.none { unread -> unread.id == read.id }
                 }
 
-                items(filteredRead, key = { it.id }) { notif ->
+                items(filteredRead, key = { "read_${it.id}" }) { notif ->
                     NotificationItem(notif, onNotificationClick)
                 }
             }
@@ -130,7 +147,10 @@ private fun NotificationItem(notif: Notification, onNotificationClick: (Notifica
     
     val summary = androidx.compose.runtime.remember(notif) {
         when (notif.type) {
-            "comment", "wall_comment", "wall_comment_reply", "comment_reply" -> if (notif.data.comment == null) "This comment was deleted." else "commented: " + (notif.data.comment.content.stripHtml())
+            "comment", "wall_comment", "wall_comment_reply", "comment_reply" -> {
+                val commentContent = notif.data.comment?.content
+                if (commentContent == null) "This comment was deleted." else "commented: " + commentContent.stripHtml()
+            }
             "love" -> "loved your post"
             "follow" -> "followed you"
             "mention", "post_mention", "comment_mention" -> if (notif.data.post == null && notif.data.comment == null) "This post/comment was deleted." else "mentioned you"
@@ -143,7 +163,7 @@ private fun NotificationItem(notif: Notification, onNotificationClick: (Notifica
         onClick = { onNotificationClick(notif) },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 2.dp, vertical = 2.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         colors = ChipDefaults.chipColors(
             backgroundColor = MaterialTheme.colors.surface
         ),
@@ -157,11 +177,11 @@ private fun NotificationItem(notif: Notification, onNotificationClick: (Notifica
                         tint = if (notif.type == "love") Color(0xFFEF4444) else MaterialTheme.colors.primary
                     )
                     Spacer(Modifier.width(4.dp))
-                    val actor = notif.data.actor
-                    if (actor != null) {
+                    val actorName = notif.data.actor?.name
+                    if (actorName != null) {
                         SubcomposeAsyncImage(
-                            model = "https://wasteof-image-proxy.tnix.dev/${actor.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
-                            contentDescription = actor.name,
+                            model = "https://wasteof-image-proxy.tnix.dev/$actorName?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
+                            contentDescription = actorName,
                             loading = {
                                 CircularProgressIndicator(modifier = Modifier.padding(1.dp), strokeWidth = 1.dp)
                             },
@@ -169,7 +189,7 @@ private fun NotificationItem(notif: Notification, onNotificationClick: (Notifica
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = actor.name,
+                            text = actorName,
                             style = MaterialTheme.typography.caption2,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colors.onSurface

@@ -29,6 +29,7 @@ import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
+import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.compose.material.icons.Icons
@@ -70,25 +71,23 @@ fun HomeScreen(
         uiState.notifications.count { !it.read }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
+    Scaffold(
+        timeText = { TimeText() }
     ) {
-        // ── Geometry ────────────────────────────────────────────────────────
-        // We remove padding between buttons and clip the entire column
-        // to a CircleShape so the buttons perfectly segment the watch face.
-        val gap = 0.dp
-        val corner = 0.dp
-
-        TimeText()
-
-        Column(
-            modifier = Modifier.fillMaxSize().clip(CircleShape),
-            verticalArrangement = Arrangement.spacedBy(gap),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
         ) {
+            val gap = 0.dp
+            val corner = 0.dp
+
+            Column(
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                verticalArrangement = Arrangement.spacedBy(gap),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             // ── Row 1: Profile | Notifications ─────────────────────────────
             Row(
                 modifier = Modifier
@@ -296,6 +295,7 @@ fun HomeScreen(
             }
         }
     }
+}
 }
 
 /**

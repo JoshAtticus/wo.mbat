@@ -165,6 +165,7 @@ fun ComposerSheet(
     viewModel: HomeViewModel? = null,
     savedAccounts: List<AuthSession> = emptyList(),
     onSwitchAccount: ((AuthSession) -> Unit)? = null,
+    repostOf: Post? = null,
     errorMessage: String? = null
 ) {
     val haptic = LocalHapticFeedback.current
@@ -179,6 +180,9 @@ fun ComposerSheet(
     var showDraftsDialog by remember { mutableStateOf(false) }
     var currentImages by remember { mutableStateOf(extractImages(draft)) }
     var lastSyncedDraft by remember { mutableStateOf("") }
+    // Serialized HTML of the editor text, kept fresh by the TextWatcher so image
+    // (re)builds never depend on the live EditText reference.
+    var lastTextHtml by remember { mutableStateOf<String?>(null) }
     var richEditTextRef by remember { mutableStateOf<RichEditText?>(null) }
     var charCount by remember { mutableStateOf(0) }
     var isBoldActive by remember { mutableStateOf(false) }
@@ -200,13 +204,24 @@ fun ComposerSheet(
         isQuoteActive = hasSpan(text, start, end, android.text.style.QuoteSpan::class.java)
     }
 
-    fun updateDraft(text: Spanned, images: List<String>) {
-        val cleanText = cleanSpannedForHtml(text)
-        val textHtml = HtmlCompat.toHtml(cleanText, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
-        val convertedHtml = convertStrikethroughToSTag(textHtml)
+    fun textHtmlForEditor(): String? {
+        lastTextHtml?.let { return it }
+        val current = richEditTextRef?.text ?: return null
+        return stripEmptyParagraphs(
+            convertStrikethroughToSTag(
+                HtmlCompat.toHtml(cleanSpannedForHtml(current), HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
+            )
+        )
+    }
+
+    fun buildDraftHtml(textHtml: String?, images: List<String>): String {
+        val resolvedHtml = textHtml ?: textHtmlForEditor() ?: ""
         val imgTags = images.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
-        val combinedHtml = if (imgTags.isBlank()) convertedHtml else "$convertedHtml\n$imgTags"
-        
+        return if (imgTags.isBlank()) resolvedHtml else "$resolvedHtml\n$imgTags"
+    }
+
+    fun updateDraft(textHtml: String?, images: List<String>) {
+        val combinedHtml = buildDraftHtml(textHtml, images)
         lastSyncedDraft = combinedHtml
         onDraftChange(combinedHtml)
     }
@@ -226,7 +241,7 @@ fun ComposerSheet(
                         uploadCurrent = index + 1
                         val uploadedUrl = viewModel.uploadImage(context, uri)
                         currentImages = currentImages + uploadedUrl
-                        richEditTextRef?.let { updateDraft(it.text, currentImages) }
+                        updateDraft(lastTextHtml, currentImages)
                     }
                 } catch (e: Exception) {
                     imageUploadError = e.message ?: "Upload failed"
@@ -475,6 +490,27 @@ fun ComposerSheet(
                     }
                 }
 
+                if (repostOf != null && !isEditing) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            ProfilePicture(username = repostOf.poster.name, size = 20.dp)
+                            Text(
+                                text = "Reposting post from @${repostOf.poster.name}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -666,7 +702,8 @@ fun ComposerSheet(
                                             charCount = currentText.length
                                             val cleanText = cleanSpannedForHtml(currentText as Spanned)
                                             val textHtml = HtmlCompat.toHtml(cleanText, HtmlCompat.TO_HTML_PARAGRAPH_LINES_INDIVIDUAL)
-                                            val convertedHtml = convertStrikethroughToSTag(textHtml)
+                                            val convertedHtml = stripEmptyParagraphs(convertStrikethroughToSTag(textHtml))
+                                            lastTextHtml = convertedHtml
                                             val imgTags = currentImages.joinToString("\n") { "<img src=\"$it\" alt=\"\">" }
                                             val combinedHtml = if (imgTags.isBlank()) convertedHtml else "$convertedHtml\n$imgTags"
                                             if (combinedHtml != lastSyncedDraft) {
@@ -690,12 +727,13 @@ fun ComposerSheet(
                                 if (draft != lastSyncedDraft) {
                                     lastSyncedDraft = draft
                                     val newImages = extractImages(draft)
-                                    if (newImages != currentImages) {
+                                    // An upload just appended image URLs to the draft; a
+                                    // stale-draft re-sync must not wipe them mid-upload.
+                                    if (!isUploadingImage && newImages != currentImages) {
                                         currentImages = newImages
                                     }
                                     val textHtml = stripImages(draft)
-                                    val spanned = HtmlCompat.fromHtml(textHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
-                                    val cleanSpanned = trimTrailingNewlines(spanned)
+                                    val cleanSpanned = parseEditorHtml(textHtml)
                                     cleanSpanned.getSpans(0, cleanSpanned.length, android.text.style.URLSpan::class.java).forEach { urlSpan ->
                                         val s = cleanSpanned.getSpanStart(urlSpan)
                                         val e = cleanSpanned.getSpanEnd(urlSpan)
@@ -745,7 +783,7 @@ fun ComposerSheet(
                                     onClick = {
                                         val updatedImages = currentImages.toMutableList().apply { removeAt(index) }
                                         currentImages = updatedImages
-                                        richEditTextRef?.let { updateDraft(it.text, updatedImages) }
+                                        updateDraft(lastTextHtml, updatedImages)
                                     },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
@@ -782,7 +820,9 @@ fun ComposerSheet(
                 }
                 Button(
                     onClick = {
-                        onSubmit(draft)
+                        // Rebuild at submit time so attached images always make it
+                        // into the outgoing HTML even if a draft sync was missed.
+                        onSubmit(buildDraftHtml(lastTextHtml, currentImages))
                     },
                     enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
                     shape = CircleShape,
@@ -935,6 +975,26 @@ fun getLineBoundaries(text: CharSequence, start: Int, end: Int): Pair<Int, Int> 
     }
     return Pair(lineStart, lineEnd)
 }
+
+// Mirrors the HtmlText display pipeline: fromHtml alone drops breaks between
+// block elements that carry no whitespace (e.g. web-format </p><p>), so the
+// explicit paragraph/br replacements are required before parsing. Blank lines
+// between paragraphs are preserved so the editor matches the rendered post.
+// Empty <p> elements are dropped so stray ones don't show as blank lines.
+fun parseEditorHtml(html: String): Spannable {
+    val processedHtml = html.trim()
+        .replace(Regex("<p[^>]*>(?:\\s|\u00A0)*</p>", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+        .replace(Regex("</p>\\s*<p", RegexOption.IGNORE_CASE), "</p>\n\n<p")
+    val spanned = HtmlCompat.fromHtml(processedHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
+    return trimTrailingNewlines(spanned)
+}
+
+// The save path wraps every editor line in its own <p>; blank lines (paragraph
+// gaps) would become empty <p> elements that render as double-wide gaps and
+// compound on every edit — strip them so saved HTML matches the source structure.
+fun stripEmptyParagraphs(html: String): String =
+    html.replace(Regex("<p[^>]*>(?:\\s|\u00A0)*</p>", RegexOption.IGNORE_CASE), "")
 
 fun trimTrailingNewlines(s: CharSequence): Spannable {
     var end = s.length

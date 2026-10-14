@@ -70,6 +70,7 @@ data class HomeUiState(
     val showComposer: Boolean = false,
     val composerDrafts: List<String> = emptyList(),
     val composeRepostId: String? = null,
+    val composeRepostPost: Post? = null,
     val composeEditPostId: String? = null,
     val composeEditPostAuthor: String? = null,
     val composeOriginalContent: String? = null,
