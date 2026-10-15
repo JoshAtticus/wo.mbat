@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -67,6 +68,7 @@ import androidx.wear.compose.material.VignettePosition
 fun PostDetailScreen(
     uiState: WearUiState,
     onLoveClick: () -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null,
     onSubmitComment: (text: String, parentId: String?) -> Unit,
     onRepostClick: (Post) -> Unit,
     onQuoteClick: (Post) -> Unit,
@@ -141,9 +143,17 @@ fun PostDetailScreen(
             // Author header
             item(key = "post_author") {
                 val authorName = post.poster?.name ?: "Unknown"
+                val canClick = onAuthorClick != null && !post.poster?.name.isNullOrBlank() && post.poster?.name != "Unknown"
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 4.dp)
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (canClick)
+                                Modifier.clickable { onAuthorClick?.invoke(post.poster!!.name) }
+                            else Modifier
+                        )
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
                     SubcomposeAsyncImage(
                         model = "https://wasteof-image-proxy.tnix.dev/$authorName?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
@@ -200,7 +210,19 @@ fun PostDetailScreen(
                                     .padding(8.dp)
                             ) {
                                 Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val repostAuthor = post.repost.poster.name
+                                    val canClickRepostAuthor = onAuthorClick != null && repostAuthor.isNotBlank() && repostAuthor != "Unknown"
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .then(
+                                                if (canClickRepostAuthor)
+                                                    Modifier.clickable { onAuthorClick?.invoke(repostAuthor) }
+                                                else Modifier
+                                            )
+                                            .padding(horizontal = 2.dp, vertical = 2.dp)
+                                    ) {
                                         SubcomposeAsyncImage(
                                             model = "https://wasteof-image-proxy.tnix.dev/${post.repost.poster.name}?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                                             contentDescription = null,
@@ -378,7 +400,18 @@ fun PostDetailScreen(
                     ),
                     label = {
                         Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            val canClickCommentAuthor = onAuthorClick != null && commentAuthor != "Unknown" && commentAuthor.isNotBlank()
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .then(
+                                        if (canClickCommentAuthor)
+                                            Modifier.clickable { onAuthorClick?.invoke(commentAuthor) }
+                                        else Modifier
+                                    )
+                                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                            ) {
                                 SubcomposeAsyncImage(
                                     model = "https://wasteof-image-proxy.tnix.dev/$commentAuthor?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
                                     contentDescription = commentAuthor,

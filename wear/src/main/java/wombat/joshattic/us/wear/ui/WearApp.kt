@@ -96,6 +96,13 @@ fun WearApp(viewModel: WearViewModel) {
             }
         )
     } else {
+        val navigateToProfile: (String) -> Unit = { username ->
+            if (username.isNotBlank() && username != "Unknown") {
+                viewModel.loadProfile(username)
+                navController.navigate(WearRoutes.PROFILE)
+            }
+        }
+
         SwipeDismissableNavHost(
             navController = navController,
             startDestination = WearRoutes.HOME
@@ -149,6 +156,7 @@ fun WearApp(viewModel: WearViewModel) {
                         navController.navigate(WearRoutes.POST_DETAIL)
                     },
                     onLoveClick = viewModel::toggleLove,
+                    onAuthorClick = navigateToProfile,
                     onLoadMore = { viewModel.loadFeed() },
                     onRefresh = { viewModel.loadFeed(refresh = true) }
                 )
@@ -163,6 +171,7 @@ fun WearApp(viewModel: WearViewModel) {
                         navController.navigate(WearRoutes.POST_DETAIL)
                     },
                     onLoveClick = viewModel::toggleLove,
+                    onAuthorClick = navigateToProfile,
                     onSearch = { query -> viewModel.searchExplorePosts(query) },
                     onClearSearch = { viewModel.clearSearch() },
                     onLoadMore = {
@@ -179,6 +188,7 @@ fun WearApp(viewModel: WearViewModel) {
                     onLoveClick = {
                         uiState.selectedPost?.let { viewModel.toggleLove(it) }
                     },
+                    onAuthorClick = navigateToProfile,
                     onSubmitComment = { text, parentId ->
                         uiState.selectedPost?.let { viewModel.submitComment(it.id, text, parentId) }
                     },
@@ -201,12 +211,18 @@ fun WearApp(viewModel: WearViewModel) {
             composable(WearRoutes.NOTIFICATIONS) {
                 NotificationsScreen(
                     uiState = uiState,
+                    onAuthorClick = navigateToProfile,
                     onNotificationClick = { notif ->
                         notif.data.post?.let { post ->
                             viewModel.openPost(post)
                             viewModel.markNotificationRead(notif.id)
                             navController.navigate(WearRoutes.POST_DETAIL)
-                        } ?: viewModel.markNotificationRead(notif.id)
+                        } ?: run {
+                            viewModel.markNotificationRead(notif.id)
+                            notif.data.actor?.name?.let { actorName ->
+                                navigateToProfile(actorName)
+                            }
+                        }
                     }
                 )
             }
@@ -246,6 +262,11 @@ fun WearApp(viewModel: WearViewModel) {
                         navController.navigate(WearRoutes.POST_DETAIL)
                     },
                     onLoveClick = viewModel::toggleLove,
+                    onAuthorClick = { username ->
+                        if (username != uiState.profileUsername) {
+                            navigateToProfile(username)
+                        }
+                    },
                     onLoadMorePosts = { viewModel.loadMoreProfilePosts() }
                 )
             }

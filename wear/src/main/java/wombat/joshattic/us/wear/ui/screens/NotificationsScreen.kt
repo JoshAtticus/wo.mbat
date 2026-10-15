@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,7 +50,8 @@ import wombat.joshattic.us.wear.data.model.Notification
 @Composable
 fun NotificationsScreen(
     uiState: WearUiState,
-    onNotificationClick: (Notification) -> Unit
+    onNotificationClick: (Notification) -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null
 ) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
 
@@ -105,7 +108,7 @@ fun NotificationsScreen(
 
             if (unreadNotifs.isNotEmpty()) {
                 items(unreadNotifs, key = { "unread_${it.id}" }) { notif ->
-                    NotificationItem(notif, onNotificationClick)
+                    NotificationItem(notif, onNotificationClick, onAuthorClick)
                 }
             }
 
@@ -127,7 +130,7 @@ fun NotificationsScreen(
                 }
 
                 items(filteredRead, key = { "read_${it.id}" }) { notif ->
-                    NotificationItem(notif, onNotificationClick)
+                    NotificationItem(notif, onNotificationClick, onAuthorClick)
                 }
             }
         }
@@ -135,7 +138,11 @@ fun NotificationsScreen(
 }
 
 @Composable
-private fun NotificationItem(notif: Notification, onNotificationClick: (Notification) -> Unit) {
+private fun NotificationItem(
+    notif: Notification,
+    onNotificationClick: (Notification) -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null
+) {
     val icon = androidx.compose.runtime.remember(notif.type) {
         when (notif.type) {
             "comment" -> Icons.AutoMirrored.Filled.Comment
@@ -179,21 +186,34 @@ private fun NotificationItem(notif: Notification, onNotificationClick: (Notifica
                     Spacer(Modifier.width(4.dp))
                     val actorName = notif.data.actor?.name
                     if (actorName != null) {
-                        SubcomposeAsyncImage(
-                            model = "https://wasteof-image-proxy.tnix.dev/$actorName?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
-                            contentDescription = actorName,
-                            loading = {
-                                CircularProgressIndicator(modifier = Modifier.padding(1.dp), strokeWidth = 1.dp)
-                            },
-                            modifier = Modifier.size(18.dp).clip(CircleShape)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = actorName,
-                            style = MaterialTheme.typography.caption2,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colors.onSurface
-                        )
+                        val canClickActor = onAuthorClick != null && actorName.isNotBlank() && actorName != "Unknown"
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .then(
+                                    if (canClickActor)
+                                        Modifier.clickable { onAuthorClick?.invoke(actorName) }
+                                    else Modifier
+                                )
+                                .padding(horizontal = 2.dp, vertical = 2.dp)
+                        ) {
+                            SubcomposeAsyncImage(
+                                model = "https://wasteof-image-proxy.tnix.dev/$actorName?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3",
+                                contentDescription = actorName,
+                                loading = {
+                                    CircularProgressIndicator(modifier = Modifier.padding(1.dp), strokeWidth = 1.dp)
+                                },
+                                modifier = Modifier.size(18.dp).clip(CircleShape)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = actorName,
+                                style = MaterialTheme.typography.caption2,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colors.onSurface
+                            )
+                        }
                     } else {
                         Text("System", style = MaterialTheme.typography.caption2, color = MaterialTheme.colors.onSurface)
                     }

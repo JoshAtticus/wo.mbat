@@ -61,6 +61,7 @@ fun FeedScreen(
     uiState: WearUiState,
     onPostClick: (Post) -> Unit,
     onLoveClick: (Post) -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null,
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -93,10 +94,18 @@ fun FeedScreen(
 
                     if (isPureRepost && post.repost != null) {
                         item(key = "${post.id}_repost_header") {
+                            val repostPosterName = post.poster?.name
+                            val canClickHeader = onAuthorClick != null && !repostPosterName.isNullOrBlank() && repostPosterName != "Unknown"
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 2.dp),
+                                    .padding(horizontal = 24.dp, vertical = 2.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .then(
+                                        if (canClickHeader)
+                                            Modifier.clickable { onAuthorClick?.invoke(repostPosterName!!) }
+                                        else Modifier
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
@@ -120,7 +129,8 @@ fun FeedScreen(
                                 showImages = uiState.showImages,
                                 showPfp = uiState.showPfp,
                                 onClick = { onPostClick(post) }, // click original post wrapper to open
-                                onLoveClick = { onLoveClick(post.repost) }
+                                onLoveClick = { onLoveClick(post.repost) },
+                                onAuthorClick = onAuthorClick
                             )
                         }
                     } else {
@@ -130,7 +140,8 @@ fun FeedScreen(
                                 showImages = uiState.showImages,
                                 showPfp = uiState.showPfp,
                                 onClick = { onPostClick(post) },
-                                onLoveClick = { onLoveClick(post) }
+                                onLoveClick = { onLoveClick(post) },
+                                onAuthorClick = onAuthorClick
                             )
                         }
                     }
@@ -177,6 +188,8 @@ fun WearPostCard(
 
     val authorName = post.poster?.name ?: "Unknown"
     val repostAuthorName = post.repost?.poster?.name ?: "Unknown"
+    val canClickAuthor = onAuthorClick != null && authorName != "Unknown" && authorName.isNotBlank()
+    val canClickRepostAuthor = onAuthorClick != null && repostAuthorName != "Unknown" && repostAuthorName.isNotBlank()
 
     Chip(
         onClick = onClick,
@@ -191,9 +204,14 @@ fun WearPostCard(
                 // Author row with avatar
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = if (onAuthorClick != null)
-                        Modifier.clickable { onAuthorClick(authorName) }
-                    else Modifier
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .then(
+                            if (canClickAuthor)
+                                Modifier.clickable { onAuthorClick?.invoke(authorName) }
+                            else Modifier
+                        )
+                        .padding(horizontal = 2.dp, vertical = 2.dp)
                 ) {
                     if (showPfp) {
                         SubcomposeAsyncImage(
@@ -244,9 +262,14 @@ fun WearPostCard(
                         Column {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = if (onAuthorClick != null)
-                                    Modifier.clickable { onAuthorClick(repostAuthorName) }
-                                else Modifier
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .then(
+                                        if (canClickRepostAuthor)
+                                            Modifier.clickable { onAuthorClick?.invoke(repostAuthorName) }
+                                        else Modifier
+                                    )
+                                    .padding(horizontal = 2.dp, vertical = 2.dp)
                             ) {
                                 if (showPfp) {
                                     SubcomposeAsyncImage(

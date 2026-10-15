@@ -52,6 +52,7 @@ fun ExploreScreen(
     uiState: WearUiState,
     onPostClick: (Post) -> Unit,
     onLoveClick: (Post) -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null,
     onSearch: (String) -> Unit,
     onClearSearch: () -> Unit,
     onLoadMore: () -> Unit,
@@ -195,7 +196,8 @@ fun ExploreScreen(
                     showImages = uiState.showImages,
                     showPfp = uiState.showPfp,
                     onClick = { onPostClick(post) },
-                    onLoveClick = { onLoveClick(post) }
+                    onLoveClick = { onLoveClick(post) },
+                    onAuthorClick = onAuthorClick
                 )
             }
 

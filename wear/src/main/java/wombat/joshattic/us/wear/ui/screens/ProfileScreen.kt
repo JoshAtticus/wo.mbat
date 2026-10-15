@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,11 +62,16 @@ fun ProfileScreen(
     uiState: WearUiState,
     onPostClick: (Post) -> Unit,
     onLoveClick: (Post) -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null,
     onLoadMorePosts: () -> Unit
 ) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
     val profile = uiState.profileUser
     val username = uiState.profileUsername ?: uiState.session?.username ?: ""
+
+    LaunchedEffect(username) {
+        listState.scrollToItem(0)
+    }
 
     Scaffold(
         timeText = { TimeText() },
@@ -126,7 +132,8 @@ fun ProfileScreen(
                         showImages = uiState.showImages,
                         showPfp = uiState.showPfp,
                         onClick = { onPostClick(post) },
-                        onLoveClick = { onLoveClick(post) }
+                        onLoveClick = { onLoveClick(post) },
+                        onAuthorClick = onAuthorClick
                     )
                 }
                 if (uiState.profilePostsHasMore) {
