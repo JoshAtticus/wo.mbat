@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.firstOrNull
@@ -45,6 +46,8 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private val profileBackStack = ArrayDeque<String>()
+    private var profileLoadJob: Job? = null
+    private var augmentLovesJob: Job? = null
 
     init {
         val initialSession = runBlocking {
@@ -129,6 +132,10 @@ class HomeViewModel(
     }
 
     fun selectTab(tab: BottomTab) {
+        profileLoadJob?.cancel()
+        profileLoadJob = null
+        augmentLovesJob?.cancel()
+        augmentLovesJob = null
         val isSameTab = _uiState.value.selectedTab == tab
         _uiState.value = _uiState.value.copy(
             selectedTab = tab,
@@ -653,7 +660,7 @@ class HomeViewModel(
     }
 
     fun openProfile(username: String) {
-        val normalizedUsername = username.trim()
+        val normalizedUsername = username.trim().removePrefix("@")
         val isBlocked = _uiState.value.blockedUsernames.contains(normalizedUsername.lowercase())
         if (isBlocked) {
             _uiState.value = _uiState.value.copy(
@@ -665,7 +672,9 @@ class HomeViewModel(
     }
 
     fun openProfileBypassingBlock(username: String) {
-        val normalizedUsername = username.trim()
+        val normalizedUsername = username.trim().removePrefix("@")
+        profileLoadJob?.cancel()
+        augmentLovesJob?.cancel()
         _uiState.value.viewingProfileUsername?.let { current ->
             if (!current.equals(normalizedUsername, ignoreCase = true)) {
                 profileBackStack.addLast(current)
@@ -686,20 +695,24 @@ class HomeViewModel(
             viewingProfilePage = 1,
             viewingProfileLast = false
         )
-        viewModelScope.launch {
+        profileLoadJob = viewModelScope.launch {
             val currentSession = _uiState.value.session
             runCatching {
                 coroutineScope {
                     val profileDeferred = async { repository.loadUserProfile(normalizedUsername) }
                     val postsDeferred = async {
-                        val response = repository.loadUserPosts(currentSession, normalizedUsername, 1)
-                        val allPosts = (response.pinned ?: emptyList()) + response.posts
-                        allPosts to response.last
+                        runCatching {
+                            val response = repository.loadUserPosts(currentSession, normalizedUsername, 1)
+                            val allPosts = (response.pinned ?: emptyList()) + response.posts
+                            allPosts to response.last
+                        }.getOrDefault(emptyList<Post>() to true)
                     }
                     val followDeferred = async {
                         currentSession
                             ?.takeUnless { it.username.equals(normalizedUsername, ignoreCase = true) }
-                            ?.let { repository.getFollowStatus(it, normalizedUsername, it.username) }
+                            ?.let {
+                                runCatching { repository.getFollowStatus(it, normalizedUsername, it.username) }.getOrNull()
+                            }
                     }
 
                     val profile = profileDeferred.await()
@@ -724,10 +737,16 @@ class HomeViewModel(
                     viewingProfileLast = followAndLast.second,
                     followedUsernames = currentFollowed
                 )
-                if (currentSession != null) augmentLovesInBackground(posts) { augmented ->
-                    _uiState.value = _uiState.value.copy(
-                        viewingProfilePosts = mergeLoveStatuses(_uiState.value.viewingProfilePosts, augmented)
-                    )
+                if (currentSession != null && posts.isNotEmpty()) {
+                    augmentLovesJob = viewModelScope.launch {
+                        augmentLovesInBackground(posts) { augmented ->
+                            if (_uiState.value.viewingProfileUsername.equals(normalizedUsername, ignoreCase = true)) {
+                                _uiState.value = _uiState.value.copy(
+                                    viewingProfilePosts = mergeLoveStatuses(_uiState.value.viewingProfilePosts, augmented)
+                                )
+                            }
+                        }
+                    }
                 }
             }.onFailure { throwable ->
                 _uiState.value = _uiState.value.copy(
@@ -739,6 +758,10 @@ class HomeViewModel(
     }
 
     fun closeProfile() {
+        profileLoadJob?.cancel()
+        profileLoadJob = null
+        augmentLovesJob?.cancel()
+        augmentLovesJob = null
         _uiState.value = _uiState.value.copy(
             viewingProfileUsername = null,
             viewingProfile = null,

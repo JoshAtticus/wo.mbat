@@ -783,7 +783,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                             linkPreviewPriority = uiState.linkPreviewPriority,
                                             onPostClickById = viewModel::openPostById,
                                             blockedUsernames = uiState.blockedUsernames,
-                                            blockedQuoteHandling = uiState.blockedQuoteHandling
+                                            blockedQuoteHandling = uiState.blockedQuoteHandling,
+                                            onRetry = { uiState.viewingProfileUsername?.let { viewModel.openProfile(it) } }
                                         )
                                     }
                                     else -> {
@@ -855,7 +856,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 linkPreviewPriority = uiState.linkPreviewPriority,
                                 onPostClickById = viewModel::openPostById,
                                 blockedUsernames = uiState.blockedUsernames,
-                                blockedQuoteHandling = uiState.blockedQuoteHandling
+                                blockedQuoteHandling = uiState.blockedQuoteHandling,
+                                onRetry = { uiState.viewingProfileUsername?.let { viewModel.openProfile(it) } }
                             )
                         } else {
                             HorizontalPager(

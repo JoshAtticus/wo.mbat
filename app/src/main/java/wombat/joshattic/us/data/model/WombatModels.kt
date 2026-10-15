@@ -11,9 +11,9 @@ data class User(
     val verified: Boolean,
     val color: String,
     val stats: UserStats?,
-    val online: Boolean,
+    val online: Boolean = false,
     val permissions: Permissions? = null,
-    val links: List<UserLink?> = emptyList(),
+    val links: List<Any?> = emptyList(),
     val history: UserHistory? = null,
     val beta: Boolean = false
 )

@@ -147,7 +147,8 @@ fun ProfileScreen(
     linkPreviewPriority: String = "images",
     onPostClickById: ((String) -> Unit)? = null,
     blockedUsernames: Set<String> = emptySet(),
-    blockedQuoteHandling: String = "warning"
+    blockedQuoteHandling: String = "warning",
+    onRetry: (() -> Unit)? = null
 ) {
     WombatTheme(userColor = profile?.color) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
@@ -169,16 +170,24 @@ fun ProfileScreen(
             return@Column
         }
 
-        if (loading && posts.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            return@Column
-        }
-
         if (profile == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Profile not found")
+                if (loading) {
+                    CircularProgressIndicator()
+                } else {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Profile not found", style = MaterialTheme.typography.titleMedium)
+                        if (onRetry != null) {
+                            Button(onClick = onRetry) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+                }
             }
             return@Column
         }
@@ -484,6 +493,12 @@ fun ProfileScreen(
                         blockedUsernames = blockedUsernames,
                         blockedQuoteHandling = blockedQuoteHandling
                     )
+                }
+            } else if (loading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
                 }
             } else {
                 item {
