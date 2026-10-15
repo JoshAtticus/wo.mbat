@@ -1,6 +1,7 @@
 package wombat.joshattic.us.data.network
 
 import org.json.JSONObject
+import wombat.joshattic.us.BuildConfig
 
 /**
  * womp 1.0.0 metadata (https://github.com/JoshAtticus/womp-spec).
@@ -15,7 +16,6 @@ data class WompMetadata(
     val enableOpenGraph: Boolean = true,
     val linkPreviewSize: String? = null
 ) {
-    /** "wo.mbat 2.4.1" style label, or null when the client is unnamed. */
     fun clientLabel(): String? {
         val name = clientName ?: return null
         return clientVersion?.takeIf { it.isNotBlank() }?.let { "$name $it" } ?: name
@@ -25,7 +25,8 @@ data class WompMetadata(
 object Womp {
     const val WOMP_VERSION = "1.0.0"
     const val CLIENT_NAME = "wo.mbat"
-    const val CLIENT_VERSION = "2.4.1"
+    val CLIENT_VERSION: String
+        get() = BuildConfig.VERSION_NAME.trim()
 
     // \b after "p" avoids matching <picture>/<pre>/<param> etc.
     private val firstPTag = Regex("<p\\b[^>]*>", RegexOption.IGNORE_CASE)
