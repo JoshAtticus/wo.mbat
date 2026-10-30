@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -901,7 +902,7 @@ fun PostCard(
                 Row(
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .clickable { onProfileClick(post.poster.name) },
+                        .copyableClickable(post.poster.name) { onProfileClick(post.poster.name) },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ProfilePicture(username = post.poster.name, size = 40.dp)
@@ -983,7 +984,8 @@ fun PostCard(
                     onPostClick = onPostClickById,
                     onClick = onClick,
                     openLinksInApp = openLinksInApp,
-                    onTruncatedChanged = { isActuallyTruncated = it }
+                    onTruncatedChanged = { isActuallyTruncated = it },
+                    selectable = true
                 )
                 if (isActuallyTruncated) {
                     Text(
@@ -1110,7 +1112,8 @@ fun PostCard(
                                     onMentionClick = onMentionClick,
                                     onPostClick = onPostClickById,
                                     onClick = { onPostClick?.invoke(repostPost) },
-                                    openLinksInApp = openLinksInApp
+                                    openLinksInApp = openLinksInApp,
+                                    selectable = true
                                 )
                             }
                         }
@@ -1369,7 +1372,7 @@ fun CommentThreadContent(
                         style = if (isReply) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.clickable { onProfileClick(comment.poster.name) }
+                        modifier = Modifier.copyableClickable(comment.poster.name) { onProfileClick(comment.poster.name) }
                     )
                 }
                 Text(
@@ -1430,6 +1433,7 @@ fun CommentThreadContent(
                     onMentionClick = onMentionClick,
                     onPostClick = onPostClick,
                     openLinksInApp = openLinksInApp,
+                    selectable = true,
                     modifier = Modifier.padding(bottom = 2.dp)
                 )
                 if (showImages && commentImageUrls.isNotEmpty()) {
@@ -1799,7 +1803,12 @@ fun HtmlText(
     onPostClick: ((String) -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     openLinksInApp: Boolean = true,
-    onTruncatedChanged: ((Boolean) -> Unit)? = null
+    onTruncatedChanged: ((Boolean) -> Unit)? = null,
+    // Normal word/range text selection (posts, comments). Taps and links keep working.
+    selectable: Boolean = false,
+    // Long press copies the whole text and shows a toast (bios). Not selectable.
+    copyOnLongPress: Boolean = false,
+    copyLabel: String = "Bio"
 ) {
     val textColor = (color ?: MaterialTheme.colorScheme.onSurface).toArgb()
     val linkColor = (color ?: MaterialTheme.colorScheme.onBackground).toArgb()
@@ -1916,16 +1925,13 @@ fun HtmlText(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            TextView(context).apply {
+            (if (selectable) SelectableTextView(context) else TextView(context)).apply {
                 applyGoogleSansFlexTypeface(this, roundness = 50f)
-                movementMethod = object : LinkMovementMethod() {
-                    override fun onTouchEvent(widget: TextView, buffer: Spannable, event: android.view.MotionEvent): Boolean {
-                        val scrollX = widget.scrollX
-                        val scrollY = widget.scrollY
-                        val result = super.onTouchEvent(widget, buffer, event)
-                        widget.scrollTo(scrollX, scrollY)
-                        return result
-                    }
+                if (selectable) {
+                    setTextIsSelectable(true)
+                    movementMethod = SelectableLinkMovementMethod()
+                } else {
+                    movementMethod = ScrollSafeLinkMovementMethod()
                 }
                 setTextColor(textColor)
                 setLinkTextColor(linkColor)
@@ -1936,8 +1942,11 @@ fun HtmlText(
             }
         },
         update = { textView ->
-            if (textView.text != spannedText) {
+            // Compare by identity: a selectable TextView keeps its own Spannable copy, so
+            // re-assigning on every update would wipe the user's current selection.
+            if (textView.tag !== spannedText) {
                 textView.text = spannedText
+                textView.tag = spannedText
             }
             
             val currentTextColor = textView.currentTextColor
@@ -1952,7 +1961,15 @@ fun HtmlText(
 
             textView.setOnClickListener { onClick?.invoke() }
             textView.isClickable = onClick != null
-            textView.isFocusable = false
+            // Selectable text must stay focusable for the selection handles to work
+            if (!selectable) textView.isFocusable = false
+            if (copyOnLongPress) {
+                textView.setOnLongClickListener {
+                    (textView.movementMethod as? ScrollSafeLinkMovementMethod)?.suppressNextLinkClick = true
+                    copyTextToClipboard(textView.context, copyLabel, spannedText.toString().trim())
+                    true
+                }
+            }
             textView.isVerticalScrollBarEnabled = false
             textView.setHorizontallyScrolling(false)
 
@@ -1979,6 +1996,119 @@ fun HtmlText(
             }
         }
     )
+}
+
+fun copyTextToClipboard(context: Context, label: String, text: String) {
+    if (text.isBlank()) return
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    clipboard.setPrimaryClip(android.content.ClipData.newPlainText(label, text))
+    Toast.makeText(context, "$label copied", Toast.LENGTH_SHORT).show()
+}
+
+/** Long press copies [text] (e.g. a username) with a toast. Taps are left untouched. */
+@Composable
+fun Modifier.copyOnLongPress(text: String, label: String = "Username"): Modifier {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    return this.pointerInput(text) {
+        detectTapGestures(onLongPress = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            copyTextToClipboard(context, label, text)
+        })
+    }
+}
+
+/** Same as clickable, plus long press copies [text] with a toast. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun Modifier.copyableClickable(text: String, label: String = "Username", onClick: () -> Unit): Modifier {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    return this.combinedClickable(
+        onClick = onClick,
+        onLongClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            copyTextToClipboard(context, label, text)
+        }
+    )
+}
+
+private fun clickableSpanAt(widget: TextView, buffer: Spannable, event: android.view.MotionEvent): ClickableSpan? {
+    val layout = widget.layout ?: return null
+    val x = event.x.toInt() - widget.totalPaddingLeft + widget.scrollX
+    val y = event.y.toInt() - widget.totalPaddingTop + widget.scrollY
+    val line = layout.getLineForVertical(y)
+    if (x < layout.getLineLeft(line) || x > layout.getLineRight(line)) return null
+    val offset = layout.getOffsetForHorizontal(line, x.toFloat())
+    return buffer.getSpans(offset, offset, ClickableSpan::class.java).firstOrNull()
+}
+
+// Link movement that keeps the TextView from scrolling itself and can swallow the
+// link click that would otherwise follow a long press copy.
+private class ScrollSafeLinkMovementMethod : LinkMovementMethod() {
+    var suppressNextLinkClick = false
+
+    override fun onTouchEvent(widget: TextView, buffer: Spannable, event: android.view.MotionEvent): Boolean {
+        if (event.action == android.view.MotionEvent.ACTION_DOWN) suppressNextLinkClick = false
+        if (event.action == android.view.MotionEvent.ACTION_UP && suppressNextLinkClick) {
+            suppressNextLinkClick = false
+            return true
+        }
+        val scrollX = widget.scrollX
+        val scrollY = widget.scrollY
+        val result = super.onTouchEvent(widget, buffer, event)
+        widget.scrollTo(scrollX, scrollY)
+        return result
+    }
+}
+
+/** Clears a selectable text selection when a touch lands outside the selected view. */
+fun clearTextSelectionOnOutsideTouch(activity: android.app.Activity, ev: android.view.MotionEvent) {
+    if (ev.actionMasked != android.view.MotionEvent.ACTION_DOWN) return
+    val focused = activity.currentFocus as? SelectableTextView ?: return
+    if (!focused.hasSelection()) return
+    val loc = IntArray(2)
+    focused.getLocationOnScreen(loc)
+    val inside = ev.rawX >= loc[0] && ev.rawX <= loc[0] + focused.width &&
+        ev.rawY >= loc[1] && ev.rawY <= loc[1] + focused.height
+    if (!inside) {
+        android.text.Selection.removeSelection(focused.text as? Spannable ?: return)
+        focused.clearFocus()
+    }
+}
+
+// A focusable-in-touch-mode view spends its first tap taking focus, and View then skips the
+// click. That made the first tap on selectable post text do nothing, so replay it here.
+internal class SelectableTextView(context: Context) : TextView(context) {
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        val wasFocused = isFocused
+        val handled = super.onTouchEvent(event)
+        if (event.action == android.view.MotionEvent.ACTION_UP &&
+            !wasFocused && isClickable && !hasSelection() &&
+            event.eventTime - event.downTime < android.view.ViewConfiguration.getLongPressTimeout()
+        ) {
+            performClick()
+        }
+        return handled
+    }
+}
+
+// Text selection (long press + handles) that still lets taps on links through.
+private class SelectableLinkMovementMethod : android.text.method.ArrowKeyMovementMethod() {
+    override fun onTouchEvent(widget: TextView, buffer: Spannable, event: android.view.MotionEvent): Boolean {
+        if (event.action == android.view.MotionEvent.ACTION_UP && !widget.hasSelection()) {
+            val span = clickableSpanAt(widget, buffer, event)
+            if (span != null) {
+                span.onClick(widget)
+                return true
+            }
+        }
+        val scrollX = widget.scrollX
+        val scrollY = widget.scrollY
+        val result = super.onTouchEvent(widget, buffer, event)
+        widget.scrollTo(scrollX, scrollY)
+        return result
+    }
 }
 
 // Matches "chud" only when it appears as a standalone word in post bodies

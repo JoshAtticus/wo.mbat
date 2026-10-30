@@ -347,7 +347,8 @@ fun AccountTab(
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                             color = accent,
                                             maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                            modifier = Modifier.copyOnLongPress(profile.name)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         UserBadges(
@@ -365,7 +366,8 @@ fun AccountTab(
                                         maxLines = 4,
                                         onMentionClick = onMentionClick,
                                         onPostClick = onPostClickById,
-                                        openLinksInApp = openLinksInApp
+                                        openLinksInApp = openLinksInApp,
+                                        copyOnLongPress = true
                                     )
 
                                     profile.history?.joined?.let { joinedTime ->

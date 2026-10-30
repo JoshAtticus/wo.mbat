@@ -40,6 +40,11 @@ class MainActivity : ComponentActivity() {
         HomeViewModel.factory(repository, applicationContext)
     }
 
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        wombat.joshattic.us.ui.screens.clearTextSelectionOnOutsideTouch(this, ev)
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)

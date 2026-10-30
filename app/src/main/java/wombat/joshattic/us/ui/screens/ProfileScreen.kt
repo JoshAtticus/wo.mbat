@@ -81,7 +81,7 @@ fun ProfileHeader(profile: User) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(profile.name, style = MaterialTheme.typography.titleLarge)
+                        Text(profile.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.copyOnLongPress(profile.name))
                         Spacer(modifier = Modifier.width(4.dp))
                         UserBadges(
                             verified = profile.verified,
@@ -99,7 +99,10 @@ fun ProfileHeader(profile: User) {
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
-            HtmlText(autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")))
+            HtmlText(
+                autoLinkAndMentions(stripImages(profile.bio ?: "<p>im a wasteof user, yay!</p>")),
+                copyOnLongPress = true
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -357,7 +360,8 @@ fun ProfileScreen(
                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                     color = accent,
                                     maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.copyOnLongPress(profile.name)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 UserBadges(
@@ -375,7 +379,8 @@ fun ProfileScreen(
                             maxLines = 4,
                             onMentionClick = onMentionClick,
                             onPostClick = onPostClickById,
-                            openLinksInApp = openLinksInApp
+                            openLinksInApp = openLinksInApp,
+                            copyOnLongPress = true
                         )
 
                         profile.history?.joined?.let { joinedTime ->
