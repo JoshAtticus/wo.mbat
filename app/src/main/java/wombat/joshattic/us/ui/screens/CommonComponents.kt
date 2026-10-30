@@ -810,7 +810,7 @@ fun PostCard(
 
     val isQuoteRepostOfBlocked = post.repost != null &&
         blockedUsernames.contains(post.repost.poster.name.lowercase()) &&
-        !post.content.replace(Regex("<.*?>"), "").trim().isBlank()
+        !isPureRepost(post)
 
     if (isQuoteRepostOfBlocked && blockedQuoteHandling == "hide_post") {
         Spacer(modifier = Modifier.size(0.dp))
@@ -1139,6 +1139,7 @@ fun PostCard(
                     value = post.comments,
                     label = "comments",
                     icon = Icons.Filled.Chat,
+                    onClick = if (clickable) onClick else null,
                     shape = RoundedCornerShape(28.dp)
                 )
                 Box {

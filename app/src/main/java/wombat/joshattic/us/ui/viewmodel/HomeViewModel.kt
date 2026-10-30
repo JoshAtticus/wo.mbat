@@ -33,6 +33,7 @@ import wombat.joshattic.us.data.model.Poster
 import wombat.joshattic.us.data.model.User
 import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.data.network.Womp
+import wombat.joshattic.us.ui.screens.isPureRepost
 import wombat.joshattic.us.ui.state.BottomTab
 import wombat.joshattic.us.ui.state.HomeUiState
 import wombat.joshattic.us.ui.state.BlockedWarningTarget
@@ -280,9 +281,7 @@ class HomeViewModel(
 
     fun openEditComposer(post: Post) {
         // Editing a pure repost wrapper targets the wrapped post itself
-        val target = if (post.repost != null &&
-            post.content.replace(Regex("<.*?>"), "").trim().isBlank()
-        ) {
+        val target = if (isPureRepost(post)) {
             post.repost!!
         } else {
             post
@@ -827,8 +826,7 @@ class HomeViewModel(
     }
 
     fun openPostBypassingBlock(post: Post, scrollToCommentId: String? = null) {
-        val isPureRepostWrapper = post.repost != null &&
-            post.content.replace(Regex("<.*?>"), "").trim().isBlank()
+        val isPureRepostWrapper = isPureRepost(post)
         val effectivePost = if (isPureRepostWrapper) post.repost!! else post
 
         _uiState.value = _uiState.value.copy(
@@ -2040,8 +2038,8 @@ class HomeViewModel(
             if (repost != null) {
                 val repostPosterBlocked = blockedUsernames.contains(repost.poster.name.lowercase())
                 if (repostPosterBlocked) {
-                    val isPureRepost = post.content.replace(Regex("<.*?>"), "").trim().isBlank()
-                    if (isPureRepost) {
+                    val isPure = isPureRepost(post)
+                    if (isPure) {
                         return@filter false
                     } else {
                         if (quoteHandling == "hide_post") {
