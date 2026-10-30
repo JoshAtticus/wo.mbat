@@ -1502,9 +1502,14 @@ fun CommentThreadContent(
             
             val safeReplies = comment.replies ?: emptyList()
             when {
-                safeReplies.isEmpty() && comment.hasReplies && onLoadReplies != null -> {
+                safeReplies.isEmpty() && comment.hasReplies && (onLoadReplies != null || (depth >= 2 && onFocusComment != null)) -> {
                     androidx.compose.material3.TextButton(
-                        onClick = { onLoadReplies(comment) },
+                        onClick = {
+                            if (depth >= 2 && onFocusComment != null) {
+                                onFocusComment(comment)
+                            }
+                            onLoadReplies?.invoke(comment)
+                        },
                         enabled = !comment.repliesLoading,
                         contentPadding = PaddingValues(0.dp),
                         modifier = Modifier.height(32.dp)

@@ -945,10 +945,11 @@ class HomeViewModel(
 
     fun focusComment(comment: Comment?) {
         val current = _uiState.value
+        val resolved = comment?.let { findCommentById(current.comments, it.id) } ?: comment
         _uiState.value = current.copy(
-            focusedComment = comment,
-            focusBackStack = rememberFocus(current, comment),
-            commentReplyParent = comment
+            focusedComment = resolved,
+            focusBackStack = rememberFocus(current, resolved),
+            commentReplyParent = resolved
         )
     }
 
@@ -956,10 +957,11 @@ class HomeViewModel(
     // composer submits top-level comments that can never appear inside the focused thread.
     fun focusWallComment(comment: Comment?) {
         val current = _uiState.value
+        val resolved = comment?.let { findCommentById(current.wallComments, it.id) } ?: comment
         _uiState.value = current.copy(
-            focusedComment = comment,
-            focusBackStack = rememberFocus(current, comment),
-            wallCommentReplyParent = comment
+            focusedComment = resolved,
+            focusBackStack = rememberFocus(current, resolved),
+            wallCommentReplyParent = resolved
         )
     }
 
