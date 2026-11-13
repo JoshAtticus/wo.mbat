@@ -200,6 +200,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"WombatShared",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = us.joshattic.wombat;
 				PRODUCT_NAME = wo.mbat;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -228,6 +233,11 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"WombatShared",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = us.joshattic.wombat;
 				PRODUCT_NAME = wo.mbat;

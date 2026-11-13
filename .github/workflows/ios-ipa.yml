@@ -52,8 +52,9 @@ jobs:
           if [ ! -d "$APP_DIR/compose-resources" ]; then
             if [ -d "shared/build/bin/iosArm64/releaseFramework/WombatShared.framework/compose-resources" ]; then
               cp -R shared/build/bin/iosArm64/releaseFramework/WombatShared.framework/compose-resources "$APP_DIR/"
-            elif [ -d "shared/build/compose/cocoapods/compose-resources" ]; then
-              cp -R shared/build/compose/cocoapods/compose-resources "$APP_DIR/"
+            elif [ -d "shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources" ]; then
+              mkdir -p "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources"
+              cp -R shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources/* "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources/"
             fi
           fi
           mkdir -p build/ipa/Payload

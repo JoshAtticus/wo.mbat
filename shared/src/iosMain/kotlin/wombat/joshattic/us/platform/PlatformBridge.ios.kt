@@ -171,14 +171,15 @@ private class MultiPickerDelegate(
         var remaining = results.size
         for ((index, result) in results.withIndex()) {
             val provider = result.itemProvider
-            if (provider.canLoadObjectOfClass(UIImage.`class`()!!)) {
-                provider.loadObjectOfClass(UIImage.`class`()!!) { obj, _ ->
-                    val image = obj as? UIImage
-                    val data = image?.let { UIImageJPEGRepresentation(it, 0.9) }
-                    if (data != null) {
+            if (provider.hasItemConformingToTypeIdentifier("public.image")) {
+                provider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
+                    val jpegData = data?.let { raw ->
+                        UIImage.imageWithData(raw)?.let { UIImageJPEGRepresentation(it, 0.9) } ?: raw
+                    }
+                    if (jpegData != null) {
                         picked.add(
                             PickedImage(
-                                bytes = data.toByteArray(),
+                                bytes = jpegData.toByteArray(),
                                 filename = "image_${index + 1}.jpg",
                                 mimeType = "image/jpeg"
                             )
