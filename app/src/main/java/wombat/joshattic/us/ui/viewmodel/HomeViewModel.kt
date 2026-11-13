@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.firstOrNull
 import wombat.joshattic.us.data.LoveCache
+import wombat.joshattic.us.data.analytics.UmamiAnalytics
 import wombat.joshattic.us.data.model.AuthSession
 import wombat.joshattic.us.data.model.Comment
 import wombat.joshattic.us.data.model.CommentResponse
@@ -41,7 +42,8 @@ import wombat.joshattic.us.ui.state.LoginStep
 
 class HomeViewModel(
     private val repository: WombatRepository,
-    private val connectivityObserver: NetworkConnectivityObserver
+    private val connectivityObserver: NetworkConnectivityObserver,
+    private val analytics: UmamiAnalytics
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -69,6 +71,17 @@ class HomeViewModel(
         observeUnreadSocketCount()
         observeSettings()
         observeConnectivity()
+
+        analytics.trackEvent(
+            name = "app_open",
+            data = mapOf(
+                "source" to "launch",
+                "logged_in" to (initialSession != null),
+                "account_count" to initialSessions.size,
+                "device_type" to if (analytics.isTablet) "tablet" else "phone"
+            )
+        )
+        analytics.trackPageView("/home", "Home Feed")
     }
 
     private fun observeConnectivity() {
@@ -117,6 +130,7 @@ class HomeViewModel(
     }
 
     fun switchAccount(username: String) {
+        analytics.trackEvent("account_switch")
         viewModelScope.launch {
             repository.switchAccount(username)
         }
@@ -170,6 +184,15 @@ class HomeViewModel(
             markAllNotificationsRead()
         } else {
             refreshForSelectedTab(tab)
+        }
+        if (!isSameTab) {
+            val (path, title) = when (tab) {
+                BottomTab.Home -> "/home" to "Home Feed"
+                BottomTab.Explore -> "/explore" to "Explore"
+                BottomTab.Notifications -> "/notifications" to "Notifications"
+                BottomTab.Account -> "/account" to "Account"
+            }
+            analytics.trackPageView(path, title)
         }
     }
 
@@ -248,6 +271,7 @@ class HomeViewModel(
                 }
                 .onSuccess { session ->
                     val isPasswordless = password.isBlank()
+                    analytics.trackEvent("login", mapOf("passwordless" to isPasswordless))
                     _uiState.value = _uiState.value.copy(
                         authLoading = false,
                         loginPassword = "",
@@ -261,6 +285,7 @@ class HomeViewModel(
 
     fun logout() {
         val username = _uiState.value.session?.username ?: return
+        analytics.trackEvent("logout")
         viewModelScope.launch {
             repository.logout(username)
         }
@@ -268,6 +293,9 @@ class HomeViewModel(
 
     fun toggleComposer() {
         val nextVisible = !_uiState.value.showComposer
+        if (nextVisible) {
+            analytics.trackPageView("/composer", "Post Composer")
+        }
         _uiState.value = _uiState.value.copy(
             showComposer = nextVisible,
             selectedPost = if (nextVisible) null else _uiState.value.selectedPost,
@@ -377,6 +405,10 @@ class HomeViewModel(
             } else {
                 runCatching { repository.createPost(session, Womp.attach(draft), repostId) }
                     .onSuccess {
+                        analytics.trackEvent(
+                            "post_create",
+                            mapOf("is_quote" to (repostId != null))
+                        )
                         _uiState.value = _uiState.value.copy(
                             showComposer = false,
                             composeDraft = "",
@@ -408,6 +440,7 @@ class HomeViewModel(
             val session = _uiState.value.session ?: return@launch
             runCatching { repository.createPost(session, "", post.id) }
                 .onSuccess {
+                    analytics.trackEvent("post_repost")
                     _uiState.value = _uiState.value.copy(
                         toastMessage = "Reposted post from @${post.poster.name}"
                     )
@@ -427,6 +460,7 @@ class HomeViewModel(
     }
 
     fun openQuoteComposer(post: Post) {
+        analytics.trackPageView("/composer", "Quote Composer")
         _uiState.value = _uiState.value.copy(
             showComposer = true,
             composeRepostId = post.id,
@@ -436,6 +470,7 @@ class HomeViewModel(
     }
 
     fun openReposts(post: Post) {
+        analytics.trackPageView("/reposts", "Reposts")
         _uiState.value = _uiState.value.copy(
             viewRepostsPost = post,
             reposts = emptyList(),
@@ -577,10 +612,12 @@ class HomeViewModel(
     fun saveExploreSearchToHistory() {
         val query = _uiState.value.exploreSearchQuery.trim()
         if (query.isEmpty()) return
+        analytics.trackEvent("search", mapOf("source" to "explore"))
         viewModelScope.launch { repository.settingsPreferences.addSearchQuery(query) }
     }
 
     fun openAdvancedSearch() {
+        analytics.trackPageView("/search/advanced", "Advanced Search")
         _uiState.value = _uiState.value.copy(advancedSearchOpen = true)
     }
 
@@ -593,6 +630,7 @@ class HomeViewModel(
     }
 
     fun setExploreTrendingTimeframe(timeframe: String?) {
+        analytics.trackEvent("explore_timeframe", mapOf("timeframe" to (timeframe ?: "all")))
         _uiState.value = _uiState.value.copy(exploreTrendingTimeframe = timeframe)
         loadExploreTrending()
     }
@@ -671,6 +709,7 @@ class HomeViewModel(
     }
 
     fun openProfileBypassingBlock(username: String) {
+        analytics.trackPageView("/profile", "User Profile")
         val normalizedUsername = username.trim().removePrefix("@")
         profileLoadJob?.cancel()
         augmentLovesJob?.cancel()
@@ -826,6 +865,7 @@ class HomeViewModel(
     }
 
     fun openPostBypassingBlock(post: Post, scrollToCommentId: String? = null) {
+        analytics.trackPageView("/post", "Post Details")
         val isPureRepostWrapper = isPureRepost(post)
         val effectivePost = if (isPureRepostWrapper) post.repost!! else post
 
@@ -1085,6 +1125,7 @@ class HomeViewModel(
     }
 
     fun openFullScreenImages(images: List<String>, index: Int, post: Post? = null, username: String? = null) {
+        analytics.trackPageView("/image-viewer", "Image Viewer")
         _uiState.value = _uiState.value.copy(
             fullScreenImages = images,
             fullScreenPost = post,
@@ -1112,6 +1153,7 @@ class HomeViewModel(
         viewModelScope.launch {
             runCatching { repository.deleteComment(session, comment.id) }
                 .onSuccess {
+                    analytics.trackEvent("comment_delete")
                     val newComments = removeCommentFromTree(_uiState.value.comments, comment.id)
                     val newWallComments = removeCommentFromTree(_uiState.value.wallComments, comment.id)
                     val focused = _uiState.value.focusedComment
@@ -1150,6 +1192,7 @@ class HomeViewModel(
             runCatching {
                 repository.deletePost(targetSession, postId)
             }.onSuccess {
+                analytics.trackEvent("post_delete")
                 _uiState.value = _uiState.value.copy(
                     feed = _uiState.value.feed.filter { it.id != postId },
                     explorePosts = _uiState.value.explorePosts.filter { it.id != postId },
@@ -1199,6 +1242,7 @@ class HomeViewModel(
                     commentReplyParent = null
                 )
                 loadComments(selectedPost.id)
+                analytics.trackEvent("comment_create", mapOf("is_reply" to (parent != null)))
                 // The create endpoint only returns {ok, id}, so reconstruct the comment
                 // locally (mirroring submitWallComment) instead of inserting a skeleton
                 // object whose poster/content would be null.
@@ -1235,6 +1279,7 @@ class HomeViewModel(
     }
 
     fun openWall(username: String) {
+        analytics.trackPageView("/wall", "User Wall")
         _uiState.value = _uiState.value.copy(
             viewingWallUsername = username,
             wallComments = emptyList(),
@@ -1274,6 +1319,14 @@ class HomeViewModel(
 
     fun handleDeepLink(uri: android.net.Uri) {
         val segments = uri.pathSegments
+        val targetType = when {
+            segments.size == 2 && segments[0] == "posts" -> "post"
+            segments.size == 2 && segments[0] == "users" -> "profile"
+            segments.size == 3 && segments[0] == "users" -> segments[2]
+            else -> "unknown"
+        }
+        analytics.setExternalReferrer(uri.toString())
+        analytics.trackEvent("deep_link_open", mapOf("target" to targetType))
         when {
             segments.size == 2 && segments[0] == "posts" -> openPostById(segments[1])
             segments.size == 2 && segments[0] == "users" -> openProfile(segments[1])
@@ -1371,6 +1424,7 @@ class HomeViewModel(
                             addCommentToTree(_uiState.value.wallComments, createdComment)
                         }
                     )
+                    analytics.trackEvent("wall_comment_create", mapOf("is_reply" to (parent != null)))
                     revealReplyInThread(
                         parentComment,
                         session,
@@ -1393,6 +1447,7 @@ class HomeViewModel(
     }
 
     fun markAllNotificationsRead() {
+        analytics.trackEvent("notifications_mark_all_read")
         viewModelScope.launch {
             val session = _uiState.value.session ?: return@launch
             val notificationIds = _uiState.value.unreadNotifications.map { it.id }
@@ -1480,6 +1535,7 @@ class HomeViewModel(
 
     fun openEditProfile() {
         val currentProfile = _uiState.value.accountProfile ?: return
+        analytics.trackPageView("/edit-profile", "Edit Profile")
         _uiState.value = _uiState.value.copy(
             showEditProfile = true,
             editProfileBio = currentProfile.bio ?: "",
@@ -1683,6 +1739,7 @@ class HomeViewModel(
                 .onSuccess { response ->
                     val newLoves = response.new.loves
                     val newIsLoving = response.new.isLoving
+                    analytics.trackEvent("post_love", mapOf("loved" to newIsLoving))
                     updatePostsWithLove(post.id, newLoves, newIsLoving)
                 }
                 .onFailure { throwable ->
@@ -1695,6 +1752,7 @@ class HomeViewModel(
     }
 
     fun blockUser(username: String, reported: Boolean = false) {
+        analytics.trackEvent("user_block", mapOf("reported" to reported))
         viewModelScope.launch {
             repository.blockUser(username)
             val normalized = username.lowercase()
@@ -1869,6 +1927,7 @@ class HomeViewModel(
             runCatching { repository.toggleFollow(session, username) }
                 .onSuccess { response ->
                     val isNowFollowing = response.new.isFollowing
+                    analytics.trackEvent("user_follow", mapOf("following" to isNowFollowing))
                     val currentFollowed = _uiState.value.followedUsernames.toMutableSet()
                     if (isNowFollowing) {
                         currentFollowed.add(normalized)
@@ -1974,6 +2033,10 @@ class HomeViewModel(
             }
             result
                 .onSuccess { message ->
+                    analytics.trackEvent(
+                        "report_submit",
+                        mapOf("type" to if (commentId != null) "comment" else "post")
+                    )
                     _uiState.value = _uiState.value.copy(
                         showReportDialog = false,
                         reportPostId = null,
@@ -2646,6 +2709,7 @@ class HomeViewModel(
     }
 
     fun openSettings() {
+        analytics.trackPageView("/settings", "Settings")
         _uiState.value = _uiState.value.copy(showSettings = true, settingsCategory = null)
     }
 
@@ -2654,6 +2718,12 @@ class HomeViewModel(
     }
 
     fun selectSettingsCategory(category: wombat.joshattic.us.ui.state.SettingsCategory?) {
+        if (category != null) {
+            analytics.trackPageView(
+                "/settings/${category.name.lowercase()}",
+                "Settings - ${category.name.lowercase().replaceFirstChar { it.uppercase() }}"
+            )
+        }
         _uiState.value = _uiState.value.copy(settingsCategory = category)
     }
 
@@ -2768,6 +2838,18 @@ class HomeViewModel(
 
     fun onAppResumed(onRefreshTriggered: () -> Unit = {}) {
         val currentTime = System.currentTimeMillis()
+        if (lastBackgroundTime > 0 && currentTime - lastBackgroundTime > UmamiAnalytics.VISIT_TIMEOUT_MS) {
+            analytics.startNewVisit()
+            analytics.trackEvent(
+                name = "app_open",
+                data = mapOf(
+                    "source" to "resume",
+                    "logged_in" to (_uiState.value.session != null),
+                    "device_type" to if (analytics.isTablet) "tablet" else "phone"
+                )
+            )
+            analytics.trackCurrentPageView()
+        }
         if (lastBackgroundTime > 0 && currentTime - lastBackgroundTime > 5 * 60 * 1000) {
             refreshFeed()
             loadExploreTrending()
@@ -2803,7 +2885,12 @@ class HomeViewModel(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return HomeViewModel(repository, NetworkConnectivityObserver(context)) as T
+                    val appContext = context.applicationContext
+                    return HomeViewModel(
+                        repository = repository,
+                        connectivityObserver = NetworkConnectivityObserver(appContext),
+                        analytics = UmamiAnalytics(appContext, repository.settingsPreferences)
+                    ) as T
                 }
             }
         }

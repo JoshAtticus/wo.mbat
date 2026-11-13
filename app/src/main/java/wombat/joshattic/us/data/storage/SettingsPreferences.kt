@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 
 private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
@@ -35,6 +37,7 @@ class SettingsPreferences(private val context: Context) {
 
         // Stored newest-first, joined by newlines
         val SearchHistory = stringPreferencesKey("search_history")
+        val AnalyticsDeviceId = stringPreferencesKey("analytics_device_id")
     }
 
     val showImagesInFeed: Flow<Boolean> = context.settingsDataStore.data.map { it[Keys.ShowImagesInFeed] ?: true }
@@ -151,5 +154,17 @@ class SettingsPreferences(private val context: Context) {
 
     suspend fun setCustomThemeDynamic(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.CustomThemeDynamic] = value }
+    }
+
+    suspend fun getOrCreateAnalyticsDeviceId(): String {
+        val existing = context.settingsDataStore.data.first()[Keys.AnalyticsDeviceId]
+        if (!existing.isNullOrBlank()) return existing
+        val generated = UUID.randomUUID().toString()
+        context.settingsDataStore.edit { prefs ->
+            if (prefs[Keys.AnalyticsDeviceId].isNullOrBlank()) {
+                prefs[Keys.AnalyticsDeviceId] = generated
+            }
+        }
+        return context.settingsDataStore.data.first()[Keys.AnalyticsDeviceId] ?: generated
     }
 }
