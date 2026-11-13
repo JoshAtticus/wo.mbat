@@ -53,4 +53,18 @@ expect class NetworkConnectivityObserver() {
     val isConnected: Flow<Boolean>
 }
 
+expect class PlatformLock() {
+    fun lock()
+    fun unlock()
+}
+
+inline fun <T> PlatformLock.withLock(block: () -> T): T {
+    lock()
+    return try {
+        block()
+    } finally {
+        unlock()
+    }
+}
+
 expect fun currentTimeMillis(): Long

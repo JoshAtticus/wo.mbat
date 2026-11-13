@@ -43,6 +43,8 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import wombat.joshattic.us.platform.PlatformActions
+import wombat.joshattic.us.platform.PlatformLock
+import wombat.joshattic.us.platform.withLock
 import wombat.joshattic.us.data.model.OpenGraphResponse
 import wombat.joshattic.us.data.network.RetrofitClient
 import wombat.joshattic.us.ui.screens.urlHost
@@ -50,42 +52,51 @@ import wombat.joshattic.us.ui.screens.urlHost
 object OpenGraphPreviewCache {
     private const val MAX_ENTRIES = 128
 
+    private val lock = PlatformLock()
     private val fetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val cache = LinkedHashMap<String, OpenGraphResponse>()
     private val failures = LinkedHashSet<String>()
     private val inFlight = mutableMapOf<String, Deferred<Result<OpenGraphResponse>>>()
 
-    fun get(url: String): OpenGraphResponse? = cache[url]
+    fun get(url: String): OpenGraphResponse? = lock.withLock { cache[url] }
 
     fun remember(url: String, response: OpenGraphResponse) {
-        cache.remove(url)
-        cache[url] = response
-        failures.remove(url)
-        while (cache.size > MAX_ENTRIES) {
-            cache.remove(cache.keys.first())
+        lock.withLock {
+            cache.remove(url)
+            cache[url] = response
+            failures.remove(url)
+            while (cache.size > MAX_ENTRIES) {
+                cache.remove(cache.keys.first())
+            }
         }
     }
 
     fun rememberFailure(url: String) {
-        failures.remove(url)
-        failures.add(url)
-        while (failures.size > MAX_ENTRIES * 2) {
-            failures.remove(failures.first())
+        lock.withLock {
+            failures.remove(url)
+            failures.add(url)
+            while (failures.size > MAX_ENTRIES * 2) {
+                failures.remove(failures.first())
+            }
         }
     }
 
-    fun isKnownFailure(url: String): Boolean = url in failures
+    fun isKnownFailure(url: String): Boolean = lock.withLock { url in failures }
 
     suspend fun getOrFetch(url: String): OpenGraphResponse? {
-        cache[url]?.let { return it }
-        if (isKnownFailure(url)) return null
-        val deferred: Deferred<Result<OpenGraphResponse>> = inFlight.getOrPut(url) {
-            fetchScope.async {
-                runCatching { RetrofitClient.openGraphApiService.fetchOpenGraph(url) }
+        val deferred = lock.withLock {
+            cache[url]?.let { return it }
+            if (url in failures) return null
+            inFlight.getOrPut(url) {
+                fetchScope.async {
+                    runCatching { RetrofitClient.openGraphApiService.fetchOpenGraph(url) }
+                }
             }
         }
         val result = deferred.await()
-        inFlight.remove(url)
+        lock.withLock {
+            inFlight.remove(url)
+        }
         return result.getOrNull()?.also { fetched ->
             if (isUsable(fetched)) remember(url, fetched) else rememberFailure(url)
         }

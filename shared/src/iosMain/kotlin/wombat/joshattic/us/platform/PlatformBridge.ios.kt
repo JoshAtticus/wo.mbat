@@ -259,4 +259,14 @@ actual class NetworkConnectivityObserver {
     }.distinctUntilChanged()
 }
 
+actual class PlatformLock {
+    private val delegate = platform.Foundation.NSLock()
+    actual fun lock() {
+        delegate.lock()
+    }
+    actual fun unlock() {
+        delegate.unlock()
+    }
+}
+
 actual fun currentTimeMillis(): Long = (NSDate().timeIntervalSince1970 * 1000.0).toLong()

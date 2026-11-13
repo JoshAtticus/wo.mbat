@@ -259,4 +259,10 @@ actual class NetworkConnectivityObserver {
     }.distinctUntilChanged()
 }
 
+actual class PlatformLock {
+    private val delegate = java.util.concurrent.locks.ReentrantLock()
+    actual fun lock() = delegate.lock()
+    actual fun unlock() = delegate.unlock()
+}
+
 actual fun currentTimeMillis(): Long = System.currentTimeMillis()
