@@ -28,6 +28,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Build Kotlin iOS framework
+        run: ./gradlew :shared:linkReleaseFrameworkIosArm64
+
       - name: Build unsigned iOS app
         run: |
           xcodebuild \
@@ -37,6 +40,7 @@ jobs:
             -sdk iphoneos \
             -arch arm64 \
             -derivedDataPath build/ios \
+            OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -44,8 +48,16 @@ jobs:
 
       - name: Package unsigned IPA for TrollStore
         run: |
+          APP_DIR="build/ios/Build/Products/Release-iphoneos/wo.mbat.app"
+          if [ ! -d "$APP_DIR/compose-resources" ]; then
+            if [ -d "shared/build/bin/iosArm64/releaseFramework/WombatShared.framework/compose-resources" ]; then
+              cp -R shared/build/bin/iosArm64/releaseFramework/WombatShared.framework/compose-resources "$APP_DIR/"
+            elif [ -d "shared/build/compose/cocoapods/compose-resources" ]; then
+              cp -R shared/build/compose/cocoapods/compose-resources "$APP_DIR/"
+            fi
+          fi
           mkdir -p build/ipa/Payload
-          cp -R build/ios/Build/Products/Release-iphoneos/wo.mbat.app build/ipa/Payload/
+          cp -R "$APP_DIR" build/ipa/Payload/
           cd build/ipa
           zip -r -y ../wo.mbat-ios.ipa Payload
 
