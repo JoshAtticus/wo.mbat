@@ -41,7 +41,11 @@ fun handleWombatDeepLink(url: String) {
     activeHomeViewModel?.handleDeepLink(url)
 }
 
-fun MainViewController(): UIViewController = ComposeUIViewController {
+fun MainViewController(): UIViewController = ComposeUIViewController(
+    configure = {
+        enforceStrictPlistSanityCheck = false
+    }
+) {
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {

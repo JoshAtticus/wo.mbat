@@ -35,13 +35,34 @@ xcodebuild \
 
 echo "==> [3/3] Packaging unsigned IPA for TrollStore..."
 APP_DIR="build/ios/Build/Products/${XC_CONFIG}-iphoneos/wo.mbat.app"
-if [ ! -d "$APP_DIR/compose-resources" ]; then
-  if [ -d "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources" ]; then
-    cp -R "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources" "$APP_DIR/"
-  elif [ -d "shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources" ]; then
-    mkdir -p "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources"
-    cp -R shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources/* \
-      "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources/"
+
+# Copy app icons into the bundle root
+cp iosApp/iosApp/AppIcon*.png "$APP_DIR/"
+
+# Copy Compose Multiplatform resources to both root and compose-resources/ paths
+if [ -d "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources" ]; then
+  cp -R "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources" "$APP_DIR/"
+  cp -R "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources/"* "$APP_DIR/"
+elif [ -d "shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources" ]; then
+  mkdir -p "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources"
+  mkdir -p "$APP_DIR/composeResources/wombat.shared.generated.resources"
+  cp -R shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources/* \
+    "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources/"
+  cp -R shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources/* \
+    "$APP_DIR/composeResources/wombat.shared.generated.resources/"
+fi
+
+# Bundle any back-deployed Swift runtime libraries needed for iOS 14.x (when CODE_SIGNING_ALLOWED=NO skips CopySwiftLibs)
+mkdir -p "$APP_DIR/Frameworks"
+xcrun swift-stdlib-tool \
+  --copy \
+  --scan-executable "$APP_DIR/wo.mbat" \
+  --platform iphoneos \
+  --destination "$APP_DIR/Frameworks" || true
+if otool -L "$APP_DIR/wo.mbat" | grep -q "libswift_Concurrency.dylib"; then
+  CONCURRENCY_DYLIB="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/iphoneos/libswift_Concurrency.dylib"
+  if [ -f "$CONCURRENCY_DYLIB" ] && [ ! -f "$APP_DIR/Frameworks/libswift_Concurrency.dylib" ]; then
+    cp "$CONCURRENCY_DYLIB" "$APP_DIR/Frameworks/"
   fi
 fi
 

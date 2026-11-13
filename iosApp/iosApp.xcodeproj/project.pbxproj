@@ -194,6 +194,7 @@
 					"$(SRCROOT)/../shared/build/bin/iosArm64/debugFramework",
 				);
 				GENERATE_INFOPLIST_FILE = NO;
+				DEAD_CODE_STRIPPING = NO;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -202,10 +203,13 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
+					"-ObjC",
 					"-framework",
 					"WombatShared",
+					"-lsqlite3",
+					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = us.joshattic.wombat;
+				PRODUCT_BUNDLE_IDENTIFIER = wombat.joshattic.us;
 				PRODUCT_NAME = wo.mbat;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -228,6 +232,7 @@
 					"$(SRCROOT)/../shared/build/bin/iosArm64/releaseFramework",
 				);
 				GENERATE_INFOPLIST_FILE = NO;
+				DEAD_CODE_STRIPPING = NO;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -236,10 +241,13 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
+					"-ObjC",
 					"-framework",
 					"WombatShared",
+					"-lsqlite3",
+					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = us.joshattic.wombat;
+				PRODUCT_BUNDLE_IDENTIFIER = wombat.joshattic.us;
 				PRODUCT_NAME = wo.mbat;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
