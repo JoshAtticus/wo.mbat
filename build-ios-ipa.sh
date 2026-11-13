@@ -15,11 +15,19 @@ else
   FW_DIR="debugFramework"
 fi
 
+VERSION_CODE=$(grep -E '^[[:space:]]*versionCode[[:space:]]*=' app/build.gradle.kts | head -n1 | sed -E 's/.*=[[:space:]]*([0-9]+).*/\1/')
+VERSION_NAME=$(grep -E '^[[:space:]]*versionName[[:space:]]*=' app/build.gradle.kts | head -n1 | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')
+
+if [[ -z "$VERSION_CODE" || -z "$VERSION_NAME" ]]; then
+  echo "Error: Failed to read versionCode/versionName from app/build.gradle.kts" >&2
+  exit 1
+fi
+
 echo "==> [1/3] Building Kotlin iOS framework ($XC_CONFIG)..."
 chmod +x ./gradlew
 ./gradlew "$GRADLE_TASK" :shared:assembleIosArm64MainResources
 
-echo "==> [2/3] Building unsigned iOS app ($XC_CONFIG)..."
+echo "==> [2/3] Building unsigned iOS app ($XC_CONFIG, v${VERSION_NAME} (${VERSION_CODE}))..."
 xcodebuild \
   -project iosApp/iosApp.xcodeproj \
   -target iosApp \
@@ -28,6 +36,8 @@ xcodebuild \
   -arch arm64 \
   SYMROOT="$(pwd)/build/ios/Build/Products" \
   OBJROOT="$(pwd)/build/ios/Build/Intermediates.noindex" \
+  MARKETING_VERSION="$VERSION_NAME" \
+  CURRENT_PROJECT_VERSION="$VERSION_CODE" \
   OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES \
   CODE_SIGN_IDENTITY="" \
   CODE_SIGNING_REQUIRED=NO \
