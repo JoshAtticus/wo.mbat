@@ -25,6 +25,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Cache Kotlin/Native toolchain (~/.konan)
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-2.2.10
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
