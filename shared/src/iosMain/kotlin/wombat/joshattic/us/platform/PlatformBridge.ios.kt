@@ -45,12 +45,15 @@ import platform.UIKit.UIPasteboard
 import platform.UIKit.UIScreen
 import platform.UIKit.UIUserInterfaceIdiomPad
 import platform.UIKit.UIViewController
+import platform.UIKit.UIWindow
+import platform.UIKit.endEditing
 import platform.darwin.NSObject
 import platform.darwin.dispatch_get_main_queue
 import platform.posix.memcpy
 import kotlin.system.exitProcess
 
 actual object PlatformConfig {
+    actual val isIOS: Boolean = true
     actual val supportsWearOs: Boolean = false
     actual val supportsDynamicColor: Boolean = false
     actual val supportsAppLinksSettings: Boolean = false
@@ -132,6 +135,19 @@ actual object PlatformActions {
     }
 
     actual fun randomUuid(): String = NSUUID().UUIDString()
+
+    @OptIn(ExperimentalForeignApi::class)
+    actual fun hideKeyboard() {
+        for (window in UIApplication.sharedApplication.windows) {
+            (window as? UIWindow)?.endEditing(true)
+        }
+        UIApplication.sharedApplication.sendAction(
+            platform.Foundation.NSSelectorFromString("resignFirstResponder"),
+            to = null,
+            from = null,
+            forEvent = null
+        )
+    }
 
     actual fun exitApp() {
         exitProcess(0)

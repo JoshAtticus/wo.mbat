@@ -6,17 +6,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -38,6 +41,7 @@ import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.KeyboardHide
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Delete
@@ -46,7 +50,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import wombat.joshattic.us.data.model.AuthSession
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -302,15 +309,34 @@ fun ComposerSheet(
         }
     }
 
+    val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = null,
+        contentWindowInsets = {
+            if (isImeVisible) WindowInsets(0) else BottomSheetDefaults.windowInsets
+        },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        val focusManager = LocalFocusManager.current
+        val keyboardController = LocalSoftwareKeyboardController.current
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    wombat.joshattic.us.platform.PlatformActions.hideKeyboard()
+                }
+                .padding(16.dp)
+        ) {
             Column(
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -710,22 +736,44 @@ fun ComposerSheet(
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
                 }
-                Button(
-                    onClick = {
-                        // Rebuild at submit time so attached images always make it
-                        // into the outgoing HTML even if a draft sync was missed.
-                        onSubmit(buildDraftHtml(null, currentImages))
-                    },
-                    enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
-                    shape = CircleShape,
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .height(48.dp)
-                        .padding(horizontal = 4.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.PostAdd, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isEditing) "Save" else "Post", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    if (wombat.joshattic.us.platform.PlatformConfig.isIOS && isImeVisible) {
+                        IconButton(
+                            onClick = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                wombat.joshattic.us.platform.PlatformActions.hideKeyboard()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.KeyboardHide,
+                                contentDescription = "Hide keyboard",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+                    Button(
+                        onClick = {
+                            // Rebuild at submit time so attached images always make it
+                            // into the outgoing HTML even if a draft sync was missed.
+                            onSubmit(buildDraftHtml(null, currentImages))
+                        },
+                        enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .height(48.dp)
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Filled.PostAdd, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (isEditing) "Save" else "Post", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    }
                 }
             }
         }

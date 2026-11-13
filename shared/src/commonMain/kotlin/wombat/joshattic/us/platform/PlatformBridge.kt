@@ -12,6 +12,7 @@ data class PickedImage(
 )
 
 expect object PlatformConfig {
+    val isIOS: Boolean
     val supportsWearOs: Boolean
     val supportsDynamicColor: Boolean
     val supportsAppLinksSettings: Boolean
@@ -32,6 +33,7 @@ expect object PlatformActions {
     fun syncWearAuth(token: String?, username: String?)
     fun dataStorePath(name: String): Path
     fun randomUuid(): String
+    fun hideKeyboard()
     fun exitApp()
 }
 

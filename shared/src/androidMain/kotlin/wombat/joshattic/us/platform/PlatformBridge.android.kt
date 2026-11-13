@@ -44,6 +44,7 @@ object AndroidPlatformContext {
 }
 
 actual object PlatformConfig {
+    actual val isIOS: Boolean = false
     actual val supportsWearOs: Boolean = true
     actual val supportsDynamicColor: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -163,6 +164,8 @@ actual object PlatformActions {
     }
 
     actual fun randomUuid(): String = UUID.randomUUID().toString()
+
+    actual fun hideKeyboard() {}
 
     actual fun exitApp() {
         Process.killProcess(Process.myPid())
