@@ -348,7 +348,7 @@ fun PostDetailsContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.background)
-                        .navigationBarsPadding()
+                        .then(if (!isImeVisible) Modifier.navigationBarsPadding() else Modifier)
                         .imePadding()
                 ) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

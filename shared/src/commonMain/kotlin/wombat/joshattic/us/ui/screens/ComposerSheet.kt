@@ -700,7 +700,6 @@ fun ComposerSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
                     .imePadding()
             ) {
                 if (errorMessage != null) {
@@ -728,7 +727,6 @@ fun ComposerSheet(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(if (isEditing) "Save" else "Post", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
