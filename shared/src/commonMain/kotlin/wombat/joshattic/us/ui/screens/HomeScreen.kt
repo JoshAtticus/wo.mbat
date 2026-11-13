@@ -634,6 +634,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                         modifier = Modifier
                                             .align(Alignment.BottomEnd)
+                                            .navigationBarsPadding()
                                             .padding(16.dp)
                                             .size(64.dp)
                                     ) {

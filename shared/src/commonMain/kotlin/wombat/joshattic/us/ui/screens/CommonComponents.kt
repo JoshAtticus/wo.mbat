@@ -1851,7 +1851,8 @@ fun HtmlText(
             onTextLayout = { layoutResult ->
                 textLayoutResult = layoutResult
                 if (maxLines != Int.MAX_VALUE) {
-                    val isTruncated = layoutResult.lineCount > maxLines ||
+                    val isTruncated = layoutResult.hasVisualOverflow ||
+                        layoutResult.lineCount > maxLines ||
                         (layoutResult.lineCount == maxLines && layoutResult.isLineEllipsized(maxLines - 1))
                     onTruncatedChanged?.invoke(isTruncated)
                 } else {
@@ -1910,7 +1911,7 @@ fun Modifier.copyableClickable(text: String, label: String = "Username", onClick
 }
 
 // Matches "chud" only when it appears as a standalone word in post bodies
-private val chudWordRegex = Regex("(?i)(^|[^\\p{L}\\p{N}])chud([^\\p{L}\\p{N}]|$)")
+private val chudWordRegex = Regex("(?i)(^|[^A-Za-z0-9])chud([^A-Za-z0-9]|$)")
 // Matches "wo.mbat" only when it appears as a standalone word in post bodies
 private val wombatWordRegex = Regex("(?i)(^|[^A-Za-z0-9])wo\\.mbat([^A-Za-z0-9]|$)")
 

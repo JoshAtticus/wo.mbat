@@ -49,13 +49,18 @@ fun DrawScope.drawQuoteBars(
     color: Color = BrandQuoteColor
 ) {
     val layout = textLayoutResult ?: return
+    if (layout.lineCount == 0 || layout.layoutInput.text.isEmpty()) return
+    val laidOutEnd = layout.getLineEnd(layout.lineCount - 1, visibleEnd = false)
+        .coerceAtMost(layout.layoutInput.text.length)
+    if (laidOutEnd <= 0) return
+    val maxOffset = laidOutEnd - 1
     val quoteAnnotations = annotatedString.getStringAnnotations(QUOTE_ANNOTATION_TAG, 0, annotatedString.length)
     for (ann in quoteAnnotations) {
-        val start = ann.start.coerceIn(0, layout.layoutInput.text.length)
-        val end = (ann.end - 1).coerceIn(start, (layout.layoutInput.text.length - 1).coerceAtLeast(0))
-        if (layout.layoutInput.text.isEmpty()) continue
-        val startLine = layout.getLineForOffset(start)
-        val endLine = layout.getLineForOffset(end)
+        if (ann.start >= ann.end || ann.start > maxOffset) continue
+        val start = ann.start.coerceIn(0, maxOffset)
+        val end = (ann.end - 1).coerceIn(start, maxOffset)
+        val startLine = runCatching { layout.getLineForOffset(start) }.getOrNull() ?: continue
+        val endLine = runCatching { layout.getLineForOffset(end) }.getOrNull() ?: continue
         val top = layout.getLineTop(startLine)
         val bottom = layout.getLineBottom(endLine)
         drawRect(
@@ -75,74 +80,128 @@ fun htmlToAnnotatedString(
     onMentionClick: ((String) -> Unit)? = null,
     onUrlClick: ((String) -> Unit)? = null
 ): AnnotatedString {
-    val tokens = tokenizeHtml(html.trim())
+    val cleanedHtml = html.trim()
+        .replace(Regex("<p[^>]*>(?:\\s|\u00A0)*</p>", RegexOption.IGNORE_CASE), "")
+    val tokens = tokenizeHtml(cleanedHtml)
     val builder = AnnotatedString.Builder()
+    val plainText = StringBuilder()
 
     data class ActiveTag(
         val name: String,
-        val start: Int,
+        var start: Int,
         val href: String? = null
     )
 
     val stack = mutableListOf<ActiveTag>()
     var listIndex = 0
     var inOrderedList = false
+    var pendingNewlines = 0
+    var lastClosedQuoteEnd = -1
 
-    fun appendNewlines(count: Int) {
-        val current = builder.toString()
+    fun requestNewlines(count: Int) {
+        if (plainText.isNotEmpty()) {
+            pendingNewlines = max(pendingNewlines, count)
+        }
+    }
+
+    fun flushPendingNewlines() {
+        if (pendingNewlines <= 0) return
+        if (plainText.isEmpty()) {
+            pendingNewlines = 0
+            return
+        }
+        val boundaryPos = plainText.length
+        val startingQuote = stack.any { it.name == "blockquote" && it.start == boundaryPos }
+        val endingQuote = lastClosedQuoteEnd == boundaryPos
+        // MultiParagraph automatically inserts a paragraph break at the start and end
+        // of a ParagraphStyle range (used by top-level blockquotes). Subtract 1 newline
+        // at those boundaries so we don't get extra blank lines before/after quotes.
+        val effectiveTarget = when {
+            startingQuote && endingQuote -> 0
+            startingQuote || endingQuote -> (pendingNewlines - 1).coerceAtLeast(0)
+            else -> pendingNewlines
+        }
         var existing = 0
-        var i = current.length - 1
-        while (i >= 0 && current[i] == '\n') {
+        var i = plainText.length - 1
+        while (i >= 0 && plainText[i] == '\n') {
             existing++
             i--
         }
-        val needed = (count - existing).coerceAtLeast(0)
-        repeat(needed) { builder.append('\n') }
+        val needed = (effectiveTarget - existing).coerceAtLeast(0)
+        repeat(needed) {
+            builder.append('\n')
+            plainText.append('\n')
+        }
+        val newPos = plainText.length
+        for (active in stack) {
+            if (active.start == boundaryPos) {
+                active.start = newPos
+            }
+        }
+        pendingNewlines = 0
+    }
+
+    fun appendText(str: String) {
+        if (str.isEmpty()) return
+        flushPendingNewlines()
+        builder.append(str)
+        plainText.append(str)
     }
 
     for (token in tokens) {
         when (token) {
             is HtmlToken.Text -> {
-                builder.append(decodeHtmlEntities(token.text))
+                val decoded = decodeHtmlEntities(token.text)
+                val inPre = stack.any { it.name == "pre" }
+                val isFormattingWhitespace = !inPre &&
+                    (pendingNewlines > 0 || plainText.isEmpty() || stack.lastOrNull()?.name == "blockquote") &&
+                    decoded.all { it == '\n' || it == '\r' || it == ' ' || it == '\t' }
+                if (!isFormattingWhitespace) {
+                    appendText(decoded)
+                }
             }
             is HtmlToken.OpenTag -> {
                 val tag = token.name.lowercase()
                 when (tag) {
-                    "br" -> builder.append('\n')
+                    "br" -> {
+                        flushPendingNewlines()
+                        builder.append('\n')
+                        plainText.append('\n')
+                    }
                     "p", "div" -> {
-                        if (builder.length > 0) appendNewlines(2)
-                        stack.add(ActiveTag(tag, builder.length))
+                        requestNewlines(2)
+                        stack.add(ActiveTag(tag, plainText.length))
                     }
                     "blockquote" -> {
-                        if (builder.length > 0) appendNewlines(1)
-                        stack.add(ActiveTag(tag, builder.length))
+                        requestNewlines(2)
+                        stack.add(ActiveTag(tag, plainText.length))
                     }
                     "ul" -> {
-                        if (builder.length > 0) appendNewlines(1)
+                        requestNewlines(1)
                         inOrderedList = false
-                        stack.add(ActiveTag(tag, builder.length))
+                        stack.add(ActiveTag(tag, plainText.length))
                     }
                     "ol" -> {
-                        if (builder.length > 0) appendNewlines(1)
+                        requestNewlines(1)
                         inOrderedList = true
                         listIndex = 0
-                        stack.add(ActiveTag(tag, builder.length))
+                        stack.add(ActiveTag(tag, plainText.length))
                     }
                     "li" -> {
-                        if (builder.length > 0) appendNewlines(1)
+                        requestNewlines(1)
                         if (inOrderedList) {
                             listIndex++
-                            builder.append("$listIndex. ")
+                            appendText("$listIndex. ")
                         } else {
-                            builder.append("• ")
+                            appendText("• ")
                         }
-                        stack.add(ActiveTag(tag, builder.length))
+                        stack.add(ActiveTag(tag, plainText.length))
                     }
                     "h1", "h2", "h3", "h4", "h5", "h6",
                     "b", "strong", "i", "em", "u", "s", "del", "strike",
                     "code", "pre", "a" -> {
-                        if (tag == "pre" && builder.length > 0) appendNewlines(1)
-                        stack.add(ActiveTag(tag, builder.length, token.attrs["href"]))
+                        if (tag == "pre") requestNewlines(1)
+                        stack.add(ActiveTag(tag, plainText.length, token.attrs["href"]))
                     }
                 }
             }
@@ -152,7 +211,7 @@ fun htmlToAnnotatedString(
                 if (idx >= 0) {
                     val active = stack.removeAt(idx)
                     val start = active.start
-                    val end = builder.length
+                    val end = plainText.length
                     if (end > start) {
                         when (tag) {
                             "b", "strong" -> builder.addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, end)
@@ -165,12 +224,21 @@ fun htmlToAnnotatedString(
                             "h3" -> builder.addStyle(SpanStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold), start, end)
                             "h4", "h5", "h6" -> builder.addStyle(SpanStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold), start, end)
                             "blockquote" -> {
-                                builder.addStyle(
-                                    ParagraphStyle(textIndent = TextIndent(firstLine = 11.sp, restLine = 11.sp)),
-                                    start,
-                                    end
-                                )
-                                builder.addStringAnnotation(QUOTE_ANNOTATION_TAG, "quote", start, end)
+                                if (stack.none { it.name == "blockquote" }) {
+                                    var quoteEnd = end
+                                    while (quoteEnd > start && (plainText[quoteEnd - 1] == '\n' || plainText[quoteEnd - 1] == '\r')) {
+                                        quoteEnd--
+                                    }
+                                    if (quoteEnd > start) {
+                                        builder.addStyle(
+                                            ParagraphStyle(textIndent = TextIndent(firstLine = 11.sp, restLine = 11.sp)),
+                                            start,
+                                            quoteEnd
+                                        )
+                                        builder.addStringAnnotation(QUOTE_ANNOTATION_TAG, "quote", start, quoteEnd)
+                                        lastClosedQuoteEnd = quoteEnd
+                                    }
+                                }
                             }
                             "a" -> {
                                 val href = active.href
@@ -199,8 +267,8 @@ fun htmlToAnnotatedString(
                         }
                     }
                     when (tag) {
-                        "p", "div" -> appendNewlines(2)
-                        "blockquote", "pre", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol" -> appendNewlines(1)
+                        "p", "div", "blockquote" -> requestNewlines(2)
+                        "pre", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol" -> requestNewlines(1)
                     }
                 }
             }
@@ -409,7 +477,7 @@ class RichTextEditorState(initialHtml: String = "") {
             val innerHtml = renderLineInlineHtml(lineText, lineStart, lineEnd)
             if (lineIdx in quotedLines) {
                 out.append("<blockquote><p dir=\"ltr\">").append(innerHtml).append("</p></blockquote>")
-            } else if (innerHtml.isNotEmpty() || lineIdx < lines.lastIndex) {
+            } else if (innerHtml.isNotEmpty()) {
                 out.append("<p dir=\"ltr\">").append(innerHtml).append("</p>")
             }
             offset = lineEnd + 1

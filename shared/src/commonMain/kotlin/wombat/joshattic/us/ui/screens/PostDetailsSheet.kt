@@ -26,9 +26,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -186,10 +189,12 @@ fun PostDetailsContent(
         }
         val displayComments = if (focusedComment != null) listOf(focusedComment) else comments
 
+        val navBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(bottom = 96.dp),
+            contentPadding = PaddingValues(bottom = 96.dp + navBottomPadding),
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -343,6 +348,7 @@ fun PostDetailsContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.background)
+                        .navigationBarsPadding()
                         .imePadding()
                 ) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

@@ -17,30 +17,35 @@ fi
 
 echo "==> [1/3] Building Kotlin iOS framework ($XC_CONFIG)..."
 chmod +x ./gradlew
-./gradlew "$GRADLE_TASK"
+./gradlew "$GRADLE_TASK" :shared:assembleIosArm64MainResources
 
 echo "==> [2/3] Building unsigned iOS app ($XC_CONFIG)..."
 xcodebuild \
   -project iosApp/iosApp.xcodeproj \
-  -scheme iosApp \
+  -target iosApp \
   -configuration "$XC_CONFIG" \
   -sdk iphoneos \
   -arch arm64 \
-  -derivedDataPath build/ios \
+  SYMROOT="$(pwd)/build/ios/Build/Products" \
+  OBJROOT="$(pwd)/build/ios/Build/Intermediates.noindex" \
   OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES \
   CODE_SIGN_IDENTITY="" \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGNING_ALLOWED=NO \
   build
 
-echo "==> [3/3] Packaging unsigned IPA for TrollStore..."
+echo "==> [3/3] Packaging unsigned TIPA for TrollStore..."
 APP_DIR="build/ios/Build/Products/${XC_CONFIG}-iphoneos/wo.mbat.app"
 
 # Copy app icons into the bundle root
 cp iosApp/iosApp/AppIcon*.png "$APP_DIR/"
 
 # Copy Compose Multiplatform resources to both root and compose-resources/ paths
-if [ -d "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources" ]; then
+if [ -d "shared/build/generated/compose/resourceGenerator/assembledResources/iosArm64Main/composeResources" ]; then
+  mkdir -p "$APP_DIR/compose-resources"
+  cp -R shared/build/generated/compose/resourceGenerator/assembledResources/iosArm64Main/composeResources "$APP_DIR/compose-resources/"
+  cp -R shared/build/generated/compose/resourceGenerator/assembledResources/iosArm64Main/composeResources "$APP_DIR/"
+elif [ -d "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources" ]; then
   cp -R "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources" "$APP_DIR/"
   cp -R "shared/build/bin/iosArm64/${FW_DIR}/WombatShared.framework/compose-resources/"* "$APP_DIR/"
 elif [ -d "shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources" ]; then
@@ -66,14 +71,14 @@ if otool -L "$APP_DIR/wo.mbat" | grep -q "libswift_Concurrency.dylib"; then
   fi
 fi
 
-rm -rf build/ipa build/wo.mbat-ios.ipa
+rm -rf build/ipa build/wo.mbat-ios.ipa build/wo.mbat-ios.tipa
 mkdir -p build/ipa/Payload
 cp -R "$APP_DIR" build/ipa/Payload/
 (
   cd build/ipa
-  zip -r -y -q ../wo.mbat-ios.ipa Payload
+  zip -r -y -q ../wo.mbat-ios.tipa Payload
 )
 
 echo ""
-echo "Done! IPA ready at: $(pwd)/build/wo.mbat-ios.ipa"
-echo "AirDrop build/wo.mbat-ios.ipa to your device and open in TrollStore."
+echo "Done! TIPA ready at: $(pwd)/build/wo.mbat-ios.tipa"
+echo "AirDrop build/wo.mbat-ios.tipa to your device and open in TrollStore."

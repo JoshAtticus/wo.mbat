@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -215,14 +216,12 @@ private fun renderPreview(
                 .clickable(onClick = openLink)
         ) {
             Row(
-                modifier = Modifier.height(IntrinsicSize.Min),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (imageUrl != null) {
                     Box(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(1f)
+                            .size(88.dp)
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     ) {
                         AsyncImage(
