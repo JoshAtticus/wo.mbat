@@ -1,0 +1,89 @@
+name: Build iOS IPA (TrollStore)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+      - multiplatform
+
+jobs:
+  build-ios-ipa:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache Kotlin/Native toolchain (~/.konan)
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-2.2.10
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build Kotlin iOS framework
+        run: ./gradlew :shared:linkReleaseFrameworkIosArm64
+
+      - name: Build unsigned iOS app
+        run: |
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            -derivedDataPath build/ios \
+            OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA for TrollStore
+        run: |
+          APP_DIR="build/ios/Build/Products/Release-iphoneos/wo.mbat.app"
+          cp iosApp/iosApp/AppIcon*.png "$APP_DIR/"
+          if [ -d "shared/build/bin/iosArm64/releaseFramework/WombatShared.framework/compose-resources" ]; then
+            cp -R shared/build/bin/iosArm64/releaseFramework/WombatShared.framework/compose-resources "$APP_DIR/"
+            cp -R shared/build/bin/iosArm64/releaseFramework/WombatShared.framework/compose-resources/* "$APP_DIR/"
+          elif [ -d "shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources" ]; then
+            mkdir -p "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources"
+            mkdir -p "$APP_DIR/composeResources/wombat.shared.generated.resources"
+            cp -R shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources/* "$APP_DIR/compose-resources/composeResources/wombat.shared.generated.resources/"
+            cp -R shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources/* "$APP_DIR/composeResources/wombat.shared.generated.resources/"
+          fi
+          mkdir -p "$APP_DIR/Frameworks"
+          xcrun swift-stdlib-tool \
+            --copy \
+            --scan-executable "$APP_DIR/wo.mbat" \
+            --platform iphoneos \
+            --destination "$APP_DIR/Frameworks" || true
+          if otool -L "$APP_DIR/wo.mbat" | grep -q "libswift_Concurrency.dylib"; then
+            CONCURRENCY_DYLIB="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/iphoneos/libswift_Concurrency.dylib"
+            if [ -f "$CONCURRENCY_DYLIB" ] && [ ! -f "$APP_DIR/Frameworks/libswift_Concurrency.dylib" ]; then
+              cp "$CONCURRENCY_DYLIB" "$APP_DIR/Frameworks/"
+            fi
+          fi
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_DIR" build/ipa/Payload/
+          cd build/ipa
+          zip -r -y ../wo.mbat-ios.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wo.mbat-ios-ipa
+          path: build/wo.mbat-ios.ipa

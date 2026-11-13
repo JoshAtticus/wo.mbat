@@ -24,3 +24,6 @@ app/release/output-metadata.json
 .idea/deploymentTargetSelector.xml
 *.salive
 .commandcode/taste/taste.md
+/shared/build/
+/.kotlin/
+/.idea/

@@ -16,9 +16,6 @@ import wombat.joshattic.us.data.repository.WombatRepository
 import wombat.joshattic.us.data.storage.AuthPreferences
 import wombat.joshattic.us.data.storage.BlockedUsersDatabase
 import wombat.joshattic.us.data.storage.SettingsPreferences
-import wombat.joshattic.us.ui.screens.HomeScreen
-import wombat.joshattic.us.ui.screens.SplashOverlay
-import wombat.joshattic.us.ui.theme.WombatTheme
 import wombat.joshattic.us.ui.viewmodel.HomeViewModel
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import wombat.joshattic.us.wear.WearSyncService
@@ -31,18 +28,13 @@ class MainActivity : ComponentActivity() {
     private val repository: WombatRepository by lazy {
         WombatRepository(
             apiService = RetrofitClient.apiService,
-            authPreferences = AuthPreferences(applicationContext),
-            blockedUsersDatabase = BlockedUsersDatabase(applicationContext),
-            settingsPreferences = SettingsPreferences(applicationContext)
+            authPreferences = AuthPreferences(),
+            blockedUsersDatabase = BlockedUsersDatabase(),
+            settingsPreferences = SettingsPreferences()
         )
     }
     private val homeViewModel: HomeViewModel by viewModels {
-        HomeViewModel.factory(repository, applicationContext)
-    }
-
-    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
-        wombat.joshattic.us.ui.screens.clearTextSelectionOnOutsideTouch(this, ev)
-        return super.dispatchTouchEvent(ev)
+        HomeViewModel.factory(repository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,27 +78,10 @@ class MainActivity : ComponentActivity() {
             val deepLink = pendingDeepLink
             pendingDeepLink = null
             if (deepLink != null) {
-                homeViewModel.handleDeepLink(deepLink)
+                homeViewModel.handleDeepLink(deepLink.toString())
             }
 
-            val useCustomTheme = uiState.themeSource == "custom"
-            val useDynamic = useCustomTheme && uiState.customThemeDynamic &&
-                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S_V2
-            val themeUserColor = if (useCustomTheme && !useDynamic) uiState.customThemeColor else uiState.accountProfile?.color
-
-            WombatTheme(userColor = themeUserColor, dynamicColor = useDynamic) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    wombat.joshattic.us.ui.screens.LocalOnViewReposts provides { post ->
-                        homeViewModel.openReposts(post)
-                    },
-                    wombat.joshattic.us.ui.screens.LocalShowBlockedQuoteRevealButton provides uiState.showBlockedQuoteRevealButton,
-                    wombat.joshattic.us.ui.screens.LocalShowBlockedCommentRevealButton provides uiState.showBlockedCommentRevealButton
-                ) {
-                    SplashOverlay {
-                        HomeScreen(viewModel = homeViewModel)
-                    }
-                }
-            }
+            WombatApp(homeViewModel = homeViewModel)
         }
     }
 
@@ -114,7 +89,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         intent.extractDeepLink()?.let { deepLink ->
-            homeViewModel.handleDeepLink(deepLink)
+            homeViewModel.handleDeepLink(deepLink.toString())
         }
     }
 

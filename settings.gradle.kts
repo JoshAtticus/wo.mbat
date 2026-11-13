@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "wo.mbat"
 include(":app")
+include(":shared")
 include(":wear")
