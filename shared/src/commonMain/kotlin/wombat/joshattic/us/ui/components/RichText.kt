@@ -93,8 +93,7 @@ fun htmlToAnnotatedString(
     )
 
     val stack = mutableListOf<ActiveTag>()
-    var listIndex = 0
-    var inOrderedList = false
+    val listStack = mutableListOf<HtmlListContext>()
     var pendingNewlines = 0
     var lastClosedQuoteEnd = -1
 
@@ -153,8 +152,9 @@ fun htmlToAnnotatedString(
             is HtmlToken.Text -> {
                 val decoded = decodeHtmlEntities(token.text)
                 val inPre = stack.any { it.name == "pre" }
+                val lastTag = stack.lastOrNull()?.name
                 val isFormattingWhitespace = !inPre &&
-                    (pendingNewlines > 0 || plainText.isEmpty() || stack.lastOrNull()?.name == "blockquote") &&
+                    (pendingNewlines > 0 || plainText.isEmpty() || lastTag in LIST_OR_QUOTE_CONTAINER_TAGS) &&
                     decoded.all { it == '\n' || it == '\r' || it == ' ' || it == '\t' }
                 if (!isFormattingWhitespace) {
                     appendText(decoded)
@@ -169,7 +169,10 @@ fun htmlToAnnotatedString(
                         plainText.append('\n')
                     }
                     "p", "div" -> {
-                        requestNewlines(2)
+                        val atLiStart = stack.lastOrNull { it.name == "li" }?.start == plainText.length && pendingNewlines == 0
+                        if (!atLiStart) {
+                            requestNewlines(2)
+                        }
                         stack.add(ActiveTag(tag, plainText.length))
                     }
                     "blockquote" -> {
@@ -178,22 +181,23 @@ fun htmlToAnnotatedString(
                     }
                     "ul" -> {
                         requestNewlines(1)
-                        inOrderedList = false
+                        listStack.add(HtmlListContext(ordered = false))
                         stack.add(ActiveTag(tag, plainText.length))
                     }
                     "ol" -> {
                         requestNewlines(1)
-                        inOrderedList = true
-                        listIndex = 0
+                        listStack.add(HtmlListContext(ordered = true))
                         stack.add(ActiveTag(tag, plainText.length))
                     }
                     "li" -> {
                         requestNewlines(1)
-                        if (inOrderedList) {
-                            listIndex++
-                            appendText("$listIndex. ")
+                        val currentList = listStack.lastOrNull()
+                        val indent = if (listStack.size > 1) "  ".repeat(listStack.size - 1) else ""
+                        if (currentList?.ordered == true) {
+                            currentList.index++
+                            appendText("$indent${currentList.index}. ")
                         } else {
-                            appendText("• ")
+                            appendText("$indent• ")
                         }
                         stack.add(ActiveTag(tag, plainText.length))
                     }
@@ -267,8 +271,19 @@ fun htmlToAnnotatedString(
                         }
                     }
                     when (tag) {
-                        "p", "div", "blockquote" -> requestNewlines(2)
-                        "pre", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol" -> requestNewlines(1)
+                        "p", "div" -> {
+                            val inListItem = stack.any { it.name == "li" }
+                            requestNewlines(if (inListItem) 1 else 2)
+                        }
+                        "blockquote" -> requestNewlines(2)
+                        "li" -> requestNewlines(1)
+                        "ul", "ol" -> {
+                            if (listStack.isNotEmpty()) {
+                                listStack.removeAt(listStack.lastIndex)
+                            }
+                            requestNewlines(if (listStack.isEmpty()) 2 else 1)
+                        }
+                        "pre", "h1", "h2", "h3", "h4", "h5", "h6" -> requestNewlines(1)
                     }
                 }
             }
@@ -282,6 +297,11 @@ fun htmlToAnnotatedString(
     }
     return if (trimmedLen < raw.length) raw.subSequence(0, trimmedLen) else raw
 }
+
+private data class HtmlListContext(val ordered: Boolean, var index: Int = 0)
+
+private val LIST_OR_QUOTE_CONTAINER_TAGS = setOf("ul", "ol", "li", "blockquote")
+private val ORDERED_LIST_LINE_REGEX = Regex("^(\\d+)\\. (.*)$")
 
 private sealed class HtmlToken {
     data class Text(val text: String) : HtmlToken()
@@ -471,17 +491,55 @@ class RichTextEditorState(initialHtml: String = "") {
         val lines = text.split('\n')
         val out = StringBuilder()
         var offset = 0
+        var openListTag: String? = null
+
+        fun closeListIfOpen() {
+            openListTag?.let {
+                out.append("</").append(it).append('>')
+                openListTag = null
+            }
+        }
+
+        fun ensureListOpen(tag: String) {
+            if (openListTag != tag) {
+                closeListIfOpen()
+                out.append('<').append(tag).append('>')
+                openListTag = tag
+            }
+        }
+
         lines.forEachIndexed { lineIdx, lineText ->
             val lineStart = offset
             val lineEnd = offset + lineText.length
-            val innerHtml = renderLineInlineHtml(lineText, lineStart, lineEnd)
             if (lineIdx in quotedLines) {
-                out.append("<blockquote><p dir=\"ltr\">").append(innerHtml).append("</p></blockquote>")
-            } else if (innerHtml.isNotEmpty()) {
-                out.append("<p dir=\"ltr\">").append(innerHtml).append("</p>")
+                closeListIfOpen()
+                val innerHtml = renderLineInlineHtml(lineText, lineStart, lineEnd)
+                out.append("<blockquote><p dir=\"ltr\">")
+                    .append(innerHtml.ifEmpty { "<br>" })
+                    .append("</p></blockquote>")
+            } else if (lineText.startsWith("• ")) {
+                ensureListOpen("ul")
+                val innerHtml = renderLineInlineHtml(lineText.substring(2), lineStart + 2, lineEnd)
+                out.append("<li><p dir=\"ltr\">").append(innerHtml).append("</p></li>")
+            } else {
+                val orderedMatch = ORDERED_LIST_LINE_REGEX.matchEntire(lineText)
+                val itemNumber = orderedMatch?.groupValues?.get(1)?.toIntOrNull()
+                if (orderedMatch != null && (openListTag == "ol" || itemNumber == 1)) {
+                    ensureListOpen("ol")
+                    val prefixLen = orderedMatch.groupValues[1].length + 2
+                    val innerHtml = renderLineInlineHtml(orderedMatch.groupValues[2], lineStart + prefixLen, lineEnd)
+                    out.append("<li><p dir=\"ltr\">").append(innerHtml).append("</p></li>")
+                } else {
+                    closeListIfOpen()
+                    val innerHtml = renderLineInlineHtml(lineText, lineStart, lineEnd)
+                    if (innerHtml.isNotEmpty()) {
+                        out.append("<p dir=\"ltr\">").append(innerHtml).append("</p>")
+                    }
+                }
             }
             offset = lineEnd + 1
         }
+        closeListIfOpen()
         return out.toString()
     }
 
@@ -706,12 +764,16 @@ class RichTextEditorState(initialHtml: String = "") {
     )
 
     private fun parseHtmlForEditor(html: String): ParsedEditorContent {
-        if (html.isEmpty()) return ParsedEditorContent("", emptyList(), emptySet())
-        val tokens = tokenizeHtml(html)
+        val cleanedHtml = html.trim()
+            .replace(Regex("<p[^>]*>(?:\\s|\u00A0)*</p>", RegexOption.IGNORE_CASE), "")
+        if (cleanedHtml.isEmpty()) return ParsedEditorContent("", emptyList(), emptySet())
+        val tokens = tokenizeHtml(cleanedHtml)
         val text = StringBuilder()
         val spans = mutableListOf<RichSpan>()
         val quotes = mutableSetOf<Int>()
-        val stack = mutableListOf<Pair<String, Int>>()
+        data class EditorTag(val name: String, val start: Int)
+        val stack = mutableListOf<EditorTag>()
+        val listStack = mutableListOf<HtmlListContext>()
         var inQuote = false
 
         fun appendNewlineIfNeeded(minNewlines: Int) {
@@ -729,11 +791,18 @@ class RichTextEditorState(initialHtml: String = "") {
             when (token) {
                 is HtmlToken.Text -> {
                     val decoded = decodeHtmlEntities(token.text)
-                    val startLine = text.count { it == '\n' }
-                    text.append(decoded)
-                    if (inQuote) {
-                        val endLine = text.count { it == '\n' }
-                        for (l in startLine..endLine) quotes.add(l)
+                    val inPre = stack.any { it.name == "pre" }
+                    val lastTag = stack.lastOrNull()?.name
+                    val isFormattingWhitespace = !inPre &&
+                        (lastTag in LIST_OR_QUOTE_CONTAINER_TAGS || (stack.isEmpty() && (text.isEmpty() || text.endsWith('\n')))) &&
+                        decoded.all { it == '\n' || it == '\r' || it == ' ' || it == '\t' }
+                    if (!isFormattingWhitespace) {
+                        val startLine = text.count { it == '\n' }
+                        text.append(decoded)
+                        if (inQuote) {
+                            val endLine = text.count { it == '\n' }
+                            for (l in startLine..endLine) quotes.add(l)
+                        }
                     }
                 }
                 is HtmlToken.OpenTag -> {
@@ -744,24 +813,55 @@ class RichTextEditorState(initialHtml: String = "") {
                             if (inQuote) quotes.add(text.count { it == '\n' })
                         }
                         "p", "div" -> {
-                            appendNewlineIfNeeded(1)
-                            stack.add(tag to text.length)
+                            val inListItem = stack.any { it.name == "li" }
+                            val atLiStart = stack.lastOrNull { it.name == "li" }?.start == text.length
+                            if (!atLiStart) {
+                                appendNewlineIfNeeded(if (inListItem || inQuote) 1 else 2)
+                            }
+                            stack.add(EditorTag(tag, text.length))
                         }
                         "blockquote" -> {
-                            appendNewlineIfNeeded(1)
+                            appendNewlineIfNeeded(2)
                             inQuote = true
-                            stack.add(tag to text.length)
+                            stack.add(EditorTag(tag, text.length))
+                        }
+                        "ul" -> {
+                            appendNewlineIfNeeded(if (listStack.isEmpty()) 2 else 1)
+                            listStack.add(HtmlListContext(ordered = false))
+                            stack.add(EditorTag(tag, text.length))
+                        }
+                        "ol" -> {
+                            appendNewlineIfNeeded(if (listStack.isEmpty()) 2 else 1)
+                            listStack.add(HtmlListContext(ordered = true))
+                            stack.add(EditorTag(tag, text.length))
+                        }
+                        "li" -> {
+                            appendNewlineIfNeeded(1)
+                            val currentList = listStack.lastOrNull()
+                            val indent = if (listStack.size > 1) "  ".repeat(listStack.size - 1) else ""
+                            if (currentList?.ordered == true) {
+                                currentList.index++
+                                text.append("$indent${currentList.index}. ")
+                            } else {
+                                text.append("$indent• ")
+                            }
+                            stack.add(EditorTag(tag, text.length))
+                        }
+                        "h1", "h2", "h3", "h4", "h5", "h6", "pre" -> {
+                            appendNewlineIfNeeded(2)
+                            stack.add(EditorTag(tag, text.length))
                         }
                         "b", "strong", "i", "em", "u", "s", "del", "strike" -> {
-                            stack.add(tag to text.length)
+                            stack.add(EditorTag(tag, text.length))
                         }
                     }
                 }
                 is HtmlToken.CloseTag -> {
                     val tag = token.name.lowercase()
-                    val idx = stack.indexOfLast { it.first == tag }
+                    val idx = stack.indexOfLast { it.name == tag }
                     if (idx >= 0) {
-                        val (_, start) = stack.removeAt(idx)
+                        val active = stack.removeAt(idx)
+                        val start = active.start
                         val end = text.length
                         if (end > start) {
                             when (tag) {
@@ -771,11 +871,27 @@ class RichTextEditorState(initialHtml: String = "") {
                                 "s", "del", "strike" -> spans.add(RichSpan(start, end, RichFormat.STRIKETHROUGH))
                             }
                         }
-                        if (tag == "blockquote") {
-                            inQuote = false
-                            appendNewlineIfNeeded(1)
-                        } else if (tag == "p" || tag == "div") {
-                            appendNewlineIfNeeded(1)
+                        when (tag) {
+                            "blockquote" -> {
+                                inQuote = stack.any { it.name == "blockquote" }
+                                appendNewlineIfNeeded(if (inQuote) 1 else 2)
+                            }
+                            "p", "div" -> {
+                                val inListItem = stack.any { it.name == "li" }
+                                appendNewlineIfNeeded(if (inListItem || inQuote) 1 else 2)
+                            }
+                            "li" -> {
+                                appendNewlineIfNeeded(1)
+                            }
+                            "h1", "h2", "h3", "h4", "h5", "h6", "pre" -> {
+                                appendNewlineIfNeeded(2)
+                            }
+                            "ul", "ol" -> {
+                                if (listStack.isNotEmpty()) {
+                                    listStack.removeAt(listStack.lastIndex)
+                                }
+                                appendNewlineIfNeeded(if (listStack.isEmpty()) 2 else 1)
+                            }
                         }
                     }
                 }
