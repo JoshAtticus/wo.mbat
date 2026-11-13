@@ -25,3 +25,5 @@ app/release/output-metadata.json
 *.salive
 .commandcode/taste/taste.md
 /shared/build/
+/.kotlin/
+/.idea/
