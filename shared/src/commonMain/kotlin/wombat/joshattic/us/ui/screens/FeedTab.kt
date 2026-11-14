@@ -91,7 +91,6 @@ fun FeedTab(
     blockedQuoteHandling: String = "warning"
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val refreshState = rememberPullToRefreshState()
 
     var wasAtTopBeforeUpdate by remember { mutableStateOf(true) }
     var previousTopPostId by remember { mutableStateOf<String?>(null) }

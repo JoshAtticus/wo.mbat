@@ -35,7 +35,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import coil3.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -181,7 +180,7 @@ private fun renderPreview(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable(onClick = openLink)
             ) {
-                SubcomposeAsyncImage(
+                AsyncImage(
                     model = imageUrl,
                     contentDescription = title ?: "Link preview from $domain",
                     contentScale = ContentScale.FillWidth,

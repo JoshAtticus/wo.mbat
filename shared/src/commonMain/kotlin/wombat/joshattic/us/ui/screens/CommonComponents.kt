@@ -900,9 +900,10 @@ fun PostCard(
                                 )
                             }
                         }
+                        val formattedTime = remember(post.time) { formatTime(post.time) }
                         Text(
                             // womp: client name/version shown after a dot next to the timestamp in details
-                            clientMetadataLabel?.let { "${formatTime(post.time)} · $it" } ?: formatTime(post.time),
+                            clientMetadataLabel?.let { "$formattedTime · $it" } ?: formattedTime,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -941,15 +942,17 @@ fun PostCard(
                             IconButton(onClick = { menuExpanded = true }) {
                                 Icon(Icons.Filled.MoreVert, contentDescription = "Post options")
                             }
-                            PostActionsMenu(
-                                expanded = menuExpanded,
-                                onDismiss = { menuExpanded = false },
-                                postId = post.id,
-                                onBlock = if (!isOwnPost) onBlockUser?.let { { menuExpanded = false; it(post.poster.name) } } else null,
-                                onReport = if (!isOwnPost) onReportPost?.let { { menuExpanded = false; it(post) } } else null,
-                                onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null,
-                                onEdit = if (isOwnPost) onEditPost?.let { { menuExpanded = false; it(post) } } else null
-                            )
+                            if (menuExpanded) {
+                                PostActionsMenu(
+                                    expanded = menuExpanded,
+                                    onDismiss = { menuExpanded = false },
+                                    postId = post.id,
+                                    onBlock = if (!isOwnPost) onBlockUser?.let { { menuExpanded = false; it(post.poster.name) } } else null,
+                                    onReport = if (!isOwnPost) onReportPost?.let { { menuExpanded = false; it(post) } } else null,
+                                    onDelete = if (isOwnPost) onDeletePost?.let { { menuExpanded = false; it(post) } } else null,
+                                    onEdit = if (isOwnPost) onEditPost?.let { { menuExpanded = false; it(post) } } else null
+                                )
+                            }
                         }
                     }
                 }
@@ -965,7 +968,7 @@ fun PostCard(
                     onClick = onClick,
                     openLinksInApp = openLinksInApp,
                     onTruncatedChanged = { isActuallyTruncated = it },
-                    selectable = true
+                    selectable = !truncated
                 )
                 if (isActuallyTruncated) {
                     Text(
@@ -1093,7 +1096,7 @@ fun PostCard(
                                     onPostClick = onPostClickById,
                                     onClick = { onPostClick?.invoke(repostPost) },
                                     openLinksInApp = openLinksInApp,
-                                    selectable = true
+                                    selectable = !truncated
                                 )
                             }
                         }
@@ -1134,46 +1137,48 @@ fun PostCard(
                         onClick = if (onRepostClick != null || onQuoteClick != null) { { repostMenuExpanded = true } } else null,
                         shape = RoundedCornerShape(28.dp)
                     )
-                    DropdownMenu(
-                        expanded = repostMenuExpanded,
-                        onDismissRequest = { repostMenuExpanded = false },
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                        tonalElevation = 3.dp
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Repost") },
-                            leadingIcon = { Icon(Icons.Filled.Repeat, contentDescription = null) },
-                            onClick = {
-                                repostMenuExpanded = false
-                                onRepostClick?.invoke(post)
-                            }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Quote") },
-                            leadingIcon = { Icon(Icons.Filled.FormatQuote, contentDescription = null) },
-                            onClick = {
-                                repostMenuExpanded = false
-                                onQuoteClick?.invoke(post)
-                            }
-                        )
-                        val onViewReposts = LocalOnViewReposts.current.takeIf { post.reposts > 0 }
-                        if (onViewReposts != null) {
+                    if (repostMenuExpanded) {
+                        DropdownMenu(
+                            expanded = repostMenuExpanded,
+                            onDismissRequest = { repostMenuExpanded = false },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                            tonalElevation = 3.dp
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Repost") },
+                                leadingIcon = { Icon(Icons.Filled.Repeat, contentDescription = null) },
+                                onClick = {
+                                    repostMenuExpanded = false
+                                    onRepostClick?.invoke(post)
+                                }
+                            )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             )
                             DropdownMenuItem(
-                                text = { Text("View reposts") },
-                                leadingIcon = { Icon(Icons.Filled.Groups, contentDescription = null) },
+                                text = { Text("Quote") },
+                                leadingIcon = { Icon(Icons.Filled.FormatQuote, contentDescription = null) },
                                 onClick = {
                                     repostMenuExpanded = false
-                                    onViewReposts(post)
+                                    onQuoteClick?.invoke(post)
                                 }
                             )
+                            val onViewReposts = LocalOnViewReposts.current.takeIf { post.reposts > 0 }
+                            if (onViewReposts != null) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("View reposts") },
+                                    leadingIcon = { Icon(Icons.Filled.Groups, contentDescription = null) },
+                                    onClick = {
+                                        repostMenuExpanded = false
+                                        onViewReposts(post)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -1700,18 +1705,23 @@ fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderCo
     val cleanUsername = username.trim().lowercase()
     val imageRequest = remember(cleanUsername, cacheBuster) {
         val url = "https://wasteof-image-proxy.tnix.dev/$cleanUsername?t=SKV8xWyDpBwzIg6Hz42EapKh5RKvb7N3"
-        ImageRequest.Builder(platformContext)
+        val builder = ImageRequest.Builder(platformContext)
             .data(url)
-            .crossfade(true)
-            .httpHeaders(
-                NetworkHeaders.Builder()
-                    .set("Cache-Control", "no-cache")
-                    .set("Pragma", "no-cache")
-                    .build()
-            )
-            .diskCachePolicy(CachePolicy.DISABLED)
+            .crossfade(false)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .build()
+        if (cacheBuster != null) {
+            builder
+                .httpHeaders(
+                    NetworkHeaders.Builder()
+                        .set("Cache-Control", "no-cache")
+                        .set("Pragma", "no-cache")
+                        .build()
+                )
+                .diskCachePolicy(CachePolicy.DISABLED)
+        } else {
+            builder.diskCachePolicy(CachePolicy.ENABLED)
+        }
+        builder.build()
     }
 
     if (borderColor != null) {
@@ -1725,21 +1735,25 @@ fun ProfilePicture(username: String, size: androidx.compose.ui.unit.Dp, borderCo
                     .clip(CircleShape)
                     .border(borderWidth, borderColor, CircleShape)
             )
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = imageRequest,
                 contentDescription = username,
-                loading = { CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp) },
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(size - 6.dp)
                     .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             )
         }
     } else {
-        SubcomposeAsyncImage(
+        AsyncImage(
             model = imageRequest,
             contentDescription = username,
-            loading = { CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp) },
-            modifier = Modifier.size(size).clip(CircleShape)
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
         )
     }
 }
@@ -1942,6 +1956,50 @@ fun PostMetric(
 ) {
     val haptic = LocalHapticFeedback.current
     val isLoveMetric = label == "loves"
+
+    if (!isLoveMetric) {
+        val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        val contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        Surface(
+            shape = shape,
+            color = containerColor,
+            contentColor = contentColor,
+            modifier = Modifier
+                .heightIn(min = 32.dp)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = shape
+                )
+                .then(
+                    if (onClick != null) Modifier.clickable(enabled = enabled) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    } else Modifier
+                )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(16.dp),
+                    tint = contentColor
+                )
+                Text(
+                    text = value.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor
+                )
+            }
+        }
+        return
+    }
+
     val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
 
     // Easter egg: liking a post containing "chud" as its own word plays the
@@ -1950,17 +2008,19 @@ fun PostMetric(
     // only on an actual tap, never from reloaded like status.
     var chudPending by remember { mutableStateOf(false) }
     var chudActive by remember { mutableStateOf(false) }
-    // Wait for the like request to finish loading before starting the chud
-    // phase, so the usual loading spinner is still visible.
-    LaunchedEffect(chudPending, pulse) {
-        if (!chudPending || pulse) return@LaunchedEffect
-        chudActive = true
-        chudPending = false
-    }
-    LaunchedEffect(chudActive) {
-        if (chudActive) {
-            delay(2500)
-            chudActive = false
+    if (isChud != null) {
+        // Wait for the like request to finish loading before starting the chud
+        // phase, so the usual loading spinner is still visible.
+        LaunchedEffect(chudPending, pulse) {
+            if (!chudPending || pulse) return@LaunchedEffect
+            chudActive = true
+            chudPending = false
+        }
+        LaunchedEffect(chudActive) {
+            if (chudActive) {
+                delay(2500)
+                chudActive = false
+            }
         }
     }
     val chudMode = isChud != null && chudActive
@@ -1972,11 +2032,7 @@ fun PostMetric(
             MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
         }
         isActive -> {
-            if (isLoveMetric) {
-                if (isDarkTheme) Color(0xFF5C1D24) else Color(0xFFFEE2E2)
-            } else {
-                MaterialTheme.colorScheme.primaryContainer
-            }
+            if (isDarkTheme) Color(0xFF5C1D24) else Color(0xFFFEE2E2)
         }
         else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
@@ -1986,11 +2042,7 @@ fun PostMetric(
         chudMode && isChud == "wombat" -> if (isDarkTheme) Color(0xFFA5A7FF) else Color(0xFF5B5EA8)
         !enabled && !pulse -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
         isActive -> {
-            if (isLoveMetric) {
-                if (isDarkTheme) Color(0xFFFF8A80) else Color(0xFFEF4444)
-            } else {
-                MaterialTheme.colorScheme.primary
-            }
+            if (isDarkTheme) Color(0xFFFF8A80) else Color(0xFFEF4444)
         }
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -2000,16 +2052,19 @@ fun PostMetric(
     val contentColor by animateColorAsState(rawContentColor, tween(300), label = "MetricContentColor")
 
     var animMode by remember { mutableStateOf(0) }
+    var prevActive by remember { mutableStateOf(isActive) }
     // Pop the icon bigger on activation, hold for a moment, then shrink back
     // to normal instead of staying enlarged while it stays active.
     val iconScale = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(isActive, chudMode) {
-        if (isActive || chudMode) {
+        val transitionedToActive = isActive && !prevActive
+        prevActive = isActive
+        if (transitionedToActive || chudMode) {
             iconScale.snapTo(1f)
             iconScale.animateTo(1.35f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
             delay(1000)
             iconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
-        } else {
+        } else if (iconScale.value != 1f) {
             iconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
         }
     }
@@ -2027,7 +2082,7 @@ fun PostMetric(
             iconOffsetY.animateTo(-4f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
             delay(1000)
             iconOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
-        } else {
+        } else if (iconOffsetY.value != 0f) {
             iconOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
         }
     }
@@ -2457,10 +2512,9 @@ fun PostImageCarousel(
                 .precision(Precision.INEXACT)
                 .build()
         }
-        SubcomposeAsyncImage(
+        AsyncImage(
             model = imageRequest,
             contentDescription = "Post image",
-            loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
             modifier = modifier
                 .fillMaxWidth()
                 .then(
@@ -2471,6 +2525,7 @@ fun PostImageCarousel(
                     }
                 )
                 .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .clickable { onImageClick(images, 0) },
             contentScale = if (isDetailView) ContentScale.FillWidth else ContentScale.Crop
         )
@@ -2495,12 +2550,12 @@ fun PostImageCarousel(
                     .precision(Precision.INEXACT)
                     .build()
             }
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = imageRequest,
                 contentDescription = "Post image ${page + 1}",
-                loading = { Box(contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable { onImageClick(images, page) },
                 contentScale = ContentScale.Crop
             )
@@ -2551,7 +2606,7 @@ fun PostImageSquares(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable { onImageClick(images, index) }
             ) {
-                SubcomposeAsyncImage(
+                AsyncImage(
                     model = imageRequest,
                     contentDescription = "Post image ${index + 1}",
                     contentScale = ContentScale.Crop,
