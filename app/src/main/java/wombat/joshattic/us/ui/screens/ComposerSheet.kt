@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +39,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -91,10 +94,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.text.HtmlCompat
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.launch
@@ -169,6 +176,7 @@ fun ComposerSheet(
     errorMessage: String? = null
 ) {
     val haptic = LocalHapticFeedback.current
+    val isTablet = LocalConfiguration.current.screenWidthDp >= 600
     var accountMenuExpanded by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -253,125 +261,98 @@ fun ComposerSheet(
     }
 
     if (showDraftsDialog) {
-        val draftsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val dismissDraftsSheet: () -> Unit = {
-            coroutineScope.launch {
-                draftsSheetState.hide()
-            }.invokeOnCompletion {
-                showDraftsDialog = false
-            }
-        }
-
-        ModalBottomSheet(
-            onDismissRequest = { showDraftsDialog = false },
-            sheetState = draftsSheetState,
-            containerColor = MaterialTheme.colorScheme.background,
-            dragHandle = null
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.7f)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+        if (isTablet) {
+            Dialog(
+                onDismissRequest = { showDraftsDialog = false },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .systemBarsPadding()
+                        .padding(24.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { showDraftsDialog = false }
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Drafts Manager", style = MaterialTheme.typography.headlineSmall)
-                    IconButton(onClick = { dismissDraftsSheet() }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Close")
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 580.dp)
+                            .heightIn(min = 360.dp, max = 560.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {}
+                            ),
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.background,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 16.dp
+                    ) {
+                        DraftsManagerContent(
+                            drafts = drafts,
+                            onRestoreDraft = { d ->
+                                onRestoreDraft(d)
+                                showDraftsDialog = false
+                            },
+                            onDeleteDraft = onDeleteDraft,
+                            onClose = { showDraftsDialog = false },
+                            modifier = Modifier.fillMaxSize().padding(20.dp)
+                        )
                     }
                 }
+            }
+        } else {
+            val draftsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val dismissDraftsSheet: () -> Unit = {
+                coroutineScope.launch {
+                    draftsSheetState.hide()
+                }.invokeOnCompletion {
+                    showDraftsDialog = false
+                }
+            }
 
-                if (drafts.isEmpty()) {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.PostAdd,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                            Text(
-                                "No saved drafts yet",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "Drafts are saved automatically when you\nclose the composer with text in it.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Fixed(2),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalItemSpacing = 8.dp
-                    ) {
-                        items(drafts) { d ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    HtmlText(
-                                        html = d,
-                                        modifier = Modifier.padding(bottom = 8.dp),
-                                        maxLines = 10
-                                    )
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        IconButton(onClick = {
-                                            onRestoreDraft(d)
-                                            dismissDraftsSheet()
-                                        }) {
-                                            Icon(Icons.Filled.Restore, contentDescription = "Restore", tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                        IconButton(onClick = { onDeleteDraft(d) }) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            ModalBottomSheet(
+                onDismissRequest = { showDraftsDialog = false },
+                sheetState = draftsSheetState,
+                containerColor = MaterialTheme.colorScheme.background,
+                dragHandle = null
+            ) {
+                DraftsManagerContent(
+                    drafts = drafts,
+                    onRestoreDraft = { d ->
+                        onRestoreDraft(d)
+                        dismissDraftsSheet()
+                    },
+                    onDeleteDraft = onDeleteDraft,
+                    onClose = dismissDraftsSheet,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.7f)
+                        .padding(16.dp)
+                )
             }
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        dragHandle = null,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+    val composerBody: @Composable () -> Unit = {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(if (isTablet) 24.dp else 16.dp)
+        ) {
             Column(
                 modifier = Modifier
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(if (isTablet) 14.dp else 12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -473,19 +454,39 @@ fun ComposerSheet(
                             }
                         }
                     }
-                    if (!isEditing) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.clickable { showDraftsDialog = true }
-                        ) {
-                            Text(
-                                text = "Drafts (${drafts.size})",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (!isEditing) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier.clickable { showDraftsDialog = true }
+                            ) {
+                                Text(
+                                    text = "Drafts (${drafts.size})",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                        if (isTablet) {
+                            IconButton(
+                                onClick = onDismiss,
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                ),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Close composer",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -512,105 +513,116 @@ fun ComposerSheet(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(if (isTablet) 18.dp else 24.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
+                    val formatButtons: @Composable () -> Unit = {
+                        FormatToggleButton(
+                            icon = Icons.Filled.FormatBold,
+                            contentDescription = "Bold",
+                            active = isBoldActive,
                             onClick = {
                                 richEditTextRef?.let { editText ->
                                     toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.BOLD) }, { it.style == Typeface.BOLD })
                                     updateFormattingStates(editText)
                                 }
-                            },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isBoldActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (isBoldActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.size(42.dp)
-                        ) {
-                            Icon(Icons.Filled.FormatBold, contentDescription = "Bold", modifier = Modifier.size(20.dp))
-                        }
-                        IconButton(
+                            }
+                        )
+                        FormatToggleButton(
+                            icon = Icons.Filled.FormatItalic,
+                            contentDescription = "Italic",
+                            active = isItalicActive,
                             onClick = {
                                 richEditTextRef?.let { editText ->
                                     toggleSpan(editText, StyleSpan::class.java, { StyleSpan(Typeface.ITALIC) }, { it.style == Typeface.ITALIC })
                                     updateFormattingStates(editText)
                                 }
-                            },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isItalicActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (isItalicActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.size(42.dp)
-                        ) {
-                            Icon(Icons.Filled.FormatItalic, contentDescription = "Italic", modifier = Modifier.size(20.dp))
-                        }
-                        IconButton(
+                            }
+                        )
+                        FormatToggleButton(
+                            icon = Icons.Filled.FormatStrikethrough,
+                            contentDescription = "Strikethrough",
+                            active = isStrikethroughActive,
                             onClick = {
                                 richEditTextRef?.let { editText ->
                                     toggleSpan(editText, StrikethroughSpan::class.java, { StrikethroughSpan() })
                                     updateFormattingStates(editText)
                                 }
-                            },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isStrikethroughActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (isStrikethroughActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.size(42.dp)
-                        ) {
-                            Icon(Icons.Filled.FormatStrikethrough, contentDescription = "Strikethrough", modifier = Modifier.size(20.dp))
-                        }
-                        IconButton(
+                            }
+                        )
+                        FormatToggleButton(
+                            icon = Icons.Filled.FormatUnderlined,
+                            contentDescription = "Underline",
+                            active = isUnderlineActive,
                             onClick = {
                                 richEditTextRef?.let { editText ->
                                     toggleSpan(editText, UnderlineSpan::class.java, { UnderlineSpan() })
                                     updateFormattingStates(editText)
                                 }
-                            },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isUnderlineActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (isUnderlineActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.size(42.dp)
-                        ) {
-                            Icon(Icons.Filled.FormatUnderlined, contentDescription = "Underline", modifier = Modifier.size(20.dp))
-                        }
-                        IconButton(
+                            }
+                        )
+                        FormatToggleButton(
+                            icon = Icons.Filled.FormatQuote,
+                            contentDescription = "Blockquote",
+                            active = isQuoteActive,
                             onClick = {
                                 richEditTextRef?.let { editText ->
                                     toggleBlockquote(editText)
                                     updateFormattingStates(editText)
                                 }
-                            },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isQuoteActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (isQuoteActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.size(42.dp)
+                            }
+                        )
+                    }
+                    val launchImagePicker = {
+                        imageUploadError = null
+                        imagePickerLauncher.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    }
+                    if (isTablet) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Filled.FormatQuote, contentDescription = "Blockquote", modifier = Modifier.size(20.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                formatButtons()
+                            }
+                            TextButton(
+                                onClick = launchImagePicker,
+                                enabled = !isUploadingImage,
+                                shape = RoundedCornerShape(14.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Add image", style = MaterialTheme.typography.labelLarge)
+                            }
                         }
-                        IconButton(
-                            onClick = {
-                                imageUploadError = null
-                                imagePickerLauncher.launch(
-                                    androidx.activity.result.PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.ImageOnly
-                                    )
-                                )
-                            },
-                            enabled = !isUploadingImage,
-                            modifier = Modifier.size(42.dp)
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(20.dp))
+                            formatButtons()
+                            IconButton(
+                                onClick = launchImagePicker,
+                                enabled = !isUploadingImage,
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Icon(Icons.Filled.Image, contentDescription = "Add image", modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
@@ -658,7 +670,10 @@ fun ComposerSheet(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 220.dp)
+                            .then(
+                                if (isTablet) Modifier.heightIn(min = 180.dp, max = 320.dp)
+                                else Modifier.heightIn(min = 220.dp)
+                            )
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
                             .border(borderWidth, borderColors, RoundedCornerShape(20.dp))
                             .clickable(
@@ -755,12 +770,14 @@ fun ComposerSheet(
                         )
                     }
 
-                    Text(
-                        text = "$charCount / ${HomeViewModel.MAX_CHAR_COUNT} characters",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (charCount > HomeViewModel.MAX_CHAR_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.End)
-                    )
+                    if (!isTablet) {
+                        Text(
+                            text = "$charCount / ${HomeViewModel.MAX_CHAR_COUNT} characters",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (charCount > HomeViewModel.MAX_CHAR_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.End)
+                        )
+                    }
                 }
 
                 if (currentImages.isNotEmpty()) {
@@ -803,39 +820,229 @@ fun ComposerSheet(
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (isTablet) 14.dp else 16.dp))
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .imePadding()
+                    .then(if (isTablet) Modifier else Modifier.imePadding())
             ) {
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 4.dp)
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
                     )
                 }
-                Button(
-                    onClick = {
-                        // Rebuild at submit time so attached images always make it
-                        // into the outgoing HTML even if a draft sync was missed.
-                        onSubmit(buildDraftHtml(lastTextHtml, currentImages))
-                    },
-                    enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
-                    shape = CircleShape,
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .height(48.dp)
-                        .padding(horizontal = 4.dp)
-                ) {
-                    Icon(Icons.Filled.PostAdd, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isEditing) "Save" else "Post", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                if (isTablet) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "$charCount / ${HomeViewModel.MAX_CHAR_COUNT} characters",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (charCount > HomeViewModel.MAX_CHAR_COUNT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = {
+                                // Rebuild at submit time so attached images always make it
+                                // into the outgoing HTML even if a draft sync was missed.
+                                onSubmit(buildDraftHtml(lastTextHtml, currentImages))
+                            },
+                            enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
+                            shape = CircleShape,
+                            modifier = Modifier.height(44.dp)
+                        ) {
+                            Icon(Icons.Filled.PostAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isEditing) "Save" else "Post", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            // Rebuild at submit time so attached images always make it
+                            // into the outgoing HTML even if a draft sync was missed.
+                            onSubmit(buildDraftHtml(lastTextHtml, currentImages))
+                        },
+                        enabled = (charCount > 0 || currentImages.isNotEmpty()) && charCount <= HomeViewModel.MAX_CHAR_COUNT,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .height(48.dp)
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Filled.PostAdd, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (isEditing) "Save" else "Post", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+
+    if (isTablet) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 32.dp, vertical = 20.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onDismiss
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 640.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {}
+                        ),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 16.dp
+                ) {
+                    composerBody()
+                }
+            }
+        }
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            dragHandle = null,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ) {
+            composerBody()
+        }
+    }
+}
+
+@Composable
+private fun FormatToggleButton(
+    icon: ImageVector,
+    contentDescription: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+            contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+        ),
+        modifier = Modifier.size(40.dp)
+    ) {
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun DraftsManagerContent(
+    drafts: List<String>,
+    onRestoreDraft: (String) -> Unit,
+    onDeleteDraft: (String) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Drafts Manager", style = MaterialTheme.typography.headlineSmall)
+            IconButton(onClick = onClose) {
+                Icon(Icons.Filled.Close, contentDescription = "Close")
+            }
+        }
+
+        if (drafts.isEmpty()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.PostAdd,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                    Text(
+                        "No saved drafts yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Drafts are saved automatically when you\nclose the composer with text in it.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(2),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalItemSpacing = 8.dp
+            ) {
+                items(drafts) { d ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            HtmlText(
+                                html = d,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                maxLines = 10
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                IconButton(onClick = { onRestoreDraft(d) }) {
+                                    Icon(Icons.Filled.Restore, contentDescription = "Restore", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(onClick = { onDeleteDraft(d) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
