@@ -177,10 +177,16 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.TextLayoutResult
+import wombat.joshattic.us.platform.PlatformConfig
+import wombat.joshattic.us.platform.currentTimeMillis
 import wombat.joshattic.us.ui.components.drawQuoteBars
 import wombat.joshattic.us.ui.components.htmlToAnnotatedString
 import androidx.compose.ui.window.Dialog
@@ -965,7 +971,7 @@ fun PostCard(
                     maxLines = if (truncated) 6 else Int.MAX_VALUE,
                     onMentionClick = onMentionClick,
                     onPostClick = onPostClickById,
-                    onClick = onClick,
+                    onClick = if (clickable) onClick else null,
                     openLinksInApp = openLinksInApp,
                     onTruncatedChanged = { isActuallyTruncated = it },
                     selectable = !truncated
@@ -1845,14 +1851,89 @@ fun HtmlText(
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val density = LocalDensity.current
     val quoteStripeWidthPx = with(density) { QUOTE_STRIPE_WIDTH_DP.dp.toPx().coerceAtLeast(1f) }
+    val useMacMouseSelection = selectable && PlatformConfig.isMac
+    val selectionHighlightColor = LocalTextSelectionColors.current.backgroundColor
+    var macSelectionRange by remember(annotatedText) { mutableStateOf<TextRange?>(null) }
+    var showMacSelectionMenu by remember(annotatedText) { mutableStateOf(false) }
 
-    val interactionModifier = when {
+    val baseInteractionModifier = when {
         copyOnLongPress -> modifier.combinedClickable(
             onClick = { onClick?.invoke() },
             onLongClick = { copyTextToClipboard(copyLabel, annotatedText.text.trim()) }
         )
         onClick != null -> modifier.clickable { onClick() }
         else -> modifier
+    }
+
+    val interactionModifier = if (useMacMouseSelection) {
+        val dragThresholdPx = with(density) { 4.dp.toPx() }
+        baseInteractionModifier
+            .pointerHoverIcon(PointerIcon.Text)
+            .pointerInput(annotatedText) {
+                var lastClickTime = 0L
+                var lastClickPos = Offset.Zero
+                var lastClickCount = 0
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val layout = textLayoutResult ?: return@awaitEachGesture
+                    val downPos = down.position
+                    val downTime = currentTimeMillis()
+                    val isMultiClick = (downTime - lastClickTime) <= viewConfiguration.doubleTapTimeoutMillis &&
+                        (downPos - lastClickPos).getDistance() <= viewConfiguration.touchSlop * 2f
+                    val clickCount = if (isMultiClick) lastClickCount + 1 else 1
+                    lastClickTime = downTime
+                    lastClickPos = downPos
+                    lastClickCount = clickCount
+
+                    var dragging = false
+                    val startOffset = layout.getOffsetForPosition(downPos)
+                        .coerceIn(0, annotatedText.length)
+
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                            ?: event.changes.firstOrNull()
+                            ?: break
+
+                        if (!change.pressed) {
+                            if (dragging) {
+                                change.consume()
+                                showMacSelectionMenu = macSelectionRange?.let { !it.collapsed } == true
+                            } else if (clickCount == 2 && annotatedText.isNotEmpty()) {
+                                val safeOffset = startOffset.coerceIn(0, (annotatedText.length - 1).coerceAtLeast(0))
+                                val wordRange = layout.getWordBoundary(safeOffset)
+                                macSelectionRange = wordRange
+                                showMacSelectionMenu = !wordRange.collapsed
+                            } else if (clickCount >= 3 && annotatedText.isNotEmpty()) {
+                                macSelectionRange = TextRange(0, annotatedText.length)
+                                showMacSelectionMenu = true
+                            } else {
+                                macSelectionRange = null
+                                showMacSelectionMenu = false
+                            }
+                            break
+                        }
+
+                        val threshold = minOf(viewConfiguration.touchSlop, dragThresholdPx)
+                        if (!dragging && (change.position - downPos).getDistance() > threshold) {
+                            dragging = true
+                            showMacSelectionMenu = false
+                        }
+
+                        if (dragging) {
+                            change.consume()
+                            val currentOffset = layout.getOffsetForPosition(change.position)
+                                .coerceIn(0, annotatedText.length)
+                            macSelectionRange = TextRange(
+                                minOf(startOffset, currentOffset),
+                                maxOf(startOffset, currentOffset)
+                            )
+                        }
+                    }
+                }
+            }
+    } else {
+        baseInteractionModifier
     }
 
     val textContent: @Composable () -> Unit = {
@@ -1874,8 +1955,20 @@ fun HtmlText(
                 }
             },
             modifier = interactionModifier.drawBehind {
+                val activeRange = macSelectionRange
+                val layout = textLayoutResult
+                if (useMacMouseSelection && activeRange != null && !activeRange.collapsed && layout != null) {
+                    val safeStart = activeRange.min.coerceIn(0, annotatedText.length)
+                    val safeEnd = activeRange.max.coerceIn(0, annotatedText.length)
+                    if (safeStart < safeEnd) {
+                        drawPath(
+                            path = layout.getPathForRange(safeStart, safeEnd),
+                            color = selectionHighlightColor
+                        )
+                    }
+                }
                 drawQuoteBars(
-                    textLayoutResult = textLayoutResult,
+                    textLayoutResult = layout,
                     annotatedString = annotatedText,
                     stripeWidthPx = quoteStripeWidthPx
                 )
@@ -1883,7 +1976,50 @@ fun HtmlText(
         )
     }
 
-    if (selectable) {
+    if (useMacMouseSelection) {
+        Box {
+            textContent()
+            val activeRange = macSelectionRange
+            val layout = textLayoutResult
+            if (showMacSelectionMenu && activeRange != null && !activeRange.collapsed && layout != null) {
+                val safeStart = activeRange.min.coerceIn(0, annotatedText.length)
+                val safeEnd = activeRange.max.coerceIn(0, annotatedText.length)
+                val anchorRect = if (safeStart < safeEnd) {
+                    layout.getBoundingBox(safeStart)
+                } else {
+                    androidx.compose.ui.geometry.Rect.Zero
+                }
+                val menuOffset = with(density) {
+                    DpOffset(anchorRect.left.toDp(), anchorRect.bottom.toDp())
+                }
+                DropdownMenu(
+                    expanded = true,
+                    onDismissRequest = {
+                        showMacSelectionMenu = false
+                        macSelectionRange = null
+                    },
+                    offset = menuOffset
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Copy") },
+                        onClick = {
+                            if (safeStart < safeEnd) {
+                                copyTextToClipboard("Text", annotatedText.text.substring(safeStart, safeEnd))
+                            }
+                            showMacSelectionMenu = false
+                            macSelectionRange = null
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Select All") },
+                        onClick = {
+                            macSelectionRange = TextRange(0, annotatedText.length)
+                        }
+                    )
+                }
+            }
+        }
+    } else if (selectable) {
         SelectionContainer {
             textContent()
         }
