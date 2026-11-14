@@ -30,6 +30,7 @@ import platform.Foundation.NSUUID
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.preferredLanguages
 import platform.Foundation.timeIntervalSince1970
+import platform.GameController.GCKeyboard
 import platform.Network.nw_path_get_status
 import platform.Network.nw_path_monitor_cancel
 import platform.Network.nw_path_monitor_create
@@ -70,6 +71,8 @@ actual object PlatformConfig {
                 (info.valueForKey("macCatalystApp") as? NSNumber)?.boolValue == true
             return onMac || catalyst
         }
+    actual val hasHardwareKeyboard: Boolean
+        get() = GCKeyboard.coalescedKeyboard != null
     actual val supportsWearOs: Boolean = false
     actual val supportsDynamicColor: Boolean = false
     actual val supportsAppLinksSettings: Boolean = false

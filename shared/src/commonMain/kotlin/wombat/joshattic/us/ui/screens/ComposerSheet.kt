@@ -309,7 +309,13 @@ fun ComposerSheet(
         }
     }
 
-    val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val density = LocalDensity.current
+    val imeBottomDp = with(density) { WindowInsets.ime.getBottom(this).toDp() }
+    val isImeVisible = imeBottomDp > 0.dp
+    val showHideKeyboardButton = wombat.joshattic.us.platform.PlatformConfig.isIOS &&
+        !wombat.joshattic.us.platform.PlatformConfig.isMac &&
+        !wombat.joshattic.us.platform.PlatformConfig.hasHardwareKeyboard &&
+        imeBottomDp >= 120.dp
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -741,7 +747,7 @@ fun ComposerSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (wombat.joshattic.us.platform.PlatformConfig.isIOS && isImeVisible) {
+                    if (showHideKeyboardButton) {
                         IconButton(
                             onClick = {
                                 focusManager.clearFocus()

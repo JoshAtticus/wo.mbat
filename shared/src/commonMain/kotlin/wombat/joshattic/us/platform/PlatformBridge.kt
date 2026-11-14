@@ -15,6 +15,7 @@ data class PickedImage(
 expect object PlatformConfig {
     val isIOS: Boolean
     val isMac: Boolean
+    val hasHardwareKeyboard: Boolean
     val supportsWearOs: Boolean
     val supportsDynamicColor: Boolean
     val supportsAppLinksSettings: Boolean
