@@ -21,11 +21,7 @@ import platform.Foundation.NSDate
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSLocale
-import platform.Foundation.NSNumber
-import platform.Foundation.NSProcessInfo
-import platform.Foundation.NSSelectorFromString
 import platform.Foundation.NSURL
-import platform.Foundation.valueForKey
 import platform.Foundation.NSUUID
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.preferredLanguages
@@ -61,16 +57,13 @@ import kotlin.system.exitProcess
 
 actual object PlatformConfig {
     actual val isIOS: Boolean = true
-    @OptIn(ExperimentalForeignApi::class)
+    private var _isMac: Boolean = false
     actual val isMac: Boolean
-        get() {
-            val info = NSProcessInfo.processInfo
-            val onMac = info.respondsToSelector(NSSelectorFromString("isiOSAppOnMac")) &&
-                (info.valueForKey("iOSAppOnMac") as? NSNumber)?.boolValue == true
-            val catalyst = info.respondsToSelector(NSSelectorFromString("isMacCatalystApp")) &&
-                (info.valueForKey("macCatalystApp") as? NSNumber)?.boolValue == true
-            return onMac || catalyst
-        }
+        get() = _isMac
+
+    fun setIsMac(value: Boolean) {
+        _isMac = value
+    }
     actual val hasHardwareKeyboard: Boolean
         get() = GCKeyboard.coalescedKeyboard != null
     actual val supportsWearOs: Boolean = false

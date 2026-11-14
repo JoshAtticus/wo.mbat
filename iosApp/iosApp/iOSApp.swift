@@ -148,6 +148,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
         }
 
+        if #available(iOS 14.0, *) {
+            PlatformConfig.shared.setIsMac(
+                value: ProcessInfo.processInfo.isiOSAppOnMac || ProcessInfo.processInfo.isMacCatalystApp
+            )
+        }
+
         let window = UIWindow(frame: UIScreen.main.bounds)
         if let url = crashLogURL(),
            FileManager.default.fileExists(atPath: url.path),
