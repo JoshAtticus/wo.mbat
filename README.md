@@ -11,7 +11,7 @@ You can get it for **Android** from [Google Play](https://play.google.com/store/
 
 For **iOS**, as I do not have an Apple Developer Account and do not intend on paying $99 per year for one, you must sideload wo.mbat onto your device. 
 
-There are various ways to do this, for example using Impactor with a normal Apple ID (must be reinstalled every 7 days), paid signing certs (these can be had for a few dollars and last about a year), TrollStore (iOS 14.0-17.0, never has to be reinstalled unless you update your phone which breaks TrollStore) or TrollStore Lite for jailbroken devices.
+There are various ways to do this, for example using Impactor with a normal Apple ID (must be reinstalled every 7 days), paid signing certs (these can be had for a few dollars and last about a year), TrollStore (iOS 14.0-17.0 with exceptions, never has to be reinstalled unless you update your phone which breaks TrollStore) or TrollStore Lite for jailbroken devices.
 
 If this is all new to you, I recommend looking up a tutorial online. https://ios.cfw.guide is great for TrollStore and Jailbreak related stuff.
 
