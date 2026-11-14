@@ -187,12 +187,16 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.TextLayoutResult
 import wombat.joshattic.us.platform.PlatformConfig
 import wombat.joshattic.us.platform.currentTimeMillis
+import wombat.joshattic.us.platform.fullScreenDialogProperties
 import wombat.joshattic.us.ui.components.drawQuoteBars
 import wombat.joshattic.us.ui.components.htmlToAnnotatedString
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
@@ -2773,18 +2777,49 @@ fun FullScreenImageViewer(
     val displayUsername = username ?: post?.poster?.name ?: comment?.poster?.name
     var showUiControls by remember { mutableStateOf(true) }
     var isZoomedIn by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val transitionProgress = remember { Animatable(0f) }
+    var isDismissing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        transitionProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+        )
+    }
+
+    fun dismissWithAnimation() {
+        if (isDismissing) return
+        isDismissing = true
+        coroutineScope.launch {
+            transitionProgress.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing)
+            )
+            onDismiss()
+        }
+    }
 
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false
-        )
+        onDismissRequest = ::dismissWithAnimation,
+        properties = fullScreenDialogProperties()
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.Black
+        val progress = transitionProgress.value
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = progress))
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = progress
+                        val s = 0.92f + 0.08f * progress
+                        scaleX = s
+                        scaleY = s
+                    }
+            ) {
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
@@ -2878,7 +2913,7 @@ fun FullScreenImageViewer(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = onDismiss,
+                            onClick = ::dismissWithAnimation,
                             modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
                         ) {
                             Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)

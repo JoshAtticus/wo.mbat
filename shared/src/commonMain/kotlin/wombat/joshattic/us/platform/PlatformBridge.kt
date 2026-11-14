@@ -2,6 +2,7 @@ package wombat.joshattic.us.platform
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.flow.Flow
 import okio.Path
 
@@ -71,3 +72,5 @@ inline fun <T> PlatformLock.withLock(block: () -> T): T {
 }
 
 expect fun currentTimeMillis(): Long
+
+expect fun fullScreenDialogProperties(): DialogProperties

@@ -18,6 +18,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -270,3 +272,9 @@ actual class PlatformLock {
 }
 
 actual fun currentTimeMillis(): Long = System.currentTimeMillis()
+
+@OptIn(ExperimentalComposeUiApi::class)
+actual fun fullScreenDialogProperties(): DialogProperties = DialogProperties(
+    usePlatformDefaultWidth = false,
+    decorFitsSystemWindows = false
+)

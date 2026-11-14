@@ -3,6 +3,8 @@ package wombat.joshattic.us.platform
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
@@ -300,3 +302,9 @@ actual class PlatformLock {
 }
 
 actual fun currentTimeMillis(): Long = (NSDate().timeIntervalSince1970 * 1000.0).toLong()
+
+actual fun fullScreenDialogProperties(): DialogProperties = DialogProperties(
+    usePlatformDefaultWidth = false,
+    usePlatformInsets = false,
+    scrimColor = Color.Transparent
+)
