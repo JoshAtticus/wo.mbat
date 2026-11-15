@@ -44,6 +44,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
@@ -3255,64 +3257,135 @@ fun ReportDialog(
         "Other"
     )
     var selectedPreset by remember { mutableStateOf(presets.first()) }
+    val coroutineScope = rememberCoroutineScope()
+    val transition = remember { Animatable(0f) }
+    var isDismissing by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                presets.forEach { preset ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedPreset = preset }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = selectedPreset == preset,
-                            onClick = { selectedPreset = preset }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(preset, style = MaterialTheme.typography.bodyLarge)
+    LaunchedEffect(Unit) {
+        transition.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+        )
+    }
+
+    fun dismissWithAnimation() {
+        if (isDismissing) return
+        isDismissing = true
+        coroutineScope.launch {
+            transition.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 150, easing = FastOutLinearInEasing)
+            )
+            onDismiss()
+        }
+    }
+
+    val progress = transition.value
+    val scrimAlpha = if (PlatformConfig.isIOS) 0.52f * progress else 0f
+
+    Dialog(
+        onDismissRequest = { if (!loading) dismissWithAnimation() },
+        properties = fullScreenDialogProperties()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = scrimAlpha))
+                .systemBarsPadding()
+                .padding(24.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { if (!loading) dismissWithAnimation() }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .widthIn(min = 280.dp, max = 560.dp)
+                    .graphicsLayer {
+                        alpha = progress
+                        val s = 0.94f + 0.06f * progress
+                        scaleX = s
+                        scaleY = s
                     }
-                }
-                if (selectedPreset == "Other") {
-                    OutlinedTextField(
-                        value = reason,
-                        onValueChange = onReasonChange,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        label = { Text("Reason") },
-                        singleLine = true
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val finalReason = if (selectedPreset == "Other") {
-                        reason
-                    } else {
-                        "$selectedPreset - Reported with wo.mbat"
-                    }
-                    onSubmit(finalReason)
-                },
-                enabled = !loading && (selectedPreset != "Other" || reason.isNotBlank())
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 6.dp
             ) {
-                if (loading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Report")
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        presets.forEach { preset ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedPreset = preset }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedPreset == preset,
+                                    onClick = { selectedPreset = preset }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(preset, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                        if (selectedPreset == "Other") {
+                            OutlinedTextField(
+                                value = reason,
+                                onValueChange = onReasonChange,
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                label = { Text("Reason") },
+                                singleLine = true
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = ::dismissWithAnimation,
+                            enabled = !loading
+                        ) {
+                            Text("Cancel")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                val finalReason = if (selectedPreset == "Other") {
+                                    reason
+                                } else {
+                                    "$selectedPreset - Reported with wo.mbat"
+                                }
+                                onSubmit(finalReason)
+                            },
+                            enabled = !loading && (selectedPreset != "Other" || reason.isNotBlank())
+                        ) {
+                            if (loading) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text("Report")
+                            }
+                        }
+                    }
                 }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !loading) {
-                Text("Cancel")
             }
         }
-    )
+    }
 }
 
 @Composable

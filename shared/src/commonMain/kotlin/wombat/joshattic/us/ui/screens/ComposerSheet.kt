@@ -2,6 +2,10 @@
 
 package wombat.joshattic.us.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -91,6 +95,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -136,6 +141,35 @@ fun ComposerSheet(
     var accountMenuExpanded by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
+    val tabletTransition = remember { Animatable(0f) }
+    var isDismissingTablet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isTablet) {
+        if (isTablet) {
+            tabletTransition.snapTo(0f)
+            tabletTransition.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+            )
+        }
+    }
+
+    val handleDismiss: () -> Unit = if (isTablet) {
+        {
+            if (!isDismissingTablet) {
+                isDismissingTablet = true
+                coroutineScope.launch {
+                    tabletTransition.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 160, easing = FastOutLinearInEasing)
+                    )
+                    onDismiss()
+                }
+            }
+        }
+    } else {
+        onDismiss
+    }
     var imageUploadError by remember { mutableStateOf<String?>(null) }
     var isUploadingImage by remember { mutableStateOf(false) }
     var uploadCurrent by remember { mutableStateOf(0) }
@@ -441,7 +475,7 @@ fun ComposerSheet(
                         }
                         if (isTablet) {
                             IconButton(
-                                onClick = onDismiss,
+                                onClick = handleDismiss,
                                 colors = IconButtonDefaults.iconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ),
@@ -844,20 +878,23 @@ fun ComposerSheet(
     }
 
     if (isTablet) {
+        val progress = tabletTransition.value
+        val scrimAlpha = if (wombat.joshattic.us.platform.PlatformConfig.isIOS) 0.52f * progress else 0f
         Dialog(
-            onDismissRequest = onDismiss,
+            onDismissRequest = handleDismiss,
             properties = fullScreenDialogProperties()
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(Color.Black.copy(alpha = scrimAlpha))
                     .systemBarsPadding()
                     .imePadding()
                     .padding(horizontal = 32.dp, vertical = 20.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        onClick = onDismiss
+                        onClick = handleDismiss
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -865,6 +902,12 @@ fun ComposerSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 640.dp)
+                        .graphicsLayer {
+                            alpha = progress
+                            val s = 0.94f + 0.06f * progress
+                            scaleX = s
+                            scaleY = s
+                        }
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
